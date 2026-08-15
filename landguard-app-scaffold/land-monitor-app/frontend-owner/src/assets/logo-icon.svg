@@ -1,0 +1,65 @@
+<svg viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="lensGlass" cx="40%" cy="35%" r="70%">
+      <stop offset="0%" stop-color="#5CE1FF" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#5CE1FF" stop-opacity="0.04"/>
+    </radialGradient>
+    <radialGradient id="globeGradient" cx="35%" cy="30%" r="75%">
+      <stop offset="0%" stop-color="#1677FF"/>
+      <stop offset="100%" stop-color="#0d1733"/>
+    </radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Globe base -->
+  <circle cx="100" cy="140" r="65" fill="url(#globeGradient)" stroke="#3BA7FF" stroke-width="2.5"/>
+
+  <!-- Latitude curves -->
+  <path d="M 35 118 Q 100 96 165 118" fill="none" stroke="#5CE1FF" stroke-opacity="0.4" stroke-width="2"/>
+  <path d="M 35 140 Q 100 166 165 140" fill="none" stroke="#5CE1FF" stroke-opacity="0.3" stroke-width="2"/>
+  <path d="M 35 162 Q 100 182 165 162" fill="none" stroke="#5CE1FF" stroke-opacity="0.2" stroke-width="2"/>
+
+  <!-- Landmasses -->
+  <path d="M 70 108 L 92 94 L 112 100 L 121 121 L 106 141 L 84 146 L 68 130 Z" fill="#0d1733"/>
+  <path d="M 58 162 L 74 151 L 90 166 L 84 187 L 63 191 L 52 175 Z" fill="#0d1733"/>
+
+  <!-- Surveyed parcel grid, sitting on the second landmass -->
+  <g stroke="#AAB7D4" stroke-width="1" stroke-opacity="0.65">
+    <line x1="63" y1="158" x2="63" y2="185"/>
+    <line x1="72" y1="155" x2="72" y2="187"/>
+    <line x1="81" y1="158" x2="81" y2="184"/>
+    <line x1="56" y1="167" x2="88" y2="167"/>
+    <line x1="55" y1="176" x2="87" y2="176"/>
+  </g>
+
+  <!-- Clip so the globe stays within its circle -->
+  <clipPath id="globeClip">
+    <circle cx="100" cy="140" r="65"/>
+  </clipPath>
+  <g clip-path="url(#globeClip)"></g>
+
+  <!-- Magnifying lens, watching over the globe's edge -->
+  <circle cx="150" cy="80" r="34" fill="url(#lensGlass)" stroke="#5CE1FF" stroke-width="7" filter="url(#glow)"/>
+
+  <!-- Crosshair, precision-instrument feel -->
+  <g stroke="#080F24" stroke-opacity="0.5" stroke-width="1.5">
+    <line x1="150" y1="58" x2="150" y2="102"/>
+    <line x1="128" y1="80" x2="172" y2="80"/>
+  </g>
+
+  <!-- Radar sweep wedge -->
+  <path d="M 150 80 L 150 50 A 30 30 0 0 1 176 65 Z" fill="#1677FF" fill-opacity="0.4"/>
+
+  <!-- Watching pulse at the center of the lens -->
+  <circle cx="150" cy="80" r="9" fill="none" stroke="#5CE1FF" stroke-width="1.5" stroke-opacity="0.6"/>
+  <circle cx="150" cy="80" r="4" fill="#5CE1FF"/>
+
+  <!-- Handle -->
+  <line x1="173.8" y1="103.8" x2="212.3" y2="142.3" stroke="#1677FF" stroke-width="10" stroke-linecap="round"/>
+</svg>
