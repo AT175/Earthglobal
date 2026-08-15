@@ -4,7 +4,7 @@ import styled from 'styled-components';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { MapPin, ArrowRight, Ruler } from 'lucide-react';
-import { Card, Badge, Skeleton, AreaBarChart } from '@earthglobal/design-system';
+import { Card, Badge, Skeleton, AreaBarChart, AlertTrendChart } from '@earthglobal/design-system';
 import api from '../services/api';
 import OwnerLayout from '../components/OwnerLayout';
 
@@ -80,15 +80,17 @@ const ChartTitle = styled.h2`
 export default function Dashboard() {
   const { t } = useTranslation();
   const [parcels, setParcels] = useState([]);
+  const [alertTrends, setAlertTrends] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    api
-      .get('/parcels')
-      .then((res) => setParcels(res.data))
+    const loadParcels = api.get('/parcels').then((res) => setParcels(res.data));
+    const loadTrends = api.get('/alerts/trends').then((res) => setAlertTrends(res.data));
+
+    Promise.all([loadParcels, loadTrends])
       .catch((err) => {
-        console.error('Failed to load parcels', err);
+        console.error('Failed to load dashboard data', err);
         setError(t('dashboard.error'));
       })
       .finally(() => setLoading(false));
@@ -127,6 +129,13 @@ export default function Dashboard() {
             data={parcels.map((p) => ({ name: p.name, value: p.area_sqm / 10000 }))}
             unit="ha"
           />
+        </ChartCard>
+      )}
+
+      {!loading && !error && parcels.length > 0 && alertTrends.length > 0 && (
+        <ChartCard>
+          <ChartTitle>{t('dashboard.alertTrend')}</ChartTitle>
+          <AlertTrendChart data={alertTrends} />
         </ChartCard>
       )}
 

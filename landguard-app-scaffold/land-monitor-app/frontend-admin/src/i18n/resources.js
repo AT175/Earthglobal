@@ -22,6 +22,7 @@ export default {
         status: 'Status',
         active: 'Active',
         inactive: 'Inactive',
+        performance: 'Completed visits by agent',
       },
       parcels: {
         title: 'All Parcels',
@@ -53,6 +54,7 @@ export default {
         status: 'Estado',
         active: 'Activo',
         inactive: 'Inactivo',
+        performance: 'Visitas completadas por agente',
       },
       parcels: {
         title: 'Todas las parcelas',

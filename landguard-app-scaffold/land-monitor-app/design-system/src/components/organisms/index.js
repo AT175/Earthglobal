@@ -12,3 +12,5 @@ export {
 export { default as ParcelMap } from './ParcelMap';
 export { mapStyles, parcelPolygonStyles, mapTypeOptions } from './mapStyles';
 export { default as AreaBarChart } from './AreaBarChart';
+export { default as AlertTrendChart } from './AlertTrendChart';
+export { default as AgentPerformanceChart } from './AgentPerformanceChart';

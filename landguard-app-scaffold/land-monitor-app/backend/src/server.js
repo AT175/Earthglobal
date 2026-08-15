@@ -8,6 +8,7 @@ const surveySessionRoutes = require('./routes/surveySessions.routes');
 const visitRequestRoutes = require('./routes/visitRequests.routes');
 const subscriptionRoutes = require('./routes/subscriptions.routes');
 const alertRoutes = require('./routes/alerts.routes');
+const agentRoutes = require('./routes/agents.routes');
 const notificationRoutes = require('./routes/notifications.routes');
 const paymentRoutes = require('./routes/payments.routes');
 
@@ -26,6 +27,8 @@ app.use('/survey-sessions', surveySessionRoutes);
 app.use('/visit-requests', visitRequestRoutes);
 app.use('/subscriptions', subscriptionRoutes);
 app.use('/parcels', alertRoutes); // mounts /parcels/:id/alerts, see routes file
+app.use('/alerts', alertRoutes);  // mounts /alerts/trends (owner-scoped aggregation)
+app.use('/agents', agentRoutes);
 app.use('/notifications', notificationRoutes);
 app.use('/payments', paymentRoutes);
 
