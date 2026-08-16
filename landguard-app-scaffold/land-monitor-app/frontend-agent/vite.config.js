@@ -14,6 +14,9 @@ export default defineConfig({
             if (id.includes('socket.io-client') || id.includes('engine.io-client') || id.includes('socket.io-parser')) {
               return 'realtime';
             }
+            if (id.includes('leaflet') || id.includes('react-leaflet')) {
+              return 'maps';
+            }
             if (id.includes('@react-google-maps/api')) {
               return 'maps';
             }

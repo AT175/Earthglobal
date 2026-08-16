@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { GoogleMap, Polygon, useJsApiLoader } from '@react-google-maps/api';
 import { mapStyles, parcelPolygonStyles, mapTypeOptions } from './mapStyles';
 import Spinner from '../atoms/Spinner';
+import FreeParcelMap from './FreeParcelMap';
 
 const MapContainer = styled.div`
   position: relative;
@@ -58,8 +59,12 @@ const LoadingWrapper = styled.div`
  * Renders a Google Map with satellite/terrain/EarthGlobal-styled base layers,
  * a style switcher, and a parcel boundary polygon in the appropriate state color.
  *
+ * If no Google Maps API key is provided, automatically falls back to FreeParcelMap
+ * (Leaflet + OpenStreetMap / Esri satellite tiles — no API key required).
+ *
  * @param {{lat:number,lng:number}[]} path - polygon path for the parcel boundary
  * @param {'active'|'draft'|'alert'} status - determines polygon coloring
+ * @param {string} googleMapsApiKey - Google Maps API key (optional — falls back to free map)
  */
 export default function ParcelMap({
   path = [],
@@ -69,6 +74,11 @@ export default function ParcelMap({
   googleMapsApiKey,
   children,
 }) {
+  // Fall back to the free Leaflet-based map when no Google Maps API key is set
+  if (!googleMapsApiKey || googleMapsApiKey === 'your_google_maps_key') {
+    return <FreeParcelMap path={path} center={center} status={status} height={height} />;
+  }
+
   const [mapType, setMapType] = useState('hybrid');
   const { isLoaded } = useJsApiLoader({ googleMapsApiKey });
 

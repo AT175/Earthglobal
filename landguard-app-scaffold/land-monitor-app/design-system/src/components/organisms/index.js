@@ -14,3 +14,4 @@ export { mapStyles, parcelPolygonStyles, mapTypeOptions } from './mapStyles';
 export { default as AreaBarChart } from './AreaBarChart';
 export { default as AlertTrendChart } from './AlertTrendChart';
 export { default as AgentPerformanceChart } from './AgentPerformanceChart';
+export { default as FreeParcelMap } from './FreeParcelMap';
