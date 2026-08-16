@@ -16,7 +16,12 @@ const { createWebSocketServer } = require('./realtime/socketServer');
 
 const app = express();
 
-app.use(cors());
+// In production, restrict CORS to known frontend origins via CORS_ORIGINS env var
+// (comma-separated). Defaults to permissive for local dev.
+const corsOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
+  : true;
+app.use(cors({ origin: corsOrigins, credentials: true }));
 // Note: payments webhook route needs the raw body for signature verification,
 // so it's mounted separately before the global json parser in a real build.
 app.use(express.json({ limit: '10mb' }));
