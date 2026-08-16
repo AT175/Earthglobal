@@ -1,0 +1,27 @@
+{
+  "name": "earthglobal",
+  "version": "1.0.0",
+  "description": "EarthGlobal — Remote Land Monitoring & Protection Platform",
+  "private": true,
+  "scripts": {
+    "start": "concurrently \"yarn start:backend\" \"yarn start:frontend\"",
+    "start:backend": "cd landguard-app-scaffold/land-monitor-app/backend && npm run dev",
+    "start:frontend": "cd landguard-app-scaffold/land-monitor-app/frontend-owner && npm run dev",
+    "build": "yarn build:design-system && yarn build:frontend && yarn build:backend",
+    "build:design-system": "cd landguard-app-scaffold/land-monitor-app/design-system && npm install",
+    "build:frontend": "cd landguard-app-scaffold/land-monitor-app/frontend-owner && npm install && npm run build",
+    "build:backend": "cd landguard-app-scaffold/land-monitor-app/backend && npm install",
+    "migrate": "cd landguard-app-scaffold/land-monitor-app/backend && node scripts/migrate.js",
+    "deploy:render": "bash scripts/render-deploy.sh",
+    "deploy:netlify": "netlify deploy --build --prod",
+    "deploy:all": "yarn deploy:render && yarn deploy:netlify",
+    "setup": "bash scripts/setup.sh",
+    "dev": "yarn start"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
