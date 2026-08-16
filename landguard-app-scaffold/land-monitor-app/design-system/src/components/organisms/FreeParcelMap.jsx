@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import {
   MapContainer,
@@ -91,8 +91,8 @@ const StyleButton = styled.button`
   }
 `;
 
-// Free tile layer options — no API key required
-const tileLayers = {
+// Free fallback tile layers — no API key required
+const fallbackTiles = {
   satellite: {
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics',
@@ -112,6 +112,7 @@ const tileLayers = {
 
 const layerOptions = [
   { value: 'satellite', label: 'Satellite' },
+  { value: 'ndvi', label: 'NDVI' },
   { value: 'terrain', label: 'Terrain' },
   { value: 'street', label: 'Dark' },
 ];
@@ -134,10 +135,31 @@ function Recenter({ center, zoom }) {
   return null;
 }
 
+// Dynamic tile layer that switches between Earth Engine and fallback tiles
+function DynamicTileLayer({ layerType, eeTiles, path }) {
+  // For satellite/ndvi: use Earth Engine tiles if available, else fallback
+  // For terrain/street: always use free tiles
+  if (layerType === 'ndvi') {
+    if (eeTiles.ndvi) {
+      return <TileLayer url={eeTiles.ndvi.url} attribution={eeTiles.ndvi.attribution} maxZoom={19} />;
+    }
+    // No NDVI available — show satellite as fallback
+    return <TileLayer url={fallbackTiles.satellite.url} attribution={fallbackTiles.satellite.attribution} maxZoom={fallbackTiles.satellite.maxZoom} />;
+  }
+
+  if (layerType === 'satellite' && eeTiles.satellite) {
+    return <TileLayer url={eeTiles.satellite.url} attribution={eeTiles.satellite.attribution} maxZoom={19} />;
+  }
+
+  const tile = fallbackTiles[layerType] || fallbackTiles.satellite;
+  return <TileLayer url={tile.url} attribution={tile.attribution} maxZoom={tile.maxZoom} />;
+}
+
 /**
- * FreeParcelMap — a free, no-API-key-required map using Leaflet + OpenStreetMap
- * tiles (with Esri satellite imagery as a free satellite option). Automatically
- * used by ParcelMap when no Google Maps API key is provided.
+ * FreeParcelMap — a free map using Leaflet. When Earth Engine is configured on
+ * the backend, satellite and NDVI layers use real Sentinel-2 satellite imagery
+ * via Earth Engine tile URLs. Otherwise, falls back to free Esri/OpenTopoMap/
+ * CARTO tiles — no API key or billing required either way.
  *
  * @param {{lat:number,lng:number}[]} path - polygon path for the parcel boundary
  * @param {'active'|'draft'|'alert'} status - determines polygon coloring
@@ -145,9 +167,54 @@ function Recenter({ center, zoom }) {
  */
 export default function FreeParcelMap({ path = [], center, status = 'active', height }) {
   const [layerType, setLayerType] = useState('satellite');
+  const [eeTiles, setEeTiles] = useState({ satellite: null, ndvi: null });
   const resolvedCenter = center || path[0];
   const positions = path.map((p) => [p.lat, p.lng]);
   const polyStyle = polygonColors[status] || polygonColors.active;
+
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
+
+  // Compute a bbox from the path for Earth Engine region filtering
+  const bbox = path.length > 0
+    ? [
+        Math.min(...path.map((p) => p.lng)) - 0.01,
+        Math.min(...path.map((p) => p.lat)) - 0.01,
+        Math.max(...path.map((p) => p.lng)) + 0.01,
+        Math.max(...path.map((p) => p.lat)) + 0.01,
+      ].join(',')
+    : null;
+
+  // Fetch Earth Engine satellite tiles on mount
+  useEffect(() => {
+    if (!token) return;
+
+    const headers = { Authorization: `Bearer ${token}` };
+    const satelliteUrl = bbox
+      ? `${apiUrl}/map-tiles/satellite?bbox=${bbox}`
+      : `${apiUrl}/map-tiles/satellite`;
+
+    fetch(satelliteUrl, { headers })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.url) {
+          setEeTiles((prev) => ({ ...prev, satellite: data }));
+        }
+      })
+      .catch(() => {});
+
+    // Fetch NDVI tiles only if we have a bbox
+    if (bbox) {
+      fetch(`${apiUrl}/map-tiles/ndvi?bbox=${bbox}`, { headers })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.url) {
+            setEeTiles((prev) => ({ ...prev, ndvi: data }));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [apiUrl, token, bbox]);
 
   return (
     <MapWrapper $height={height}>
@@ -170,11 +237,7 @@ export default function FreeParcelMap({ path = [], center, status = 'active', he
         scrollWheelZoom
         style={{ width: '100%', height: '100%' }}
       >
-        <TileLayer
-          url={tileLayers[layerType].url}
-          attribution={tileLayers[layerType].attribution}
-          maxZoom={tileLayers[layerType].maxZoom}
-        />
+        <DynamicTileLayer layerType={layerType} eeTiles={eeTiles} path={path} />
         {positions.length > 0 && (
           <Polygon
             positions={positions}

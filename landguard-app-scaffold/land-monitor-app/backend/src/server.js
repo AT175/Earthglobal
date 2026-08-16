@@ -12,6 +12,7 @@ const alertRoutes = require('./routes/alerts.routes');
 const agentRoutes = require('./routes/agents.routes');
 const notificationRoutes = require('./routes/notifications.routes');
 const paymentRoutes = require('./routes/payments.routes');
+const mapTilesRoutes = require('./routes/mapTiles.routes');
 const { createWebSocketServer } = require('./realtime/socketServer');
 
 const app = express();
@@ -38,6 +39,7 @@ app.use('/alerts', alertRoutes);  // mounts /alerts/trends (owner-scoped aggrega
 app.use('/agents', agentRoutes);
 app.use('/notifications', notificationRoutes);
 app.use('/payments', paymentRoutes);
+app.use('/map-tiles', mapTilesRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error(err);
