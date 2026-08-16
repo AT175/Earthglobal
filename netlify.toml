@@ -1,0 +1,19 @@
+# Netlify Configuration — EarthGlobal Unified App
+# Single frontend with role-based routing (owner / agent / admin)
+# Deploys to earthglobalgh.netlify.app
+
+[build]
+  base = "landguard-app-scaffold/land-monitor-app"
+  command = "cd design-system && npm install && cd ../frontend-owner && npm install && npm run build"
+  publish = "frontend-owner/dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+  VITE_API_URL = "https://earthglobal-api.onrender.com"
+  VITE_STRIPE_PUBLISHABLE_KEY = "sb_publishable_L4s9Yu3IfhPcXm6xCW6T2Q_aJHSG-4Y"
+
+# SPA routing — all routes serve index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

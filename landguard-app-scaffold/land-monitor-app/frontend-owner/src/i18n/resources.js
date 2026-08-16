@@ -1,9 +1,30 @@
-// Owner app translation strings. "common" namespace terms (status, visitType, nav,
-// tagline) come from @earthglobal/design-system and are merged in automatically —
-// only owner-app-specific copy lives here.
+// Unified EarthGlobal app translation strings (owner + agent + admin).
+// "common" namespace terms (status, visitType, nav, tagline) come from
+// @earthglobal/design-system and are merged in automatically.
 export default {
   en: {
     app: {
+      // ── Auth ──
+      auth: {
+        title: 'EarthGlobal',
+        subtitle: 'Land monitoring & protection',
+        login: 'Sign in',
+        signup: 'Create account',
+        email: 'Email',
+        password: 'Password',
+        name: 'Full name',
+        phone: 'Phone number',
+        loginButton: 'Sign in',
+        signupButton: 'Create account',
+        switchToSignup: "Don't have an account? Sign up",
+        switchToLogin: 'Already have an account? Sign in',
+        error: 'Invalid credentials. Please try again.',
+        roleOwner: 'Landowner',
+        roleAgent: 'Agent',
+        roleAdmin: 'Admin',
+        selectRole: 'I am a...',
+      },
+      // ── Owner: Dashboard ──
       dashboard: {
         title: 'Your Land',
         loading: 'Loading your land...',
@@ -17,6 +38,7 @@ export default {
         newAlert: 'New {{type}} alert detected on {{parcel}}',
         unknownParcel: 'Unknown parcel',
       },
+      // ── Owner: Parcel Detail ──
       parcelDetail: {
         notFound: 'Parcel not found.',
         requestVisit: 'Request a visit',
@@ -25,6 +47,7 @@ export default {
         detected: 'Detected {{date}}',
         perimeter: '{{value}}m perimeter',
       },
+      // ── Owner: Request Visit ──
       requestVisit: {
         title: 'Request a Visit',
         question: 'What kind of visit do you need?',
@@ -32,10 +55,75 @@ export default {
         submitting: 'Submitting...',
         error: 'Something went wrong submitting your request. Please try again.',
       },
+      // ── Agent: Visit List ──
+      visitList: {
+        title: 'My Assigned Visits',
+        empty: 'No visits assigned yet.',
+        requested: 'Requested {{date}}',
+      },
+      // ── Agent: Visit Detail ──
+      visitDetail: {
+        notFound: 'Visit request not found.',
+        updateStatus: 'Update status',
+        uploadPrompt: 'Tap to upload photos or video for this visit',
+        uploading: 'Uploading...',
+        markCompleted: 'Mark visit as completed',
+        visitLabel: '{{type}} visit',
+      },
+      // ── Admin: Onboarding ──
+      onboarding: {
+        title: 'Onboard a Parcel',
+        liveTab: 'Live GPS Survey',
+        importTab: 'File Import',
+        liveDescription:
+          'Walk the parcel boundary while capturing GPS points. Points are synced to POST /survey-sessions/:id/sync, then finalized into a polygon.',
+        startSurvey: 'Start live survey',
+        stopSurvey: 'Stop capturing',
+        dropPrompt: 'Drop a GeoJSON, KML/KMZ, Shapefile, or GPX file here',
+        dropNote: 'GeoJSON import is fully wired; KML/Shapefile/GPX parsing is stubbed server-side.',
+      },
+      // ── Admin: Agents ──
+      agents: {
+        title: 'Agents',
+        name: 'Name',
+        region: 'Region',
+        phone: 'Phone',
+        status: 'Status',
+        active: 'Active',
+        inactive: 'Inactive',
+        performance: 'Completed visits by agent',
+      },
+      // ── Admin: Parcels ──
+      parcels: {
+        title: 'All Parcels',
+        name: 'Name',
+        region: 'Region',
+        area: 'Area (ha)',
+        surveyed: 'Surveyed',
+      },
     },
   },
   es: {
     app: {
+      auth: {
+        title: 'EarthGlobal',
+        subtitle: 'Monitoreo y protección de tierras',
+        login: 'Iniciar sesión',
+        signup: 'Crear cuenta',
+        email: 'Correo',
+        password: 'Contraseña',
+        name: 'Nombre completo',
+        phone: 'Número de teléfono',
+        loginButton: 'Iniciar sesión',
+        signupButton: 'Crear cuenta',
+        switchToSignup: '¿No tienes cuenta? Regístrate',
+        switchToLogin: '¿Ya tienes cuenta? Inicia sesión',
+        error: 'Credenciales inválidas. Inténtalo de nuevo.',
+        roleOwner: 'Propietario',
+        roleAgent: 'Agente',
+        roleAdmin: 'Administrador',
+        selectRole: 'Soy un...',
+      },
       dashboard: {
         title: 'Tu terreno',
         loading: 'Cargando tu terreno...',
@@ -63,6 +151,47 @@ export default {
         submit: 'Enviar solicitud',
         submitting: 'Enviando...',
         error: 'Algo salió mal al enviar tu solicitud. Inténtalo de nuevo.',
+      },
+      visitList: {
+        title: 'Mis visitas asignadas',
+        empty: 'Aún no tienes visitas asignadas.',
+        requested: 'Solicitado el {{date}}',
+      },
+      visitDetail: {
+        notFound: 'Solicitud de visita no encontrada.',
+        updateStatus: 'Actualizar estado',
+        uploadPrompt: 'Toca para subir fotos o video de esta visita',
+        uploading: 'Subiendo...',
+        markCompleted: 'Marcar visita como completada',
+        visitLabel: 'Visita de {{type}}',
+      },
+      onboarding: {
+        title: 'Registrar una parcela',
+        liveTab: 'Inspección GPS en vivo',
+        importTab: 'Importar archivo',
+        liveDescription:
+          'Camina el perímetro de la parcela mientras capturas puntos GPS. Los puntos se sincronizan con POST /survey-sessions/:id/sync y luego se finalizan como un polígono.',
+        startSurvey: 'Iniciar inspección en vivo',
+        stopSurvey: 'Detener captura',
+        dropPrompt: 'Suelta un archivo GeoJSON, KML/KMZ, Shapefile o GPX aquí',
+        dropNote: 'La importación de GeoJSON está lista; KML/Shapefile/GPX están simulados en el servidor.',
+      },
+      agents: {
+        title: 'Agentes',
+        name: 'Nombre',
+        region: 'Región',
+        phone: 'Teléfono',
+        status: 'Estado',
+        active: 'Activo',
+        inactive: 'Inactivo',
+        performance: 'Visitas completadas por agente',
+      },
+      parcels: {
+        title: 'Todas las parcelas',
+        name: 'Nombre',
+        region: 'Región',
+        area: 'Área (ha)',
+        surveyed: 'Inspeccionado',
       },
     },
   },

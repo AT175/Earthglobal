@@ -45,3 +45,6 @@ coverage/
 
 # Archives
 *.zip
+
+# Local Netlify folder
+.netlify
