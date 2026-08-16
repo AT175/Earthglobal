@@ -4,19 +4,21 @@
   "description": "EarthGlobal — Remote Land Monitoring & Protection Platform",
   "private": true,
   "scripts": {
-    "start": "concurrently \"yarn start:backend\" \"yarn start:frontend\"",
+    "start": "node landguard-app-scaffold/land-monitor-app/backend/src/server.js",
+    "start:dev": "concurrently \"yarn start:backend\" \"yarn start:frontend\"",
     "start:backend": "cd landguard-app-scaffold/land-monitor-app/backend && npm run dev",
     "start:frontend": "cd landguard-app-scaffold/land-monitor-app/frontend-owner && npm run dev",
-    "build": "yarn build:design-system && yarn build:frontend && yarn build:backend",
+    "build": "cd landguard-app-scaffold/land-monitor-app/backend && npm install",
     "build:design-system": "cd landguard-app-scaffold/land-monitor-app/design-system && npm install",
     "build:frontend": "cd landguard-app-scaffold/land-monitor-app/frontend-owner && npm install && npm run build",
     "build:backend": "cd landguard-app-scaffold/land-monitor-app/backend && npm install",
+    "build:all": "yarn build:design-system && yarn build:frontend && yarn build:backend",
     "migrate": "cd landguard-app-scaffold/land-monitor-app/backend && node scripts/migrate.js",
     "deploy:render": "bash scripts/render-deploy.sh",
     "deploy:netlify": "netlify deploy --build --prod",
     "deploy:all": "yarn deploy:render && yarn deploy:netlify",
     "setup": "bash scripts/setup.sh",
-    "dev": "yarn start"
+    "dev": "yarn start:dev"
   },
   "devDependencies": {
     "concurrently": "^9.2.4"

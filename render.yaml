@@ -17,9 +17,8 @@ services:
     region: oregon
     plan: starter
     runtime: node
-    rootDir: landguard-app-scaffold/land-monitor-app/backend
-    buildCommand: npm install
-    startCommand: node src/server.js
+    buildCommand: yarn build
+    startCommand: yarn start
     healthCheckPath: /health
     autoDeploy: true
     envVars:
@@ -69,9 +68,8 @@ services:
     region: oregon
     plan: starter
     runtime: node
-    rootDir: landguard-app-scaffold/land-monitor-app/backend
-    buildCommand: npm install
-    startCommand: node scripts/migrate.js
+    buildCommand: yarn build
+    startCommand: yarn migrate
     envVars:
       - key: DATABASE_URL
         sync: false  # set manually — same shared Postgres connection string
