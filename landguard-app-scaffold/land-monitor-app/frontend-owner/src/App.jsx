@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, Spinner } from '@earthglobal/design-system';
+import PWAInstallPrompt from './components/PWAInstallPrompt';
 
 // Landing + Login (eager-loaded — entry points)
 import Landing from './pages/Landing';
@@ -79,6 +80,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
+        <PWAInstallPrompt />
       </BrowserRouter>
     </ThemeProvider>
   );

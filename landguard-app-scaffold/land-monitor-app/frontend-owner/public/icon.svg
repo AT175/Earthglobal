@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="96" fill="#080f24"/>
+  <circle cx="256" cy="256" r="160" fill="none" stroke="#3b82f6" stroke-width="12"/>
+  <circle cx="256" cy="256" r="100" fill="none" stroke="#60a5fa" stroke-width="8" opacity="0.6"/>
+  <path d="M256 96 L256 416 M96 256 L416 256" stroke="#3b82f6" stroke-width="4" opacity="0.3"/>
+  <path d="M176 296 L256 176 L336 296 L256 256 Z" fill="#3b82f6"/>
+  <circle cx="256" cy="256" r="24" fill="#60a5fa"/>
+  <text x="256" y="460" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="#60a5fa" text-anchor="middle">EG</text>
+</svg>
