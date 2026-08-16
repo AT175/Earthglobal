@@ -6,6 +6,7 @@ const pool = new Pool({
   ssl: process.env.DATABASE_SSL === 'true' || process.env.NODE_ENV === 'production'
     ? { rejectUnauthorized: false }
     : undefined,
+  options: '-c search_path=earthglobal,public',
 });
 
 pool.on('error', (err) => {

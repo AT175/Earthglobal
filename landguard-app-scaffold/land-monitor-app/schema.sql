@@ -1,13 +1,27 @@
--- Remote Land Monitoring App — Database Schema
+-- EarthGlobal Land Monitoring App — Database Schema
 -- PostgreSQL + PostGIS
+--
+-- IMPORTANT: This schema creates a dedicated PostgreSQL schema named "earthglobal"
+-- so it is fully isolated from any other application sharing the same database.
+-- Extensions (postgis, uuid-ossp) are installed at the database level in "public"
+-- since PostgreSQL extensions must be owned by a superuser and live in a schema
+-- accessible to all users. All EarthGlobal tables, types, and indexes live inside
+-- the "earthglobal" schema.
 
+-- Extensions must be created in public (PostgreSQL requirement)
 CREATE EXTENSION IF NOT EXISTS postgis;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Create the dedicated EarthGlobal schema (idempotent)
+CREATE SCHEMA IF NOT EXISTS earthglobal;
+
+-- All subsequent objects are created inside the earthglobal schema
+SET search_path TO earthglobal, public;
 
 -- =========================================================
 -- OWNERS
 -- =========================================================
-CREATE TABLE owners (
+CREATE TABLE IF NOT EXISTS owners (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE,
@@ -19,7 +33,7 @@ CREATE TABLE owners (
 -- =========================================================
 -- AGENTS
 -- =========================================================
-CREATE TABLE agents (
+CREATE TABLE IF NOT EXISTS agents (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
     phone VARCHAR(50) UNIQUE NOT NULL,
@@ -31,7 +45,7 @@ CREATE TABLE agents (
 -- =========================================================
 -- PARCELS
 -- =========================================================
-CREATE TABLE parcels (
+CREATE TABLE IF NOT EXISTS parcels (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     owner_id UUID NOT NULL REFERENCES owners(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
@@ -45,15 +59,17 @@ CREATE TABLE parcels (
 );
 
 -- Spatial index for fast map queries / bounding box lookups
-CREATE INDEX idx_parcels_boundary ON parcels USING GIST (boundary);
-CREATE INDEX idx_parcels_owner ON parcels (owner_id);
+CREATE INDEX IF NOT EXISTS idx_parcels_boundary ON parcels USING GIST (boundary);
+CREATE INDEX IF NOT EXISTS idx_parcels_owner ON parcels (owner_id);
 
 -- =========================================================
 -- SURVEY SESSIONS
 -- =========================================================
-CREATE TYPE survey_method AS ENUM ('live_gps', 'file_import', 'manual_coords');
+DO $$ BEGIN
+    CREATE TYPE survey_method AS ENUM ('live_gps', 'file_import', 'manual_coords');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TABLE survey_sessions (
+CREATE TABLE IF NOT EXISTS survey_sessions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     parcel_id UUID REFERENCES parcels(id) ON DELETE SET NULL,
     surveyed_by UUID, -- references agents(id) or an admin user id
@@ -65,14 +81,16 @@ CREATE TABLE survey_sessions (
     completed_at TIMESTAMPTZ
 );
 
-CREATE INDEX idx_survey_sessions_parcel ON survey_sessions (parcel_id);
+CREATE INDEX IF NOT EXISTS idx_survey_sessions_parcel ON survey_sessions (parcel_id);
 
 -- =========================================================
 -- PLANS & SUBSCRIPTIONS
 -- =========================================================
-CREATE TYPE plan_period AS ENUM ('week', 'month', 'quarter');
+DO $$ BEGIN
+    CREATE TYPE plan_period AS ENUM ('week', 'month', 'quarter');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TABLE plans (
+CREATE TABLE IF NOT EXISTS plans (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(100) NOT NULL,
     included_visits_per_period INT NOT NULL DEFAULT 0,
@@ -81,9 +99,11 @@ CREATE TABLE plans (
     live_video_included BOOLEAN NOT NULL DEFAULT false
 );
 
-CREATE TYPE subscription_status AS ENUM ('active', 'past_due', 'cancelled');
+DO $$ BEGIN
+    CREATE TYPE subscription_status AS ENUM ('active', 'past_due', 'cancelled');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TABLE subscriptions (
+CREATE TABLE IF NOT EXISTS subscriptions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     owner_id UUID NOT NULL REFERENCES owners(id) ON DELETE CASCADE,
     plan_id UUID NOT NULL REFERENCES plans(id),
@@ -93,15 +113,20 @@ CREATE TABLE subscriptions (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_subscriptions_owner ON subscriptions (owner_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_owner ON subscriptions (owner_id);
 
 -- =========================================================
 -- VISIT REQUESTS
 -- =========================================================
-CREATE TYPE visit_type AS ENUM ('photo', 'video', 'live');
-CREATE TYPE visit_status AS ENUM ('pending', 'assigned', 'in_progress', 'completed', 'cancelled');
+DO $$ BEGIN
+    CREATE TYPE visit_type AS ENUM ('photo', 'video', 'live');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TABLE visit_requests (
+DO $$ BEGIN
+    CREATE TYPE visit_status AS ENUM ('pending', 'assigned', 'in_progress', 'completed', 'cancelled');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS visit_requests (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     parcel_id UUID NOT NULL REFERENCES parcels(id) ON DELETE CASCADE,
     owner_id UUID NOT NULL REFERENCES owners(id) ON DELETE CASCADE,
@@ -115,16 +140,18 @@ CREATE TABLE visit_requests (
     plan_credit_used BOOLEAN NOT NULL DEFAULT false
 );
 
-CREATE INDEX idx_visit_requests_owner ON visit_requests (owner_id);
-CREATE INDEX idx_visit_requests_agent ON visit_requests (agent_id);
-CREATE INDEX idx_visit_requests_status ON visit_requests (status);
+CREATE INDEX IF NOT EXISTS idx_visit_requests_owner ON visit_requests (owner_id);
+CREATE INDEX IF NOT EXISTS idx_visit_requests_agent ON visit_requests (agent_id);
+CREATE INDEX IF NOT EXISTS idx_visit_requests_status ON visit_requests (status);
 
 -- =========================================================
 -- MEDIA
 -- =========================================================
-CREATE TYPE media_type AS ENUM ('photo', 'video');
+DO $$ BEGIN
+    CREATE TYPE media_type AS ENUM ('photo', 'video');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TABLE media (
+CREATE TABLE IF NOT EXISTS media (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     visit_request_id UUID NOT NULL REFERENCES visit_requests(id) ON DELETE CASCADE,
     url TEXT NOT NULL,
@@ -132,14 +159,16 @@ CREATE TABLE media (
     uploaded_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_media_visit_request ON media (visit_request_id);
+CREATE INDEX IF NOT EXISTS idx_media_visit_request ON media (visit_request_id);
 
 -- =========================================================
 -- ALERTS (satellite change detection)
 -- =========================================================
-CREATE TYPE alert_type AS ENUM ('clearing', 'possible_structure', 'other');
+DO $$ BEGIN
+    CREATE TYPE alert_type AS ENUM ('clearing', 'possible_structure', 'other');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TABLE alerts (
+CREATE TABLE IF NOT EXISTS alerts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     parcel_id UUID NOT NULL REFERENCES parcels(id) ON DELETE CASCADE,
     detected_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -152,15 +181,20 @@ CREATE TABLE alerts (
     verified_by_visit_id UUID REFERENCES visit_requests(id)
 );
 
-CREATE INDEX idx_alerts_parcel ON alerts (parcel_id);
+CREATE INDEX IF NOT EXISTS idx_alerts_parcel ON alerts (parcel_id);
 
 -- =========================================================
 -- PAYMENTS
 -- =========================================================
-CREATE TYPE payment_purpose AS ENUM ('subscription', 'one_off_visit');
-CREATE TYPE payment_status AS ENUM ('pending', 'succeeded', 'failed', 'refunded');
+DO $$ BEGIN
+    CREATE TYPE payment_purpose AS ENUM ('subscription', 'one_off_visit');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TABLE payments (
+DO $$ BEGIN
+    CREATE TYPE payment_status AS ENUM ('pending', 'succeeded', 'failed', 'refunded');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS payments (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     owner_id UUID NOT NULL REFERENCES owners(id) ON DELETE CASCADE,
     amount NUMERIC(10, 2) NOT NULL,
@@ -172,12 +206,12 @@ CREATE TABLE payments (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_payments_owner ON payments (owner_id);
+CREATE INDEX IF NOT EXISTS idx_payments_owner ON payments (owner_id);
 
 -- =========================================================
 -- NOTIFICATIONS
 -- =========================================================
-CREATE TABLE notifications (
+CREATE TABLE IF NOT EXISTS notifications (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     owner_id UUID REFERENCES owners(id) ON DELETE CASCADE,
     agent_id UUID REFERENCES agents(id) ON DELETE CASCADE,
@@ -188,18 +222,26 @@ CREATE TABLE notifications (
     CHECK (owner_id IS NOT NULL OR agent_id IS NOT NULL)
 );
 
-CREATE INDEX idx_notifications_owner ON notifications (owner_id);
-CREATE INDEX idx_notifications_agent ON notifications (agent_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_owner ON notifications (owner_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_agent ON notifications (agent_id);
+
+-- =========================================================
+-- Reset search_path to default after schema setup
+-- =========================================================
+RESET search_path;
 
 -- =========================================================
 -- USEFUL SPATIAL QUERIES (examples, not part of schema)
 -- =========================================================
+-- All queries must prefix tables with earthglobal. or set search_path:
+--   SET search_path TO earthglobal, public;
+--
 -- Compute area in square meters for a parcel (geography cast gives meters, not degrees):
--- SELECT ST_Area(boundary::geography) FROM parcels WHERE id = '...';
-
+-- SELECT ST_Area(boundary::geography) FROM earthglobal.parcels WHERE id = '...';
+--
 -- Compute perimeter in meters:
--- SELECT ST_Perimeter(boundary::geography) FROM parcels WHERE id = '...';
-
+-- SELECT ST_Perimeter(boundary::geography) FROM earthglobal.parcels WHERE id = '...';
+--
 -- Find parcels within a bounding box (for map viewport loading):
--- SELECT * FROM parcels
+-- SELECT * FROM earthglobal.parcels
 -- WHERE boundary && ST_MakeEnvelope(minLng, minLat, maxLng, maxLat, 4326);

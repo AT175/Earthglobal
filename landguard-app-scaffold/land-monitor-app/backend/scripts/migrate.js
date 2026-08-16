@@ -18,9 +18,10 @@ async function run() {
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
+    options: '-c search_path=earthglobal,public',
   });
 
-  console.log('Running schema.sql against the database...');
+  console.log('Running schema.sql against the database (earthglobal schema)...');
 
   // Split on semicolons but keep it simple — schema.sql uses plain statements
   const statements = schema
