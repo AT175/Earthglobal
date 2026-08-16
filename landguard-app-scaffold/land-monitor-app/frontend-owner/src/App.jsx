@@ -2,7 +2,8 @@ import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, Spinner } from '@earthglobal/design-system';
 
-// Login page (eager-loaded — it's the entry point)
+// Landing + Login (eager-loaded — entry points)
+import Landing from './pages/Landing';
 import Login from './pages/Login';
 
 // Owner pages
@@ -25,11 +26,29 @@ const PageFallback = () => (
   </div>
 );
 
-// Simple auth guard — redirects to /login if no token
+// Auth guard — redirects to /login if no token
 function RequireAuth({ children }) {
   const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
   if (!token) return <Navigate to="/login" replace />;
   return children;
+}
+
+// Auto-route authenticated users to their role's home page
+function AutoRoute() {
+  if (typeof localStorage === 'undefined') return <Navigate to="/login" replace />;
+  const token = localStorage.getItem('token');
+  if (!token) return <Landing />;
+
+  const userStr = localStorage.getItem('user');
+  if (userStr) {
+    try {
+      const user = JSON.parse(userStr);
+      if (user.role === 'agent') return <Navigate to="/agent" replace />;
+      if (user.role === 'admin') return <Navigate to="/admin" replace />;
+    } catch {}
+  }
+  // Default: owner dashboard
+  return <Navigate to="/dashboard" replace />;
 }
 
 export default function App() {
@@ -38,11 +57,12 @@ export default function App() {
       <BrowserRouter>
         <Suspense fallback={<PageFallback />}>
           <Routes>
-            {/* Login / signup */}
+            {/* Public routes */}
+            <Route path="/" element={<AutoRoute />} />
             <Route path="/login" element={<Login />} />
 
-            {/* Owner routes (default) */}
-            <Route path="/" element={<RequireAuth><Dashboard /></RequireAuth>} />
+            {/* Owner routes */}
+            <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
             <Route path="/parcels/:id" element={<RequireAuth><ParcelDetail /></RequireAuth>} />
             <Route path="/parcels/:id/request-visit" element={<RequireAuth><RequestVisit /></RequireAuth>} />
 
@@ -56,7 +76,7 @@ export default function App() {
             <Route path="/admin/parcels" element={<RequireAuth><ParcelsList /></RequireAuth>} />
 
             {/* Fallback */}
-            <Route path="*" element={<Navigate to="/login" replace />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
       </BrowserRouter>

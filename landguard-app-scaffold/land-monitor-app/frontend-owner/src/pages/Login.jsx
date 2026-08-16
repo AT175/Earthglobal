@@ -121,10 +121,8 @@ export default function Login() {
       if (data.token) {
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify({ ...data.owner, role }));
-        // Redirect based on role
-        if (role === 'agent') navigate('/agent');
-        else if (role === 'admin') navigate('/admin');
-        else navigate('/');
+        // Auto-route to "/" which redirects to the correct role page
+        navigate('/');
       }
     } catch (err) {
       setError(t('app.auth.error'));
