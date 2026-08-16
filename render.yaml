@@ -31,7 +31,7 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: CORS_ORIGINS
-        value: "https://earthglobalgh.netlify.app,https://earthglobal-api.onrender.com"
+        value: "https://earthglobalgh.netlify.app,https://earthglobal.onrender.com"
       - key: PORT
         value: "10000"
       # Stripe payments
@@ -91,7 +91,7 @@ services:
     autoDeploy: true
     envVars:
       - key: VITE_API_URL
-        value: "https://earthglobal-api.onrender.com"
+        value: "https://earthglobal.onrender.com"
       - key: VITE_STRIPE_PUBLISHABLE_KEY
         value: "sb_publishable_L4s9Yu3IfhPcXm6xCW6T2Q_aJHSG-4Y"
       - key: VITE_GOOGLE_MAPS_API_KEY
@@ -116,7 +116,7 @@ services:
     autoDeploy: true
     envVars:
       - key: VITE_API_URL
-        value: "https://earthglobal-api.onrender.com"
+        value: "https://earthglobal.onrender.com"
       - key: VITE_STRIPE_PUBLISHABLE_KEY
         value: "sb_publishable_L4s9Yu3IfhPcXm6xCW6T2Q_aJHSG-4Y"
       - key: VITE_GOOGLE_MAPS_API_KEY
@@ -141,7 +141,7 @@ services:
     autoDeploy: true
     envVars:
       - key: VITE_API_URL
-        value: "https://earthglobal-api.onrender.com"
+        value: "https://earthglobal.onrender.com"
       - key: VITE_STRIPE_PUBLISHABLE_KEY
         value: "sb_publishable_L4s9Yu3IfhPcXm6xCW6T2Q_aJHSG-4Y"
       - key: VITE_GOOGLE_MAPS_API_KEY

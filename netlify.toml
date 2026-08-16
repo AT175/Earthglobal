@@ -9,7 +9,7 @@
 
 [build.environment]
   NODE_VERSION = "20"
-  VITE_API_URL = "https://earthglobal-api.onrender.com"
+  VITE_API_URL = "https://earthglobal.onrender.com"
   VITE_STRIPE_PUBLISHABLE_KEY = "sb_publishable_L4s9Yu3IfhPcXm6xCW6T2Q_aJHSG-4Y"
 
 # SPA routing — all routes serve index.html
