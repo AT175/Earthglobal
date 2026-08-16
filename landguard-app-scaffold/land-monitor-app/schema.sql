@@ -9,6 +9,7 @@
 -- the "earthglobal" schema.
 
 -- Extensions must be created in public (PostgreSQL requirement)
+-- Supabase installs extensions in the "extensions" schema
 CREATE EXTENSION IF NOT EXISTS postgis;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
@@ -16,7 +17,8 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE SCHEMA IF NOT EXISTS earthglobal;
 
 -- All subsequent objects are created inside the earthglobal schema
-SET search_path TO earthglobal, public;
+-- Include "extensions" for Supabase-installed extension functions
+SET search_path TO earthglobal, public, extensions;
 
 -- =========================================================
 -- OWNERS
