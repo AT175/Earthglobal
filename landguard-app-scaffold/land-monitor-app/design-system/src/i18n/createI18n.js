@@ -74,6 +74,11 @@ export const commonResources = {
         parcels: 'Parcels',
       },
       tagline: 'See it. Check it. Secure it.',
+      realtime: {
+        live: 'Live',
+        reconnecting: 'Reconnecting…',
+        dismissAlert: 'Dismiss alert',
+      },
     },
   },
   es: {
@@ -103,6 +108,11 @@ export const commonResources = {
         parcels: 'Parcelas',
       },
       tagline: 'Obsérvalo. Compruébalo. Protégelo.',
+      realtime: {
+        live: 'En vivo',
+        reconnecting: 'Reconectando…',
+        dismissAlert: 'Descartar alerta',
+      },
     },
   },
 };

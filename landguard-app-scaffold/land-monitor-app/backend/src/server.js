@@ -1,4 +1,5 @@
 require('dotenv').config();
+const http = require('http');
 const express = require('express');
 const cors = require('cors');
 
@@ -11,6 +12,7 @@ const alertRoutes = require('./routes/alerts.routes');
 const agentRoutes = require('./routes/agents.routes');
 const notificationRoutes = require('./routes/notifications.routes');
 const paymentRoutes = require('./routes/payments.routes');
+const { createWebSocketServer } = require('./realtime/socketServer');
 
 const app = express();
 
@@ -37,5 +39,8 @@ app.use((err, _req, res, _next) => {
   res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
 });
 
+const server = http.createServer(app);
+createWebSocketServer(server);
+
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`API listening on port ${PORT}`));
+server.listen(PORT, () => console.log(`API + WebSocket listening on port ${PORT}`));

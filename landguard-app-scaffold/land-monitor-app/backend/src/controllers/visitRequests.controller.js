@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const bus = require('../realtime/eventBus');
 
 // GET /visit-requests — scoped by role: owner sees own, agent sees assigned, admin sees all
 exports.list = async (req, res, next) => {
@@ -50,8 +51,13 @@ exports.create = async (req, res, next) => {
       );
     }
 
-    // TODO: notify nearest/assigned agent here via the notifications service
-    res.status(201).json(result.rows[0]);
+    const visit = result.rows[0];
+
+    // Create a notification for agents in the parcel's region + emit real-time event
+    // TODO: in a real build, look up agents by region and insert notification rows.
+    bus.emit('visit:status', { visit, ownerId: visit.owner_id, agentId: visit.agent_id });
+
+    res.status(201).json(visit);
   } catch (err) {
     next(err);
   }
@@ -73,8 +79,12 @@ exports.updateStatus = async (req, res, next) => {
       `UPDATE visit_requests SET ${fields.join(', ')} WHERE id = $${i} RETURNING *`,
       values
     );
-    // TODO: notify owner when status changes, especially on 'completed'
-    res.json(result.rows[0]);
+    const visit = result.rows[0];
+
+    // Emit real-time status change to the owner and assigned agent
+    bus.emit('visit:status', { visit, ownerId: visit.owner_id, agentId: visit.agent_id });
+
+    res.json(visit);
   } catch (err) {
     next(err);
   }

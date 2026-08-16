@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { MapPin, ArrowRight, Ruler } from 'lucide-react';
-import { Card, Badge, Skeleton, AreaBarChart, AlertTrendChart } from '@earthglobal/design-system';
+import { MapPin, ArrowRight, Ruler, AlertTriangle, X } from 'lucide-react';
+import { Card, Badge, Skeleton, AreaBarChart, AlertTrendChart, useRealTime, ConnectionStatus } from '@earthglobal/design-system';
 import api from '../services/api';
 import OwnerLayout from '../components/OwnerLayout';
 
@@ -77,12 +77,62 @@ const ChartTitle = styled.h2`
   margin-bottom: ${({ theme }) => theme.spacing[4]};
 `;
 
+const HeaderRow = styled.div`
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.spacing[4]};
+`;
+
+const LiveAlertBanner = styled(motion.div)`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing[3]};
+  padding: ${({ theme }) => theme.spacing[3]} ${({ theme }) => theme.spacing[4]};
+  margin-bottom: ${({ theme }) => theme.spacing[6]};
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid ${({ theme }) => theme.colors.warning};
+  border-radius: ${({ theme }) => theme.radii.md};
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.2);
+`;
+
+const LiveAlertText = styled.div`
+  flex: 1;
+  color: ${({ theme }) => theme.colors.text};
+  font-size: ${({ theme }) => theme.fontSizes.sm};
+`;
+
+const LiveAlertClose = styled.button`
+  background: none;
+  border: none;
+  color: ${({ theme }) => theme.colors.textMuted};
+  cursor: pointer;
+  padding: 4px;
+  border-radius: ${({ theme }) => theme.radii.sm};
+  display: flex;
+  align-items: center;
+
+  &:hover {
+    color: ${({ theme }) => theme.colors.text};
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.primaryBright};
+    outline-offset: 2px;
+  }
+`;
+
 export default function Dashboard() {
   const { t } = useTranslation();
   const [parcels, setParcels] = useState([]);
   const [alertTrends, setAlertTrends] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [liveAlert, setLiveAlert] = useState(null);
+
+  const token = localStorage.getItem('token');
+  const { connected, on } = useRealTime({ token });
 
   useEffect(() => {
     const loadParcels = api.get('/parcels').then((res) => setParcels(res.data));
@@ -96,12 +146,64 @@ export default function Dashboard() {
       .finally(() => setLoading(false));
   }, [t]);
 
+  // Subscribe to real-time alert events
+  useEffect(() => {
+    if (!on) return;
+    const unsubscribe = on('alert:new', ({ alert, parcelId }) => {
+      const parcel = parcels.find((p) => p.id === parcelId);
+      setLiveAlert({
+        alertType: alert.alert_type,
+        parcelName: parcel?.name || t('dashboard.unknownParcel'),
+        parcelId,
+      });
+    });
+    return unsubscribe;
+  }, [on, parcels, t]);
+
   return (
     <OwnerLayout>
       <Header>
-        <Title>{t('dashboard.title')}</Title>
-        <Subtitle>{t('tagline', { ns: 'common' })}</Subtitle>
+        <HeaderRow>
+          <div>
+            <Title>{t('dashboard.title')}</Title>
+            <Subtitle>{t('tagline', { ns: 'common' })}</Subtitle>
+          </div>
+          <ConnectionStatus
+            connected={connected}
+            connectedLabel={t('realtime.live', { ns: 'common' })}
+            disconnectedLabel={t('realtime.reconnecting', { ns: 'common' })}
+          />
+        </HeaderRow>
       </Header>
+
+      <AnimatePresence>
+        {liveAlert && (
+          <LiveAlertBanner
+            role="alert"
+            initial={{ opacity: 0, y: -12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.3 }}
+          >
+            <AlertTriangle size={20} color="#f59e0b" aria-hidden="true" />
+            <LiveAlertText>
+              {t('dashboard.newAlert', {
+                type: liveAlert.alertType,
+                parcel: liveAlert.parcelName,
+              })}
+            </LiveAlertText>
+            <Link to={`/parcels/${liveAlert.parcelId}`}>
+              <Badge tone="warning">{t('dashboard.viewParcel')}</Badge>
+            </Link>
+            <LiveAlertClose
+              onClick={() => setLiveAlert(null)}
+              aria-label={t('dashboard.dismissAlert', { ns: 'common' })}
+            >
+              <X size={16} aria-hidden="true" />
+            </LiveAlertClose>
+          </LiveAlertBanner>
+        )}
+      </AnimatePresence>
 
       {loading && (
         <Grid>

@@ -3,14 +3,21 @@ import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 import { useTranslation } from 'react-i18next';
 import { Camera, Video, Radio, ChevronRight } from 'lucide-react';
-import { Card, Badge, Skeleton } from '@earthglobal/design-system';
+import { Card, Badge, Skeleton, useRealTime, ConnectionStatus } from '@earthglobal/design-system';
 import api from '../services/api';
 import AgentLayout from '../components/AgentLayout';
+
+const TitleRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.spacing[4]};
+  margin-bottom: ${({ theme }) => theme.spacing[6]};
+`;
 
 const Title = styled.h1`
   font-size: ${({ theme }) => theme.fontSizes['2xl']};
   color: ${({ theme }) => theme.colors.text};
-  margin-bottom: ${({ theme }) => theme.spacing[6]};
 `;
 
 const List = styled.div`
@@ -49,6 +56,9 @@ export default function VisitList() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const token = localStorage.getItem('token');
+  const { connected, on } = useRealTime({ token });
+
   useEffect(() => {
     api
       .get('/visit-requests')
@@ -57,9 +67,27 @@ export default function VisitList() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Subscribe to real-time visit status updates — update the list in place
+  useEffect(() => {
+    if (!on) return;
+    const unsubscribe = on('visit:status', ({ visit }) => {
+      setRequests((prev) =>
+        prev.map((r) => (r.id === visit.id ? { ...r, ...visit } : r))
+      );
+    });
+    return unsubscribe;
+  }, [on]);
+
   return (
     <AgentLayout>
-      <Title>{t('visitList.title')}</Title>
+      <TitleRow>
+        <Title>{t('visitList.title')}</Title>
+        <ConnectionStatus
+          connected={connected}
+          connectedLabel={tCommon('realtime.live')}
+          disconnectedLabel={tCommon('realtime.reconnecting')}
+        />
+      </TitleRow>
 
       {loading && (
         <List>

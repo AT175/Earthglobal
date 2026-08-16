@@ -11,5 +11,6 @@ export * from './theme/animations';
 export * from './components/atoms';
 export * from './components/molecules';
 export * from './components/organisms';
+export { default as useRealTime } from './hooks/useRealTime';
 export { cn } from './utils/cn';
 export * from './i18n';

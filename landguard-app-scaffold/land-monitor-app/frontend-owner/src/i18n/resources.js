@@ -14,6 +14,8 @@ export default {
         surveyedUnknown: 'Surveyed N/A',
         areaByParcel: 'Area by parcel',
         alertTrend: 'Alert history (last 12 months)',
+        newAlert: 'New {{type}} alert detected on {{parcel}}',
+        unknownParcel: 'Unknown parcel',
       },
       parcelDetail: {
         notFound: 'Parcel not found.',
@@ -44,6 +46,8 @@ export default {
         surveyedUnknown: 'Inspección: N/D',
         areaByParcel: 'Área por parcela',
         alertTrend: 'Historial de alertas (últimos 12 meses)',
+        newAlert: 'Nueva alerta de {{type}} detectada en {{parcel}}',
+        unknownParcel: 'Parcela desconocida',
       },
       parcelDetail: {
         notFound: 'Parcela no encontrada.',

@@ -9,11 +9,24 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom', 'styled-components'],
-          motion: ['framer-motion'],
-          maps: ['@react-google-maps/api'],
-          charts: ['recharts'],
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('socket.io-client') || id.includes('engine.io-client') || id.includes('socket.io-parser')) {
+              return 'realtime';
+            }
+            if (id.includes('recharts') || id.includes('d3-') || id.includes('victory-vendor')) {
+              return 'charts';
+            }
+            if (id.includes('@react-google-maps/api')) {
+              return 'maps';
+            }
+            if (id.includes('framer-motion')) {
+              return 'motion';
+            }
+            if (id.includes('react-router') || id.includes('react-dom') || id.includes('/react/') || id.includes('styled-components') || id.includes('i18next') || id.includes('react-i18next')) {
+              return 'vendor';
+            }
+          }
         },
       },
     },

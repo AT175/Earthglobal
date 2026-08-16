@@ -9,6 +9,7 @@
  */
 require('dotenv').config();
 const db = require('../config/db');
+const bus = require('../realtime/eventBus');
 
 const NDVI_CHANGE_THRESHOLD = 0.15; // tune based on testing — higher = fewer false positives
 
@@ -46,12 +47,22 @@ async function run() {
 
       if (changeScore >= NDVI_CHANGE_THRESHOLD) {
         const alertType = ndviValue < previousNdvi ? 'clearing' : 'possible_structure';
-        await db.query(
+        const { rows: alertRows } = await db.query(
           `INSERT INTO alerts (parcel_id, ndvi_before, ndvi_after, change_score, alert_type, image_url)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
+           VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
           [parcel.id, previousNdvi, ndviValue, changeScore, alertType, imageUrl]
         );
-        // TODO: insert a notification row for the parcel's owner here
+        const alert = alertRows[0];
+
+        // Look up the parcel's owner and emit a real-time alert event
+        const { rows: ownerRows } = await db.query(
+          'SELECT owner_id FROM parcels WHERE id = $1',
+          [parcel.id]
+        );
+        const ownerId = ownerRows[0]?.owner_id;
+        if (ownerId) {
+          bus.emit('alert:new', { alert, parcelId: parcel.id, ownerId });
+        }
         console.log(`Alert created for parcel ${parcel.id}: ${alertType} (change: ${changeScore.toFixed(3)})`);
       }
     } catch (err) {
