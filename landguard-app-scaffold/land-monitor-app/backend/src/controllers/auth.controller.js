@@ -5,15 +5,40 @@ const db = require('../config/db');
 // In-memory OTP store for scaffolding purposes only — replace with Redis or a DB table in production.
 const otpStore = new Map();
 
+// ── Helper: find user across owners, agents, admins ──
+async function findUserByEmail(email) {
+  // Check owners
+  let result = await db.query('SELECT id, name, email, phone, password_hash FROM owners WHERE email = $1', [email]);
+  if (result.rows[0]) return { ...result.rows[0], role: 'owner' };
+
+  // Check agents
+  result = await db.query('SELECT id, name, email, phone, password_hash, active FROM agents WHERE email = $1', [email]);
+  if (result.rows[0]) return { ...result.rows[0], role: 'agent' };
+
+  // Check admins
+  result = await db.query('SELECT id, name, email, password_hash FROM admins WHERE email = $1', [email]);
+  if (result.rows[0]) return { ...result.rows[0], role: 'admin' };
+
+  return null;
+}
+
 exports.signup = async (req, res, next) => {
   try {
     const { name, email, phone, password } = req.body;
     const passwordHash = password ? await bcrypt.hash(password, 10) : null;
+
+    // Check if email already exists in any table
+    const existing = await findUserByEmail(email);
+    if (existing) return res.status(409).json({ error: 'An account with this email already exists' });
+
     const result = await db.query(
       `INSERT INTO owners (name, email, phone, password_hash) VALUES ($1, $2, $3, $4) RETURNING id, name, email, phone`,
       [name, email, phone, passwordHash]
     );
-    res.status(201).json(result.rows[0]);
+
+    const owner = result.rows[0];
+    const token = jwt.sign({ id: owner.id, role: 'owner' }, process.env.JWT_SECRET, { expiresIn: '30d' });
+    res.status(201).json({ token, owner, role: 'owner' });
   } catch (err) {
     next(err);
   }
@@ -46,24 +71,39 @@ exports.verifyOtp = async (req, res, next) => {
     if (!owner) return res.status(404).json({ error: 'No account found for this phone number' });
 
     const token = jwt.sign({ id: owner.id, role: 'owner' }, process.env.JWT_SECRET, { expiresIn: '30d' });
-    res.json({ token, owner });
+    res.json({ token, owner, role: 'owner' });
   } catch (err) {
     next(err);
   }
 };
 
+// ── Unified login — auto-detects role from the database ──
 exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    const result = await db.query('SELECT * FROM owners WHERE email = $1', [email]);
-    const owner = result.rows[0];
-    if (!owner || !owner.password_hash) return res.status(401).json({ error: 'Invalid credentials' });
 
-    const valid = await bcrypt.compare(password, owner.password_hash);
-    if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+    // Find user across all role tables
+    const user = await findUserByEmail(email);
+    if (!user || !user.password_hash) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
 
-    const token = jwt.sign({ id: owner.id, role: 'owner' }, process.env.JWT_SECRET, { expiresIn: '30d' });
-    res.json({ token, owner: { id: owner.id, name: owner.name, email: owner.email } });
+    // Check if agent is active
+    if (user.role === 'agent' && user.active === false) {
+      return res.status(403).json({ error: 'Your agent account has been deactivated. Contact an administrator.' });
+    }
+
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) return res.status(401).json({ error: 'Invalid email or password' });
+
+    const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '30d' });
+
+    // Return user info + role — frontend auto-routes based on role
+    const userInfo = { id: user.id, name: user.name, email: user.email };
+    if (user.phone) userInfo.phone = user.phone;
+    if (user.region) userInfo.region = user.region;
+
+    res.json({ token, owner: userInfo, role: user.role });
   } catch (err) {
     next(err);
   }

@@ -38,9 +38,30 @@ CREATE TABLE IF NOT EXISTS owners (
 CREATE TABLE IF NOT EXISTS agents (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE,
     phone VARCHAR(50) UNIQUE NOT NULL,
     region VARCHAR(255),
+    password_hash VARCHAR(255),
     active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Add email + password_hash to agents if they don't exist (for existing DBs)
+DO $$ BEGIN
+    ALTER TABLE agents ADD COLUMN IF NOT EXISTS email VARCHAR(255) UNIQUE;
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN
+    ALTER TABLE agents ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255);
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+-- =========================================================
+-- ADMINS
+-- =========================================================
+CREATE TABLE IF NOT EXISTS admins (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
