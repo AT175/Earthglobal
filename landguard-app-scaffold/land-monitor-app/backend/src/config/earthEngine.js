@@ -56,7 +56,7 @@ function init() {
     }
 
     try {
-      ee.authenticateViaPrivateKey(
+      ee.data.authenticateViaPrivateKey(
         credentials,
         () => {
           ee.initialize(
