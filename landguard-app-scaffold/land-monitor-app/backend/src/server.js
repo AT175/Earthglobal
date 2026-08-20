@@ -14,6 +14,8 @@ const notificationRoutes = require('./routes/notifications.routes');
 const paymentRoutes = require('./routes/payments.routes');
 const mapTilesRoutes = require('./routes/mapTiles.routes');
 const { createWebSocketServer } = require('./realtime/socketServer');
+const cron = require('node-cron');
+const { run: runNdviJob } = require('./jobs/ndviChangeDetection');
 
 const app = express();
 
@@ -50,4 +52,19 @@ const server = http.createServer(app);
 createWebSocketServer(server);
 
 const PORT = process.env.PORT || 4000;
-server.listen(PORT, () => console.log(`API + WebSocket listening on port ${PORT}`));
+server.listen(PORT, () => {
+  console.log(`API + WebSocket listening on port ${PORT}`);
+
+  // Schedule NDVI change detection — runs every 2 days at 3:00 AM UTC
+  // Sentinel-2 revisits every 2-3 days, so checking every 2 days catches
+  // new imagery soon after it's available.
+  if (process.env.NODE_ENV === 'production' || process.env.ENABLE_NDVI_CRON === 'true') {
+    cron.schedule('0 3 */2 * *', () => {
+      console.log('[Cron] Starting scheduled NDVI change detection...');
+      runNdviJob().catch((err) => console.error('[Cron] NDVI job error:', err.message));
+    });
+    console.log('NDVI change detection scheduled: every 2 days at 3:00 AM UTC');
+  } else {
+    console.log('NDVI cron disabled in dev — set ENABLE_NDVI_CRON=true to enable');
+  }
+});

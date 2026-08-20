@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const turf = require('@turf/turf');
+const { computeParcelNdvi } = require('../jobs/ndviChangeDetection');
 
 // GET /parcels — list parcels belonging to the authenticated owner
 exports.listForOwner = async (req, res, next) => {
@@ -92,6 +93,57 @@ exports.remove = async (req, res, next) => {
   try {
     await db.query('DELETE FROM parcels WHERE id = $1', [req.params.id]);
     res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /parcels/:id/satellite — capture a fresh satellite image + NDVI for a parcel
+exports.captureSatellite = async (req, res, next) => {
+  try {
+    const result = await db.query(
+      `SELECT id, name, ST_AsGeoJSON(boundary) AS boundary_geojson FROM parcels WHERE id = $1`,
+      [req.params.id]
+    );
+    const parcel = result.rows[0];
+    if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
+
+    const boundary = JSON.parse(parcel.boundary_geojson);
+    const capture = await computeParcelNdvi(boundary);
+
+    if (!capture) {
+      return res.status(503).json({
+        error: 'Satellite imagery not available. Earth Engine may not be configured or no cloud-free imagery in the last 30 days.',
+      });
+    }
+
+    // Store the snapshot
+    await db.query(
+      `INSERT INTO parcel_images (parcel_id, image_url, ndvi_value, source) VALUES ($1, $2, $3, $4)`,
+      [parcel.id, capture.imageUrl, capture.ndviValue, 'sentinel-2']
+    );
+
+    res.json({
+      parcelId: parcel.id,
+      ndvi: capture.ndviValue,
+      imageUrl: capture.imageUrl,
+      capturedAt: new Date().toISOString(),
+      source: 'sentinel-2',
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /parcels/:id/images — list historical satellite images for a parcel
+exports.listImages = async (req, res, next) => {
+  try {
+    const result = await db.query(
+      `SELECT id, image_url, ndvi_value, captured_at, source
+       FROM parcel_images WHERE parcel_id = $1 ORDER BY captured_at DESC LIMIT 50`,
+      [req.params.id]
+    );
+    res.json(result.rows);
   } catch (err) {
     next(err);
   }

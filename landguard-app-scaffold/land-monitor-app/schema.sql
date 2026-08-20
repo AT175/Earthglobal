@@ -207,6 +207,21 @@ CREATE TABLE IF NOT EXISTS alerts (
 CREATE INDEX IF NOT EXISTS idx_alerts_parcel ON alerts (parcel_id);
 
 -- =========================================================
+-- PARCEL IMAGES (satellite snapshots)
+-- =========================================================
+CREATE TABLE IF NOT EXISTS parcel_images (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    parcel_id UUID NOT NULL REFERENCES parcels(id) ON DELETE CASCADE,
+    image_url TEXT NOT NULL,
+    ndvi_value NUMERIC(5, 3),
+    captured_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    source VARCHAR(50) NOT NULL DEFAULT 'sentinel-2'
+);
+
+CREATE INDEX IF NOT EXISTS idx_parcel_images_parcel ON parcel_images (parcel_id);
+CREATE INDEX IF NOT EXISTS idx_parcel_images_date ON parcel_images (captured_at DESC);
+
+-- =========================================================
 -- PAYMENTS
 -- =========================================================
 DO $$ BEGIN

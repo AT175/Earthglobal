@@ -861,17 +861,17 @@ const FEATURES = [
   {
     icon: Satellite,
     title: 'Satellite Monitoring',
-    desc: 'Sentinel-2 satellite imagery with NDVI vegetation index analysis. Detect land changes, clearing, and encroachment when new imagery is processed.',
+    desc: 'Sentinel-2 satellite imagery checked every 2 days. NDVI vegetation analysis detects clearing, encroachment, and vegetation loss automatically.',
   },
   {
     icon: Bell,
-    title: 'Change Alerts',
-    desc: 'Get notified when NDVI analysis detects vegetation loss on your land. Email, SMS, and in-app alerts keep you informed of potential threats.',
+    title: 'Real-time Alerts',
+    desc: 'Get notified via WebSocket, email, and SMS the moment NDVI analysis detects a change on your land. Push alerts stream live to your dashboard.',
   },
   {
     icon: Camera,
-    title: 'Field Visits',
-    desc: 'Request on-the-ground visits by verified agents. Receive geo-tagged photos, videos, and live video streams directly from your parcel.',
+    title: 'Parcel Imagery',
+    desc: 'Capture satellite snapshots of your parcels on demand. Historical imagery gallery shows how your land changes over time.',
   },
   {
     icon: Shield,
@@ -893,14 +893,14 @@ const FEATURES = [
 const STEPS = [
   { title: 'Create Account', desc: 'Sign up as a landowner, agent, or admin in under 60 seconds.' },
   { title: 'Register Parcels', desc: 'Survey boundaries with GPS or import GeoJSON files with PostGIS.' },
-  { title: 'Monitor Land', desc: 'Satellite NDVI analysis watches your land. Get alerts when changes are detected.' },
+  { title: 'Monitor Land', desc: 'Satellite NDVI analysis runs every 2 days. Get real-time alerts when changes are detected.' },
   { title: 'Verify & Protect', desc: 'Send agents to inspect. Build evidence. Secure your land for good.' },
 ];
 
 const TRUST_ITEMS = [
   { icon: Satellite, label: 'Sentinel-2 Satellite Imagery' },
   { icon: Shield, label: 'PostGIS Boundary Mapping' },
-  { icon: Zap, label: 'WebSocket Live Updates' },
+  { icon: Zap, label: 'Real-time WebSocket Alerts' },
   { icon: Globe, label: 'Monitor from Anywhere' },
 ];
 
@@ -1000,8 +1000,8 @@ export default function Landing() {
               transition={{ delay: 0.3 }}
             >
               Remote land monitoring powered by satellite imagery and field agents.
-              Detect changes with NDVI analysis, get alerts, and send agents to verify —
-              all from one dashboard.
+              NDVI analysis runs every 2 days, real-time alerts notify you of changes,
+              and satellite imagery captures your parcel over time.
             </HeroSubtitle>
 
             <HeroCTAs
@@ -1031,16 +1031,16 @@ export default function Landing() {
               transition={{ delay: 0.6 }}
             >
               <Stat>
-                <StatValue>Satellite</StatValue>
-                <StatLabel>NDVI monitoring</StatLabel>
+                <StatValue>2-day</StatValue>
+                <StatLabel>Satellite monitoring</StatLabel>
               </Stat>
               <Stat>
-                <StatValue>Live</StatValue>
+                <StatValue>Real-time</StatValue>
                 <StatLabel>WebSocket alerts</StatLabel>
               </Stat>
               <Stat>
-                <StatValue>GPS</StatValue>
-                <StatLabel>Boundary mapping</StatLabel>
+                <StatValue>Satellite</StatValue>
+                <StatLabel>Parcel imagery</StatLabel>
               </Stat>
             </HeroStats>
           </HeroLeft>
