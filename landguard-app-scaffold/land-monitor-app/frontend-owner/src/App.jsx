@@ -17,6 +17,7 @@ const VisitList = lazy(() => import('./pages/agent/VisitList'));
 const VisitDetail = lazy(() => import('./pages/agent/VisitDetail'));
 
 // Admin pages
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const ParcelOnboarding = lazy(() => import('./pages/admin/ParcelOnboarding'));
 const AgentManagement = lazy(() => import('./pages/admin/AgentManagement'));
 const ParcelsList = lazy(() => import('./pages/admin/ParcelsList'));
@@ -77,6 +78,7 @@ export default function App() {
 
             {/* Admin routes */}
             <Route path="/admin" element={<RequireAuth><ParcelOnboarding /></RequireAuth>} />
+            <Route path="/admin/dashboard" element={<RequireAuth><AdminDashboard /></RequireAuth>} />
             <Route path="/admin/agents" element={<RequireAuth><AgentManagement /></RequireAuth>} />
             <Route path="/admin/parcels" element={<RequireAuth><ParcelsList /></RequireAuth>} />
 

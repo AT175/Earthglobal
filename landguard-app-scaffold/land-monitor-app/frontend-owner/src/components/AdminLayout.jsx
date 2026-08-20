@@ -1,6 +1,6 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LayoutGrid, Users, MapPinned } from 'lucide-react';
+import { LayoutGrid, Users, MapPinned, Home, LogOut } from 'lucide-react';
 import {
   AppShell,
   Sidebar,
@@ -14,15 +14,23 @@ import {
 } from '@earthglobal/design-system';
 
 const NAV_ITEMS = [
+  { to: '/admin/dashboard', labelKey: 'nav.dashboard', icon: LayoutGrid },
   { to: '/admin', labelKey: 'nav.parcelOnboarding', icon: MapPinned },
   { to: '/admin/agents', labelKey: 'nav.agents', icon: Users },
-  { to: '/admin/parcels', labelKey: 'nav.parcels', icon: LayoutGrid },
+  { to: '/admin/parcels', labelKey: 'nav.parcels', icon: Home },
 ];
 
 export default function AdminLayout({ children }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { t } = useTranslation('common');
   const navItems = NAV_ITEMS.map((item) => ({ ...item, label: t(item.labelKey) }));
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    navigate('/');
+  };
 
   const navContent = (
     <NavList aria-label="Primary navigation">
@@ -50,8 +58,16 @@ export default function AdminLayout({ children }) {
             Earth<span>Global</span> Admin
           </Logo>
           {navContent}
-          <div style={{ marginTop: 'auto', paddingTop: 24 }}>
+          <div style={{ marginTop: 'auto', paddingTop: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
             <LanguageSwitcher />
+            <NavItem
+              as="button"
+              onClick={handleLogout}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+            >
+              <LogOut size={18} aria-hidden="true" />
+              Logout
+            </NavItem>
           </div>
         </Sidebar>
       }
