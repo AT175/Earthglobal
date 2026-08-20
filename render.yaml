@@ -74,7 +74,7 @@ services:
     plan: free
     runtime: static
     rootDir: landguard-app-scaffold/land-monitor-app
-    buildCommand: bash build-frontend.sh
+    buildCommand: cd design-system && npm install && cd ../frontend-owner && npm install && npm run build
     staticPublishPath: ./frontend-owner/dist
     autoDeploy: true
     envVars:
