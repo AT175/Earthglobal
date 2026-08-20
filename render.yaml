@@ -15,7 +15,7 @@ services:
   - type: web
     name: earthglobal-api
     region: oregon
-    plan: starter
+    plan: free
     runtime: node
     buildCommand: yarn build
     startCommand: yarn start
@@ -71,7 +71,7 @@ services:
   # ─────────────────────────────────────────────────────────────
   - type: web
     name: earthglobal-app
-    plan: starter
+    plan: free
     runtime: static
     rootDir: landguard-app-scaffold/land-monitor-app
     buildCommand: bash build-frontend.sh
