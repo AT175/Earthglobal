@@ -77,7 +77,6 @@ services:
     rootDir: landguard-app-scaffold/land-monitor-app
     buildCommand: bash build-frontend.sh
     staticPublishPath: ./frontend-owner/dist
-    pullRequestPreviewsEnabled: false
     autoDeploy: true
     envVars:
       - key: VITE_API_URL
@@ -88,17 +87,17 @@ services:
         sync: false  # set manually in Render dashboard
     # SPA fallback — all routes serve index.html so React Router works
     routes:
-      - pattern: /assets/*
-        source: /assets/:splat
+      - type: rewrite
+        source: /assets/*
         destination: /assets/:splat
-      - pattern: /sw.js
+      - type: rewrite
         source: /sw.js
         destination: /sw.js
-      - pattern: /manifest.webmanifest
+      - type: rewrite
         source: /manifest.webmanifest
         destination: /manifest.webmanifest
-      - pattern: /*
-        source: /
+      - type: rewrite
+        source: /*
         destination: /index.html
     # Security + caching headers
     headers:
