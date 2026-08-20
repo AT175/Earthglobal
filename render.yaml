@@ -72,9 +72,9 @@ services:
   - type: web
     name: earthglobal-app
     runtime: static
-    rootDir: landguard-app-scaffold/land-monitor-app
-    buildCommand: cd design-system && npm install && cd ../frontend-owner && npm install && npm run build
-    staticPublishPath: ./frontend-owner/dist
+    rootDir: landguard-app-scaffold/land-monitor-app/frontend-owner
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
     autoDeploy: true
     envVars:
       - key: VITE_API_URL
