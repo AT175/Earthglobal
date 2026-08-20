@@ -29,8 +29,14 @@ CREATE TABLE IF NOT EXISTS owners (
     email VARCHAR(255) UNIQUE,
     phone VARCHAR(50) UNIQUE,
     password_hash VARCHAR(255),
+    approved BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Add approved column to owners if it doesn't exist (for existing DBs)
+DO $$ BEGIN
+    ALTER TABLE owners ADD COLUMN IF NOT EXISTS approved BOOLEAN NOT NULL DEFAULT false;
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 
 -- =========================================================
 -- AGENTS

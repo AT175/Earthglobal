@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutGrid, Users, MapPinned, Home, LogOut } from 'lucide-react';
+import { LayoutGrid, Users, MapPinned, Home, LogOut, Building2, UserCog } from 'lucide-react';
 import {
   AppShell,
   Sidebar,
@@ -15,8 +15,10 @@ import {
 const NAV_ITEMS = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutGrid },
   { to: '/admin', label: 'Onboard Parcel', icon: MapPinned },
-  { to: '/admin/agents', label: 'Agents', icon: Users },
   { to: '/admin/parcels', label: 'Parcels', icon: Home },
+  { to: '/admin/agents', label: 'Agents', icon: Users },
+  { to: '/admin/users', label: 'User Management', icon: UserCog },
+  { to: '/admin/organizations', label: 'Organizations', icon: Building2 },
 ];
 
 export default function AdminLayout({ children }) {

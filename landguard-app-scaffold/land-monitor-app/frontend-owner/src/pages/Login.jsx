@@ -425,6 +425,7 @@ export default function Login() {
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [signupSuccess, setSignupSuccess] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -435,6 +436,13 @@ export default function Login() {
     try {
       if (mode === 'signup') {
         await api.post('/auth/signup', { name, email, phone, password });
+        // Account created — but needs admin approval before login
+        setMode('login');
+        setError('');
+        setLoading(false);
+        // Show success message instead of trying to log in (which would fail)
+        setSignupSuccess(true);
+        return;
       }
 
       const { data } = await api.post('/auth/login', { email, password });
@@ -543,6 +551,21 @@ export default function Login() {
               >
                 <AlertCircle size={16} aria-hidden="true" />
                 {error}
+              </ErrorBanner>
+            )}
+          </AnimatePresence>
+
+          {/* Signup success */}
+          <AnimatePresence>
+            {signupSuccess && (
+              <ErrorBanner
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                style={{ background: 'rgba(34,197,94,0.1)', borderColor: 'rgba(34,197,94,0.3)', color: '#4ade80' }}
+              >
+                <CheckCircle2 size={16} aria-hidden="true" />
+                Account created! An administrator must approve your account before you can log in.
               </ErrorBanner>
             )}
           </AnimatePresence>

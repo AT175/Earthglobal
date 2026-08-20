@@ -3,9 +3,10 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, Spinner } from '@earthglobal/design-system';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 
-// Landing + Login (eager-loaded — entry points)
+// Landing + Login + Signup (eager-loaded — entry points)
 import Landing from './pages/Landing';
 import Login from './pages/Login';
+import Signup from './pages/Signup';
 
 // Owner pages
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -21,6 +22,8 @@ const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const ParcelOnboarding = lazy(() => import('./pages/admin/ParcelOnboarding'));
 const AgentManagement = lazy(() => import('./pages/admin/AgentManagement'));
 const ParcelsList = lazy(() => import('./pages/admin/ParcelsList'));
+const UserManagement = lazy(() => import('./pages/admin/UserManagement'));
+const OrganizationManagement = lazy(() => import('./pages/admin/OrganizationManagement'));
 
 // Assembly pages
 const AssemblyDashboard = lazy(() => import('./pages/assembly/AssemblyDashboard'));
@@ -66,6 +69,7 @@ export default function App() {
             {/* Public routes */}
             <Route path="/" element={<AutoRoute />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
 
             {/* Owner routes */}
             <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
@@ -81,6 +85,8 @@ export default function App() {
             <Route path="/admin/dashboard" element={<RequireAuth><AdminDashboard /></RequireAuth>} />
             <Route path="/admin/agents" element={<RequireAuth><AgentManagement /></RequireAuth>} />
             <Route path="/admin/parcels" element={<RequireAuth><ParcelsList /></RequireAuth>} />
+            <Route path="/admin/users" element={<RequireAuth><UserManagement /></RequireAuth>} />
+            <Route path="/admin/organizations" element={<RequireAuth><OrganizationManagement /></RequireAuth>} />
 
             {/* Assembly routes */}
             <Route path="/assembly" element={<RequireAuth><AssemblyDashboard /></RequireAuth>} />

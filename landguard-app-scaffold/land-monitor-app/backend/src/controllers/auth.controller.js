@@ -8,7 +8,7 @@ const otpStore = new Map();
 // ── Helper: find user across owners, agents, admins, assembly_users ──
 async function findUserByEmail(email) {
   // Check owners
-  let result = await db.query('SELECT id, name, email, phone, password_hash FROM owners WHERE email = $1', [email]);
+  let result = await db.query('SELECT id, name, email, phone, password_hash, approved FROM owners WHERE email = $1', [email]);
   if (result.rows[0]) return { ...result.rows[0], role: 'owner' };
 
   // Check agents
@@ -29,20 +29,26 @@ async function findUserByEmail(email) {
 exports.signup = async (req, res, next) => {
   try {
     const { name, email, phone, password } = req.body;
-    const passwordHash = password ? await bcrypt.hash(password, 10) : null;
+    if (!name || !email || !password) return res.status(400).json({ error: 'Name, email, and password are required' });
+
+    const passwordHash = await bcrypt.hash(password, 10);
 
     // Check if email already exists in any table
     const existing = await findUserByEmail(email);
     if (existing) return res.status(409).json({ error: 'An account with this email already exists' });
 
     const result = await db.query(
-      `INSERT INTO owners (name, email, phone, password_hash) VALUES ($1, $2, $3, $4) RETURNING id, name, email, phone`,
+      `INSERT INTO owners (name, email, phone, password_hash, approved) VALUES ($1, $2, $3, $4, false) RETURNING id, name, email, phone`,
       [name, email, phone, passwordHash]
     );
 
     const owner = result.rows[0];
-    const token = jwt.sign({ id: owner.id, role: 'owner' }, process.env.JWT_SECRET, { expiresIn: '30d' });
-    res.status(201).json({ token, owner, role: 'owner' });
+    // Don't return a token — account must be approved by admin first
+    res.status(201).json({
+      success: true,
+      message: 'Account created successfully. An administrator must approve your account before you can log in.',
+      owner: { id: owner.id, name: owner.name, email: owner.email, phone: owner.phone },
+    });
   } catch (err) {
     next(err);
   }
@@ -100,6 +106,11 @@ exports.login = async (req, res, next) => {
     // Check if assembly user is active
     if (user.role === 'assembly' && user.active === false) {
       return res.status(403).json({ error: 'Your assembly account has been deactivated. Contact your administrator.' });
+    }
+
+    // Check if owner is approved
+    if (user.role === 'owner' && user.approved === false) {
+      return res.status(403).json({ error: 'Your account is pending administrator approval. Please check back later.' });
     }
 
     const valid = await bcrypt.compare(password, user.password_hash);
