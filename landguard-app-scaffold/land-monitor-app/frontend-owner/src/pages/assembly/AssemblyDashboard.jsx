@@ -7,7 +7,7 @@ import {
   Trees, MapPin, LogOut, RefreshCw, TrendingUp, Home, Landmark,
   CheckCircle2, XCircle, Clock, ArrowRight, Search,
 } from 'lucide-react';
-import api from '../services/api';
+import api from '../../services/api';
 
 // ═══════════════════════════════════════════════════════════
 // Layout
