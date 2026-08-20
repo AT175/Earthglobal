@@ -5,7 +5,7 @@ const db = require('../config/db');
 // In-memory OTP store for scaffolding purposes only — replace with Redis or a DB table in production.
 const otpStore = new Map();
 
-// ── Helper: find user across owners, agents, admins ──
+// ── Helper: find user across owners, agents, admins, assembly_users ──
 async function findUserByEmail(email) {
   // Check owners
   let result = await db.query('SELECT id, name, email, phone, password_hash FROM owners WHERE email = $1', [email]);
@@ -18,6 +18,10 @@ async function findUserByEmail(email) {
   // Check admins
   result = await db.query('SELECT id, name, email, password_hash FROM admins WHERE email = $1', [email]);
   if (result.rows[0]) return { ...result.rows[0], role: 'admin' };
+
+  // Check assembly users
+  result = await db.query('SELECT id, name, email, phone, password_hash, active, organization_id, role as assembly_role FROM assembly_users WHERE email = $1', [email]);
+  if (result.rows[0]) return { ...result.rows[0], role: 'assembly' };
 
   return null;
 }
@@ -93,15 +97,22 @@ exports.login = async (req, res, next) => {
       return res.status(403).json({ error: 'Your agent account has been deactivated. Contact an administrator.' });
     }
 
+    // Check if assembly user is active
+    if (user.role === 'assembly' && user.active === false) {
+      return res.status(403).json({ error: 'Your assembly account has been deactivated. Contact your administrator.' });
+    }
+
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(401).json({ error: 'Invalid email or password' });
 
-    const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '30d' });
+    const token = jwt.sign({ id: user.id, role: user.role, organizationId: user.organization_id }, process.env.JWT_SECRET, { expiresIn: '30d' });
 
     // Return user info + role — frontend auto-routes based on role
     const userInfo = { id: user.id, name: user.name, email: user.email };
     if (user.phone) userInfo.phone = user.phone;
     if (user.region) userInfo.region = user.region;
+    if (user.organization_id) userInfo.organizationId = user.organization_id;
+    if (user.assembly_role) userInfo.assemblyRole = user.assembly_role;
 
     res.json({ token, owner: userInfo, role: user.role });
   } catch (err) {

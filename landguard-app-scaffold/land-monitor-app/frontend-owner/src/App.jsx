@@ -21,6 +21,9 @@ const ParcelOnboarding = lazy(() => import('./pages/admin/ParcelOnboarding'));
 const AgentManagement = lazy(() => import('./pages/admin/AgentManagement'));
 const ParcelsList = lazy(() => import('./pages/admin/ParcelsList'));
 
+// Assembly pages
+const AssemblyDashboard = lazy(() => import('./pages/assembly/AssemblyDashboard'));
+
 const PageFallback = () => (
   <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem' }}>
     <Spinner size="32px" />
@@ -46,6 +49,7 @@ function AutoRoute() {
       const user = JSON.parse(userStr);
       if (user.role === 'agent') return <Navigate to="/agent" replace />;
       if (user.role === 'admin') return <Navigate to="/admin" replace />;
+      if (user.role === 'assembly') return <Navigate to="/assembly" replace />;
     } catch {}
   }
   // Default: owner dashboard
@@ -75,6 +79,9 @@ export default function App() {
             <Route path="/admin" element={<RequireAuth><ParcelOnboarding /></RequireAuth>} />
             <Route path="/admin/agents" element={<RequireAuth><AgentManagement /></RequireAuth>} />
             <Route path="/admin/parcels" element={<RequireAuth><ParcelsList /></RequireAuth>} />
+
+            {/* Assembly routes */}
+            <Route path="/assembly" element={<RequireAuth><AssemblyDashboard /></RequireAuth>} />
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />

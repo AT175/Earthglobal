@@ -13,6 +13,7 @@ const agentRoutes = require('./routes/agents.routes');
 const notificationRoutes = require('./routes/notifications.routes');
 const paymentRoutes = require('./routes/payments.routes');
 const mapTilesRoutes = require('./routes/mapTiles.routes');
+const assemblyRoutes = require('./routes/assembly.routes');
 const { createWebSocketServer } = require('./realtime/socketServer');
 const cron = require('node-cron');
 const { run: runNdviJob } = require('./jobs/ndviChangeDetection');
@@ -42,6 +43,7 @@ app.use('/agents', agentRoutes);
 app.use('/notifications', notificationRoutes);
 app.use('/payments', paymentRoutes);
 app.use('/map-tiles', mapTilesRoutes);
+app.use('/assembly', assemblyRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error(err);
