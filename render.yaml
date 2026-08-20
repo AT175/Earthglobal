@@ -77,10 +77,11 @@ services:
         value: "true"
 
   # ─────────────────────────────────────────────────────────────
-  # Frontend — Owner app (static site)
+  # Frontend — Unified app (owner + agent + admin in one)
+  # Deployed to Netlify as earthglobalgh.netlify.app
   # ─────────────────────────────────────────────────────────────
   - type: web
-    name: earthglobal-owner
+    name: earthglobal-app
     region: oregon
     plan: starter
     runtime: static
@@ -96,56 +97,6 @@ services:
         value: "sb_publishable_L4s9Yu3IfhPcXm6xCW6T2Q_aJHSG-4Y"
       - key: VITE_GOOGLE_MAPS_API_KEY
         sync: false  # set manually in Render dashboard
-    routes:
-      - pattern: /*
-        source: /
-        destination: /index.html
-
-  # ─────────────────────────────────────────────────────────────
-  # Frontend — Agent app (static site)
-  # ─────────────────────────────────────────────────────────────
-  - type: web
-    name: earthglobal-agent
-    region: oregon
-    plan: starter
-    runtime: static
-    rootDir: landguard-app-scaffold/land-monitor-app/frontend-agent
-    buildCommand: cd ../design-system && npm install && cd ../frontend-agent && npm install && npm run build
-    staticPublishPath: ./dist
-    pullRequestPreviewsEnabled: false
-    autoDeploy: true
-    envVars:
-      - key: VITE_API_URL
-        value: "https://earthglobal.onrender.com"
-      - key: VITE_STRIPE_PUBLISHABLE_KEY
-        value: "sb_publishable_L4s9Yu3IfhPcXm6xCW6T2Q_aJHSG-4Y"
-      - key: VITE_GOOGLE_MAPS_API_KEY
-        sync: false
-    routes:
-      - pattern: /*
-        source: /
-        destination: /index.html
-
-  # ─────────────────────────────────────────────────────────────
-  # Frontend — Admin app (static site)
-  # ─────────────────────────────────────────────────────────────
-  - type: web
-    name: earthglobal-admin
-    region: oregon
-    plan: starter
-    runtime: static
-    rootDir: landguard-app-scaffold/land-monitor-app/frontend-admin
-    buildCommand: cd ../design-system && npm install && cd ../frontend-admin && npm install && npm run build
-    staticPublishPath: ./dist
-    pullRequestPreviewsEnabled: false
-    autoDeploy: true
-    envVars:
-      - key: VITE_API_URL
-        value: "https://earthglobal.onrender.com"
-      - key: VITE_STRIPE_PUBLISHABLE_KEY
-        value: "sb_publishable_L4s9Yu3IfhPcXm6xCW6T2Q_aJHSG-4Y"
-      - key: VITE_GOOGLE_MAPS_API_KEY
-        sync: false
     routes:
       - pattern: /*
         source: /
