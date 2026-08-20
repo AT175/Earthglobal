@@ -6,12 +6,17 @@ const pool = new Pool({
   ssl: process.env.DATABASE_SSL === 'true' || process.env.NODE_ENV === 'production'
     ? { rejectUnauthorized: false }
     : undefined,
-  options: '-c search_path=earthglobal,public,extensions',
 });
 
 pool.on('error', (err) => {
   console.error('Unexpected error on idle database client', err);
   process.exit(1);
+});
+
+// Set search_path on each connection (Supabase pooler doesn't support
+// the `options` parameter in the connection string)
+pool.on('connect', (client) => {
+  client.query("SET search_path TO earthglobal, public, extensions");
 });
 
 module.exports = {
