@@ -860,47 +860,47 @@ const FooterBottom = styled.div`
 const FEATURES = [
   {
     icon: Satellite,
-    title: 'Satellite Surveillance',
-    desc: 'Sentinel-2 imagery monitors your land every 5 days. AI-powered NDVI analysis detects vegetation loss, clearing, and encroachment automatically.',
+    title: 'Satellite Monitoring',
+    desc: 'Sentinel-2 satellite imagery with NDVI vegetation index analysis. Detect land changes, clearing, and encroachment when new imagery is processed.',
   },
   {
     icon: Bell,
-    title: 'Instant Alerts',
-    desc: 'Get push notifications the moment a change is detected. Email, SMS, and in-app alerts ensure you never miss a threat to your property.',
+    title: 'Change Alerts',
+    desc: 'Get notified when NDVI analysis detects vegetation loss on your land. Email, SMS, and in-app alerts keep you informed of potential threats.',
   },
   {
     icon: Camera,
-    title: 'Field Verification',
-    desc: 'Dispatch verified agents to inspect changes on the ground. Receive geo-tagged photos, videos, and live streams directly from your parcel.',
+    title: 'Field Visits',
+    desc: 'Request on-the-ground visits by verified agents. Receive geo-tagged photos, videos, and live video streams directly from your parcel.',
   },
   {
     icon: Shield,
-    title: 'Legal Evidence Trail',
-    desc: 'GPS-accurate boundary surveys, timestamped satellite imagery, and field visit reports build a court-ready evidence chain for disputes.',
+    title: 'Evidence Documentation',
+    desc: 'GPS boundary surveys, timestamped satellite imagery, and field visit reports build a documented evidence trail for land disputes.',
   },
   {
     icon: Eye,
     title: 'Live Dashboard',
-    desc: 'Monitor all your parcels in real-time. WebSocket-powered updates stream alerts, visit statuses, and satellite data as it arrives.',
+    desc: 'Monitor all your parcels in one place. WebSocket-powered updates stream alerts, visit statuses, and satellite data as it arrives.',
   },
   {
     icon: MapPin,
     title: 'PostGIS Mapping',
-    desc: 'Professional-grade boundary mapping with satellite, terrain, and NDVI layers. Import GeoJSON or survey with GPS — sub-meter accuracy.',
+    desc: 'Boundary mapping with satellite, terrain, and NDVI layers. Import GeoJSON files or survey with GPS — stored accurately with PostGIS.',
   },
 ];
 
 const STEPS = [
   { title: 'Create Account', desc: 'Sign up as a landowner, agent, or admin in under 60 seconds.' },
   { title: 'Register Parcels', desc: 'Survey boundaries with GPS or import GeoJSON files with PostGIS.' },
-  { title: 'Monitor 24/7', desc: 'Satellites watch your land. Get alerts the moment changes are detected.' },
+  { title: 'Monitor Land', desc: 'Satellite NDVI analysis watches your land. Get alerts when changes are detected.' },
   { title: 'Verify & Protect', desc: 'Send agents to inspect. Build evidence. Secure your land for good.' },
 ];
 
 const TRUST_ITEMS = [
   { icon: Satellite, label: 'Sentinel-2 Satellite Imagery' },
   { icon: Shield, label: 'PostGIS Boundary Mapping' },
-  { icon: Zap, label: 'Real-time WebSocket Alerts' },
+  { icon: Zap, label: 'WebSocket Live Updates' },
   { icon: Globe, label: 'Monitor from Anywhere' },
 ];
 
@@ -982,7 +982,7 @@ export default function Landing() {
               transition={{ delay: 0.1 }}
             >
               <Satellite size={14} aria-hidden="true" />
-              Powered by Sentinel-2 Satellite Imagery
+              Sentinel-2 Satellite Imagery + NDVI Analysis
             </Badge>
 
             <HeroTitle
@@ -1000,8 +1000,8 @@ export default function Landing() {
               transition={{ delay: 0.3 }}
             >
               Remote land monitoring powered by satellite imagery and field agents.
-              Protect your land from anywhere in the world — 24/7 surveillance,
-              instant alerts, and on-the-ground verification.
+              Detect changes with NDVI analysis, get alerts, and send agents to verify —
+              all from one dashboard.
             </HeroSubtitle>
 
             <HeroCTAs
@@ -1031,16 +1031,16 @@ export default function Landing() {
               transition={{ delay: 0.6 }}
             >
               <Stat>
-                <StatValue>5-day</StatValue>
-                <StatLabel>Satellite revisit</StatLabel>
+                <StatValue>Satellite</StatValue>
+                <StatLabel>NDVI monitoring</StatLabel>
               </Stat>
               <Stat>
-                <StatValue>24/7</StatValue>
-                <StatLabel>Real-time alerts</StatLabel>
+                <StatValue>Live</StatValue>
+                <StatLabel>WebSocket alerts</StatLabel>
               </Stat>
               <Stat>
-                <StatValue>Sub-meter</StatValue>
-                <StatLabel>GPS accuracy</StatLabel>
+                <StatValue>GPS</StatValue>
+                <StatLabel>Boundary mapping</StatLabel>
               </Stat>
             </HeroStats>
           </HeroLeft>
@@ -1195,7 +1195,7 @@ export default function Landing() {
             <CTATitle>Ready to protect your land?</CTATitle>
             <CTADesc>
               Join EarthGlobal today and monitor your property with satellite imagery,
-              instant alerts, and professional field agents — from anywhere in the world.
+              NDVI change detection, and verified field agents — from anywhere in the world.
             </CTADesc>
             <CTAButtons>
               <Button

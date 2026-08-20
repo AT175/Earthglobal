@@ -408,9 +408,9 @@ const BackLink = styled.button`
 // Data
 // ═══════════════════════════════════════════════════════════
 const BRAND_FEATURES = [
-  { icon: Satellite, text: 'Satellite imagery every 5 days' },
-  { icon: CheckCircle2, text: 'Instant alerts on land changes' },
-  { icon: Shield, text: 'Court-ready evidence documentation' },
+  { icon: Satellite, text: 'Sentinel-2 satellite imagery with NDVI analysis' },
+  { icon: CheckCircle2, text: 'Alerts when land changes are detected' },
+  { icon: Shield, text: 'Documented evidence for land disputes' },
 ];
 
 // ═══════════════════════════════════════════════════════════
