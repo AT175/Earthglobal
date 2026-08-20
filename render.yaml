@@ -71,7 +71,6 @@ services:
   # ─────────────────────────────────────────────────────────────
   - type: web
     name: earthglobal-app
-    plan: free
     runtime: static
     rootDir: landguard-app-scaffold/land-monitor-app
     buildCommand: cd design-system && npm install && cd ../frontend-owner && npm install && npm run build
