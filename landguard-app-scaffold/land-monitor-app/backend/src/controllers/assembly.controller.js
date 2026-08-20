@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const bcrypt = require('bcrypt');
 const bus = require('../realtime/eventBus');
 const { notifyOwnerOfAlert } = require('../services/notificationService');
 
@@ -337,5 +338,108 @@ exports.listAlerts = async (req, res, next) => {
     query += ' ORDER BY a.detected_at DESC LIMIT 100';
     const result = await db.query(query, params);
     res.json(result.rows);
+  } catch (err) { next(err); }
+};
+
+// ═══════════════════════════════════════════════════════════
+// USER MANAGEMENT (org-scoped — assembly_admin only)
+// ═══════════════════════════════════════════════════════════
+
+// GET /assembly/users — list users in this organization
+exports.listUsers = async (req, res, next) => {
+  try {
+    const orgId = getOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'No organization associated with this account' });
+
+    const result = await db.query(
+      `SELECT id, name, email, phone, role as assembly_role, active, created_at
+       FROM assembly_users WHERE organization_id = $1 ORDER BY created_at DESC`,
+      [orgId]
+    );
+    res.json(result.rows);
+  } catch (err) { next(err); }
+};
+
+// POST /assembly/users — create a new user in this organization
+exports.createUser = async (req, res, next) => {
+  try {
+    const orgId = getOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'No organization associated with this account' });
+
+    const { name, email, phone, password, role } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: 'Name, email, and password are required' });
+    }
+
+    const existing = await db.query('SELECT email FROM assembly_users WHERE email = $1', [email]);
+    if (existing.rows[0]) return res.status(409).json({ error: 'An account with this email already exists' });
+
+    const hash = await bcrypt.hash(password, 10);
+    const result = await db.query(
+      `INSERT INTO assembly_users (organization_id, name, email, phone, password_hash, role)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, name, email, phone, role as assembly_role, active, created_at`,
+      [orgId, name, email, phone, hash, role || 'planning_officer']
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Email already exists' });
+    next(err);
+  }
+};
+
+// PATCH /assembly/users/:id — update user (activate/deactivate, change role, edit info)
+exports.updateUser = async (req, res, next) => {
+  try {
+    const orgId = getOrgId(req);
+    const { name, phone, role, active } = req.body;
+
+    const existing = await db.query('SELECT id FROM assembly_users WHERE id = $1 AND organization_id = $2', [req.params.id, orgId]);
+    if (!existing.rows[0]) return res.status(404).json({ error: 'User not found in your organization' });
+
+    const result = await db.query(
+      `UPDATE assembly_users SET
+         name = COALESCE($1, name),
+         phone = COALESCE($2, phone),
+         role = COALESCE($3, role),
+         active = COALESCE($4, active)
+       WHERE id = $5 AND organization_id = $6
+       RETURNING id, name, email, phone, role as assembly_role, active`,
+      [name, phone, role, active, req.params.id, orgId]
+    );
+    res.json(result.rows[0]);
+  } catch (err) { next(err); }
+};
+
+// DELETE /assembly/users/:id — delete user from this organization
+exports.deleteUser = async (req, res, next) => {
+  try {
+    const orgId = getOrgId(req);
+
+    if (req.params.id === req.user.id) {
+      return res.status(400).json({ error: 'You cannot delete your own account' });
+    }
+
+    const existing = await db.query('SELECT id FROM assembly_users WHERE id = $1 AND organization_id = $2', [req.params.id, orgId]);
+    if (!existing.rows[0]) return res.status(404).json({ error: 'User not found in your organization' });
+
+    await db.query('DELETE FROM assembly_users WHERE id = $1 AND organization_id = $2', [req.params.id, orgId]);
+    res.json({ success: true });
+  } catch (err) { next(err); }
+};
+
+// GET /assembly/organization — get current organization info
+exports.getOrganization = async (req, res, next) => {
+  try {
+    const orgId = getOrgId(req);
+    if (!orgId) return res.status(400).json({ error: 'No organization associated with this account' });
+
+    const result = await db.query(
+      `SELECT id, name, type, region, contact_email, contact_phone, address, active, created_at
+       FROM organizations WHERE id = $1`,
+      [orgId]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'Organization not found' });
+    res.json(result.rows[0]);
   } catch (err) { next(err); }
 };

@@ -6,6 +6,7 @@ import {
   Building2, FileCheck, FileX, AlertTriangle, DollarSign, Shield,
   Trees, MapPin, LogOut, RefreshCw, TrendingUp, Home, Landmark,
   CheckCircle2, XCircle, Clock, ArrowRight, Search,
+  Users, Plus, Trash2, X, Save, Mail, Phone as PhoneIcon, UserCog,
 } from 'lucide-react';
 import api from '../../services/api';
 
@@ -221,6 +222,23 @@ const FilterBtn = styled.button`
   &:hover { border-color: ${({ theme }) => theme.colors.borderLight}; }
 `;
 
+const AddBtn = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: ${({ theme }) => `${theme.spacing[2]} ${theme.spacing[3]}`};
+  background: ${({ theme }) => theme.colors.gradientPrimary};
+  color: white;
+  border: none;
+  border-radius: ${({ theme }) => theme.radii.md};
+  cursor: pointer;
+  font-size: ${({ theme }) => theme.fontSizes.sm};
+  font-weight: 600;
+  transition: all 0.2s;
+
+  &:hover { transform: translateY(-1px); box-shadow: ${({ theme }) => theme.shadows.glowPrimarySoft}; }
+`;
+
 const Table = styled.table`
   width: 100%;
   border-collapse: collapse;
@@ -291,6 +309,7 @@ const TABS = [
   { id: 'protected', label: 'Protected Areas', icon: Trees },
   { id: 'revenue', label: 'Revenue', icon: DollarSign },
   { id: 'alerts', label: 'Alerts', icon: AlertTriangle },
+  { id: 'users', label: 'User Management', icon: UserCog },
 ];
 
 const statusColors = {
@@ -323,6 +342,12 @@ export default function AssemblyDashboard() {
   const [revenue, setRevenue] = useState([]);
   const [revenueSummary, setRevenueSummary] = useState([]);
   const [alerts, setAlerts] = useState([]);
+  const [orgUsers, setOrgUsers] = useState([]);
+  const [orgInfo, setOrgInfo] = useState(null);
+  const [showUserForm, setShowUserForm] = useState(false);
+  const [userForm, setUserForm] = useState({ name: '', email: '', phone: '', password: '', role: 'planning_officer' });
+  const [savingUser, setSavingUser] = useState(false);
+  const [userToast, setUserToast] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState('');
@@ -364,6 +389,13 @@ export default function AssemblyDashboard() {
       } else if (tab === 'alerts') {
         const { data } = await api.get('/assembly/alerts', filter ? { params: { alert_type: filter } } : {});
         setAlerts(data);
+      } else if (tab === 'users') {
+        const [usersRes, orgRes] = await Promise.all([
+          api.get('/assembly/users'),
+          api.get('/assembly/organization'),
+        ]);
+        setOrgUsers(usersRes.data);
+        setOrgInfo(orgRes.data);
       }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load data');
@@ -381,6 +413,52 @@ export default function AssemblyDashboard() {
     localStorage.removeItem('user');
     navigate('/');
   };
+
+  // ── User management handlers ──
+  const showToast = (msg, type = 'success') => {
+    setUserToast({ msg, type });
+    setTimeout(() => setUserToast(null), 3000);
+  };
+
+  const createUser = async () => {
+    if (!userForm.name || !userForm.email || !userForm.password) {
+      showToast('Name, email, and password are required', 'error'); return;
+    }
+    setSavingUser(true);
+    try {
+      await api.post('/assembly/users', userForm);
+      showToast('User created');
+      setUserForm({ name: '', email: '', phone: '', password: '', role: 'planning_officer' });
+      setShowUserForm(false);
+      const { data } = await api.get('/assembly/users');
+      setOrgUsers(data);
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Failed to create user', 'error');
+    } finally { setSavingUser(false); }
+  };
+
+  const toggleUserActive = async (u) => {
+    try {
+      await api.patch(`/assembly/users/${u.id}`, { active: !u.active });
+      showToast(`User ${u.active ? 'deactivated' : 'activated'}`);
+      const { data } = await api.get('/assembly/users');
+      setOrgUsers(data);
+    } catch { showToast('Failed to update user', 'error'); }
+  };
+
+  const deleteUser = async (u) => {
+    if (!confirm(`Delete user "${u.name}"?`)) return;
+    try {
+      await api.delete(`/assembly/users/${u.id}`);
+      showToast('User deleted');
+      const { data } = await api.get('/assembly/users');
+      setOrgUsers(data);
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Failed to delete user', 'error');
+    }
+  };
+
+  const initials = (name) => name?.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() || '??';
 
   const fmtMoney = (v) => v ? `GHS ${Number(v).toLocaleString()}` : '—';
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString() : '—';
@@ -721,6 +799,153 @@ export default function AssemblyDashboard() {
               </Table>
             )}
           </Panel>
+        )}
+
+        {/* ── User Management ── */}
+        {activeTab === 'users' && (
+          <Panel>
+            <PanelHeader>
+              <PanelTitle><UserCog size={18} /> Assembly Users</PanelTitle>
+              <AddBtn onClick={() => setShowUserForm(!showUserForm)}>
+                <Plus size={16} /> Add User
+              </AddBtn>
+            </PanelHeader>
+
+            {orgInfo && (
+              <div style={{ padding: '0 24px 16px', borderBottom: '1px solid rgba(92,225,255,0.1)' }}>
+                <div style={{ fontSize: '0.85rem', color: '#aab7d4' }}>
+                  Organization: <span style={{ color: '#5ce1ff', fontWeight: 600 }}>{orgInfo.name}</span> — {orgInfo.region}
+                </div>
+              </div>
+            )}
+
+            {showUserForm && (
+              <div style={{ padding: 24, background: 'rgba(13,23,51,0.5)', borderBottom: '1px solid rgba(92,225,255,0.1)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                  <div>
+                    <label style={{ fontSize: '0.85rem', color: '#aab7d4', display: 'block', marginBottom: 6 }}>Full Name *</label>
+                    <input
+                      style={{ width: '100%', padding: 10, background: '#080f24', border: '1px solid rgba(92,225,255,0.15)', borderRadius: 8, color: '#e6edf7', fontSize: '0.9rem', outline: 'none' }}
+                      value={userForm.name}
+                      onChange={(e) => setUserForm({ ...userForm, name: e.target.value })}
+                      placeholder="e.g. Planning Officer"
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.85rem', color: '#aab7d4', display: 'block', marginBottom: 6 }}>Email *</label>
+                    <input
+                      type="email"
+                      style={{ width: '100%', padding: 10, background: '#080f24', border: '1px solid rgba(92,225,255,0.15)', borderRadius: 8, color: '#e6edf7', fontSize: '0.9rem', outline: 'none' }}
+                      value={userForm.email}
+                      onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
+                      placeholder="officer@assembly.gov.gh"
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.85rem', color: '#aab7d4', display: 'block', marginBottom: 6 }}>Phone</label>
+                    <input
+                      style={{ width: '100%', padding: 10, background: '#080f24', border: '1px solid rgba(92,225,255,0.15)', borderRadius: 8, color: '#e6edf7', fontSize: '0.9rem', outline: 'none' }}
+                      value={userForm.phone}
+                      onChange={(e) => setUserForm({ ...userForm, phone: e.target.value })}
+                      placeholder="+233240000000"
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.85rem', color: '#aab7d4', display: 'block', marginBottom: 6 }}>Password *</label>
+                    <input
+                      type="password"
+                      style={{ width: '100%', padding: 10, background: '#080f24', border: '1px solid rgba(92,225,255,0.15)', borderRadius: 8, color: '#e6edf7', fontSize: '0.9rem', outline: 'none' }}
+                      value={userForm.password}
+                      onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
+                      placeholder="Set login password"
+                    />
+                  </div>
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ fontSize: '0.85rem', color: '#aab7d4', display: 'block', marginBottom: 6 }}>Role</label>
+                  <select
+                    style={{ padding: 10, background: '#080f24', border: '1px solid rgba(92,225,255,0.15)', borderRadius: 8, color: '#e6edf7', fontSize: '0.9rem', outline: 'none' }}
+                    value={userForm.role}
+                    onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}
+                  >
+                    <option value="assembly_admin">Assembly Admin</option>
+                    <option value="planning_officer">Planning Officer</option>
+                    <option value="revenue_officer">Revenue Officer</option>
+                    <option value="inspector">Inspector</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <button
+                    onClick={createUser}
+                    disabled={savingUser}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', background: 'linear-gradient(135deg, #1677ff, #5ce1ff)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem', opacity: savingUser ? 0.5 : 1 }}
+                  >
+                    {savingUser ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
+                    {savingUser ? 'Creating...' : 'Create User'}
+                  </button>
+                  <button
+                    onClick={() => setShowUserForm(false)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', background: 'transparent', border: '1px solid rgba(92,225,255,0.15)', color: '#aab7d4', borderRadius: 8, cursor: 'pointer', fontSize: '0.9rem' }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {loading ? (
+              <LoadingState>Loading users...</LoadingState>
+            ) : orgUsers.length === 0 ? (
+              <EmptyState>No assembly users yet. Click "Add User" to create one.</EmptyState>
+            ) : (
+              <div style={{ padding: 16 }}>
+                {orgUsers.map((u) => (
+                  <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 16, borderRadius: 12, background: 'rgba(13,23,51,0.5)', marginBottom: 8, border: '1px solid rgba(92,225,255,0.08)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: '50%', background: 'rgba(168,85,247,0.15)', color: '#c084fc', fontWeight: 600, fontSize: '0.8rem', flexShrink: 0 }}>
+                      {initials(u.name)}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 500, fontSize: '0.9rem' }}>
+                        {u.name}
+                        {u.id === user?.id && <span style={{ color: '#5ce1ff', fontSize: '0.75rem', marginLeft: 8 }}>(You)</span>}
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: '#aab7d4', display: 'flex', gap: 12, marginTop: 2 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Mail size={11} /> {u.email}</span>
+                        {u.phone && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><PhoneIcon size={11} /> {u.phone}</span>}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#5ce1ff', marginTop: 4 }}>{u.assembly_role?.replace(/_/g, ' ')}</div>
+                    </div>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 999, fontSize: '0.7rem', fontWeight: 600, background: u.active ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)', color: u.active ? '#4ade80' : '#f87171' }}>
+                      {u.active ? 'Active' : 'Inactive'}
+                    </span>
+                    <button
+                      onClick={() => toggleUserActive(u)}
+                      title={u.active ? 'Deactivate' : 'Activate'}
+                      disabled={u.id === user?.id}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(92,225,255,0.15)', background: 'transparent', color: '#aab7d4', cursor: u.id === user?.id ? 'not-allowed' : 'pointer', opacity: u.id === user?.id ? 0.4 : 1 }}
+                    >
+                      {u.active ? <XCircle size={15} /> : <CheckCircle2 size={15} />}
+                    </button>
+                    <button
+                      onClick={() => deleteUser(u)}
+                      title="Delete"
+                      disabled={u.id === user?.id}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(239,68,68,0.2)', background: 'transparent', color: '#f87171', cursor: u.id === user?.id ? 'not-allowed' : 'pointer', opacity: u.id === user?.id ? 0.4 : 1 }}
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
+        )}
+
+        {userToast && (
+          <div style={{ position: 'fixed', bottom: 24, right: 24, display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', background: userToast.type === 'error' ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)', border: `1px solid ${userToast.type === 'error' ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.3)'}`, borderRadius: 12, color: userToast.type === 'error' ? '#f87171' : '#4ade80', zIndex: 2000, fontSize: '0.9rem' }}>
+            {userToast.type === 'error' ? <XCircle size={16} /> : <CheckCircle2 size={16} />}
+            {userToast.msg}
+          </div>
         )}
       </Container>
     </Page>

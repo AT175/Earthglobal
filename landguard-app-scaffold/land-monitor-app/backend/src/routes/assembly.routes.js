@@ -39,4 +39,13 @@ router.post('/revenue', ctrl.createRevenue);
 // Alerts (assembly-scoped)
 router.get('/alerts', ctrl.listAlerts);
 
+// Organization info
+router.get('/organization', ctrl.getOrganization);
+
+// User management (org-scoped — assembly_admin only)
+router.get('/users', ctrl.listUsers);
+router.post('/users', ctrl.createUser);
+router.patch('/users/:id', ctrl.updateUser);
+router.delete('/users/:id', ctrl.deleteUser);
+
 module.exports = router;
