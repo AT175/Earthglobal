@@ -2,6 +2,8 @@ require('dotenv').config();
 const http = require('http');
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 
 const authRoutes = require('./routes/auth.routes');
 const parcelRoutes = require('./routes/parcels.routes');
@@ -17,6 +19,26 @@ const assemblyRoutes = require('./routes/assembly.routes');
 const { createWebSocketServer } = require('./realtime/socketServer');
 const cron = require('node-cron');
 const { run: runNdviJob } = require('./jobs/ndviChangeDetection');
+const db = require('./config/db');
+
+// ── Auto-migrate on startup ──
+// Runs schema.sql (idempotent — uses IF NOT EXISTS + DO blocks).
+// This replaces the need for a separate migration job service.
+async function runMigrations() {
+  try {
+    const schemaPath = path.join(__dirname, '..', '..', 'schema.sql');
+    if (!fs.existsSync(schemaPath)) {
+      console.log('[Migration] schema.sql not found, skipping');
+      return;
+    }
+    const schema = fs.readFileSync(schemaPath, 'utf8');
+    await db.query(schema);
+    console.log('[Migration] Schema applied successfully');
+  } catch (err) {
+    console.error('[Migration] Error:', err.message);
+    // Don't crash — the DB might already be up to date
+  }
+}
 
 const app = express();
 
@@ -54,19 +76,23 @@ const server = http.createServer(app);
 createWebSocketServer(server);
 
 const PORT = process.env.PORT || 4000;
-server.listen(PORT, () => {
-  console.log(`API + WebSocket listening on port ${PORT}`);
 
-  // Schedule NDVI change detection — runs every 2 days at 3:00 AM UTC
-  // Sentinel-2 revisits every 2-3 days, so checking every 2 days catches
-  // new imagery soon after it's available.
-  if (process.env.NODE_ENV === 'production' || process.env.ENABLE_NDVI_CRON === 'true') {
-    cron.schedule('0 3 */2 * *', () => {
-      console.log('[Cron] Starting scheduled NDVI change detection...');
-      runNdviJob().catch((err) => console.error('[Cron] NDVI job error:', err.message));
-    });
-    console.log('NDVI change detection scheduled: every 2 days at 3:00 AM UTC');
-  } else {
-    console.log('NDVI cron disabled in dev — set ENABLE_NDVI_CRON=true to enable');
-  }
+// Run migrations then start the server
+runMigrations().then(() => {
+  server.listen(PORT, () => {
+    console.log(`API + WebSocket listening on port ${PORT}`);
+
+    // Schedule NDVI change detection — runs every 2 days at 3:00 AM UTC
+    // Sentinel-2 revisits every 2-3 days, so checking every 2 days catches
+    // new imagery soon after it's available.
+    if (process.env.NODE_ENV === 'production' || process.env.ENABLE_NDVI_CRON === 'true') {
+      cron.schedule('0 3 */2 * *', () => {
+        console.log('[Cron] Starting scheduled NDVI change detection...');
+        runNdviJob().catch((err) => console.error('[Cron] NDVI job error:', err.message));
+      });
+      console.log('NDVI change detection scheduled: every 2 days at 3:00 AM UTC');
+    } else {
+      console.log('NDVI cron disabled in dev — set ENABLE_NDVI_CRON=true to enable');
+    }
+  });
 });

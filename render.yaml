@@ -60,21 +60,10 @@ services:
         sync: false
 
   # ─────────────────────────────────────────────────────────────
-  # Database migration — runs schema.sql (creates the "earthglobal" schema
-  # and all tables inside it). Safe to re-run — uses IF NOT EXISTS + DO blocks.
+  # Database migration — runs automatically on backend startup.
+  # The backend runs schema.sql (idempotent — uses IF NOT EXISTS + DO blocks)
+  # before listening for connections. No separate job service needed.
   # ─────────────────────────────────────────────────────────────
-  - type: job
-    name: earthglobal-migrate
-    region: oregon
-    plan: starter
-    runtime: node
-    buildCommand: yarn build
-    startCommand: yarn migrate
-    envVars:
-      - key: DATABASE_URL
-        sync: false  # set manually — same shared Postgres connection string
-      - key: DATABASE_SSL
-        value: "true"
 
   # ─────────────────────────────────────────────────────────────
   # Frontend — Unified app (owner + agent + admin + assembly in one)
