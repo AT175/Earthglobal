@@ -89,6 +89,18 @@ function createWebSocketServer(server) {
     });
   });
 
+  // Environmental hazard detection — push to all assembly users in the org
+  bus.on('hazard:detected', ({ orgId, totalHazards, hazardsByType, tileUrl, bbox, timestamp }) => {
+    io.to(`org:${orgId}`).emit('hazard:detected', {
+      orgId,
+      totalHazards,
+      hazardsByType,
+      tileUrl,
+      bbox,
+      timestamp: timestamp || new Date().toISOString(),
+    });
+  });
+
   return io;
 }
 

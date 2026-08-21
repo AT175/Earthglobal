@@ -452,15 +452,6 @@ exports.certifyRequest = async (req, res, next) => {
       }
     }
 
-    // Generate PDF report
-    const pdfBuffer = await generatePDFReport({
-      validation,
-      org,
-      stamp,
-      plannerName: req.user.name || req.user.email,
-      parcelBoundary,
-    });
-
     // Generate KML if parcel exists
     let kmlBuffer = null;
     if (parcelBoundary) {
@@ -473,11 +464,56 @@ exports.certifyRequest = async (req, res, next) => {
       googleMapsLink = `https://www.google.com/maps?q=${validation.parcel_found_centroid_lat},${validation.parcel_found_centroid_lng}&z=16`;
     }
 
+    // ── Fetch nearby environmental hazards for the report ──
+    let nearbyHazards = [];
+    if (validation.parcel_found_centroid_lat && validation.parcel_found_centroid_lng) {
+      try {
+        const hazardResult = await db.query(
+          `SELECT id, hazard_type, severity, description, area_sqm,
+                  centroid_lat, centroid_lng, detected_at, status,
+                  ST_Distance(
+                    ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography,
+                    ST_SetSRID(ST_MakePoint(centroid_lng, centroid_lat), 4326)::geography
+                  ) as distance_m
+           FROM environmental_hazards
+           WHERE organization_id = $1
+             AND status IN ('active', 'verified')
+             AND ST_DWithin(
+                    ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography,
+                    ST_SetSRID(ST_MakePoint(centroid_lng, centroid_lat), 4326)::geography,
+                    5000
+                  )
+           ORDER BY distance_m ASC
+           LIMIT 20`,
+          [orgId, validation.parcel_found_centroid_lng, validation.parcel_found_centroid_lat]
+        );
+        nearbyHazards = hazardResult.rows.map(r => ({
+          ...r,
+          centroid_lat: parseFloat(r.centroid_lat),
+          centroid_lng: parseFloat(r.centroid_lng),
+          area_sqm: parseFloat(r.area_sqm) || 0,
+          distance_m: parseFloat(r.distance_m),
+        }));
+      } catch (e) {
+        console.error('Failed to fetch nearby hazards for report:', e.message);
+      }
+    }
+
+    // Generate PDF report (with hazards)
+    const pdfBuffer = await generatePDFReport({
+      validation,
+      org,
+      stamp,
+      plannerName: req.user.name || req.user.email,
+      parcelBoundary,
+      nearbyHazards,
+    });
+
     // Store as data URLs (for simplicity — in production use S3/R2)
     const reportDataUrl = `data:application/pdf;base64,${pdfBuffer.toString('base64')}`;
     const kmlDataUrl = kmlBuffer ? `data:application/vnd.google-earth.kml+xml;base64,${kmlBuffer.toString('base64')}` : null;
 
-    // Update request
+    // Update request with hazards
     const result = await db.query(
       `UPDATE parcel_validation_requests SET
          status = 'certified',
@@ -486,9 +522,10 @@ exports.certifyRequest = async (req, res, next) => {
          google_maps_link = $3,
          stamp_image_url = $4,
          signature_image_url = $5,
+         nearby_hazards = $6,
          certified_at = now(),
          updated_at = now()
-       WHERE id = $6 AND organization_id = $7
+       WHERE id = $7 AND organization_id = $8
        RETURNING id, status, certified_at, google_maps_link`,
       [
         reportDataUrl,
@@ -496,6 +533,7 @@ exports.certifyRequest = async (req, res, next) => {
         googleMapsLink,
         stamp?.stamp_image ? `data:${stamp.stamp_image_type};base64,${stamp.stamp_image.toString('base64')}` : null,
         stamp?.signature_image ? `data:${stamp.signature_image_type};base64,${stamp.signature_image.toString('base64')}` : null,
+        JSON.stringify(nearbyHazards),
         requestId,
         orgId,
       ]
@@ -503,7 +541,8 @@ exports.certifyRequest = async (req, res, next) => {
 
     res.json({
       ...result.rows[0],
-      message: 'Report certified and generated. The requester can now download it from their dashboard.',
+      nearby_hazards_count: nearbyHazards.length,
+      message: `Report certified and generated.${nearbyHazards.length > 0 ? ` ${nearbyHazards.length} environmental hazard(s) found nearby and included in the report.` : ''} The requester can now download it from their dashboard.`,
     });
   } catch (err) {
     console.error('Certification error:', err.message);
@@ -515,7 +554,7 @@ exports.certifyRequest = async (req, res, next) => {
 // PDF REPORT GENERATION
 // ═══════════════════════════════════════════════════════════
 
-async function generatePDFReport({ validation, org, stamp, plannerName, parcelBoundary }) {
+async function generatePDFReport({ validation, org, stamp, plannerName, parcelBoundary, nearbyHazards }) {
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({ size: 'A4', margin: 50 });
@@ -609,6 +648,66 @@ async function generatePDFReport({ validation, org, stamp, plannerName, parcelBo
         doc.moveDown(0.3);
         doc.fontSize(10).font('Helvetica');
         doc.text(validation.planner_notes, { width: contentWidth });
+        doc.moveDown(1);
+      }
+
+      // ── Environmental Hazard Assessment ──
+      if (nearbyHazards && nearbyHazards.length > 0) {
+        doc.fontSize(12).font('Helvetica-Bold');
+        doc.fillColor('#dc2626');
+        doc.text('ENVIRONMENTAL HAZARD ASSESSMENT', { width: contentWidth });
+        doc.fillColor('#000');
+        doc.moveDown(0.3);
+        doc.fontSize(10).font('Helvetica');
+        doc.fillColor('#dc2626');
+        doc.text(`WARNING: ${nearbyHazards.length} environmental hazard(s) were detected within 5km of this parcel. Prospective buyers and developers should be aware of these conditions.`, { width: contentWidth });
+        doc.fillColor('#000');
+        doc.moveDown(0.5);
+
+        const hazardLabels = {
+          water_pollution: 'Water Pollution',
+          flood_prone: 'Flood-Prone Area',
+          illegal_mining: 'Illegal Mining',
+          open_dump: 'Open Dump',
+        };
+        const severityColors = {
+          low: '#fbbf24',
+          moderate: '#f97316',
+          high: '#ef4444',
+          critical: '#991b1b',
+        };
+
+        nearbyHazards.forEach((hazard, i) => {
+          const label = hazardLabels[hazard.hazard_type] || hazard.hazard_type;
+          const distKm = (hazard.distance_m / 1000).toFixed(2);
+          const sevColor = severityColors[hazard.severity] || '#000';
+
+          doc.fontSize(10).font('Helvetica-Bold');
+          doc.fillColor(sevColor);
+          doc.text(`${i + 1}. ${label} (${hazard.severity.toUpperCase()})`, { width: contentWidth });
+          doc.fillColor('#000');
+          doc.fontSize(9).font('Helvetica');
+          doc.text(`   Distance: ${distKm} km | Area: ${Math.round(hazard.area_sqm).toLocaleString()} m² | Detected: ${new Date(hazard.detected_at).toLocaleDateString()}`);
+          if (hazard.description) {
+            doc.text(`   ${hazard.description}`, { width: contentWidth - 20 });
+          }
+          doc.moveDown(0.3);
+        });
+
+        doc.moveDown(0.5);
+        doc.fontSize(9).font('Helvetica-Oblique');
+        doc.fillColor('#666');
+        doc.text('Hazard data is derived from satellite-based spectral analysis (Sentinel-2 via Google Earth Engine) and may be supplemented by field verification. This assessment does not constitute a complete environmental impact study.', { width: contentWidth });
+        doc.fillColor('#000');
+        doc.moveDown(1);
+      } else if (validation.parcel_found_centroid_lat) {
+        doc.fontSize(12).font('Helvetica-Bold');
+        doc.fillColor('#16a34a');
+        doc.text('Environmental Hazard Assessment');
+        doc.fillColor('#000');
+        doc.moveDown(0.3);
+        doc.fontSize(10).font('Helvetica');
+        doc.text('No environmental hazards were detected within 5km of this parcel at the time of this report.');
         doc.moveDown(1);
       }
 

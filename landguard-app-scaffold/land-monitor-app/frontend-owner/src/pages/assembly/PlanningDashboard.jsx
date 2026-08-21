@@ -467,7 +467,20 @@ export default function PlanningDashboard() {
   const [showBuildings, setShowBuildings] = useState(true);
   const [showProtected, setShowProtected] = useState(true);
   const [showDistrict, setShowDistrict] = useState(true);
+  const [showHazards, setShowHazards] = useState(true);
   const [baseLayer, setBaseLayer] = useState('satellite');
+
+  // Environmental hazards
+  const [hazardsFC, setHazardsFC] = useState(null);
+  const [detectingHazards, setDetectingHazards] = useState(false);
+  const [hazardResult, setHazardResult] = useState(null);
+  const [showHazardPanel, setShowHazardPanel] = useState(false);
+  const [hazardQuery, setHazardQuery] = useState({
+    hazard_type: '', severity: '', date_from: '', date_to: '',
+    region: '', lat: '', lng: '', radius_km: '5', status: '',
+  });
+  const [queryingHazards, setQueryingHazards] = useState(false);
+  const [hazardStats, setHazardStats] = useState(null);
 
   // Active panel: 'building' | 'transfer' | 'parcelCreate' | 'parcelEdit' | null
   const [activePanel, setActivePanel] = useState(null);
@@ -522,6 +535,20 @@ export default function PlanningDashboard() {
     return unsub;
   }, [onWsEvent]);
 
+  // ── Real-time WebSocket: listen for environmental hazard detections ──
+  useEffect(() => {
+    if (!onWsEvent) return;
+    const unsub = onWsEvent('hazard:detected', (payload) => {
+      setRealtimeAlert(payload);
+      showToast(`ENVIRONMENTAL ALERT: ${payload.totalHazards} hazard(s) detected!`, 'error');
+      // Reload hazards + stats
+      api.get('/assembly/planning/hazards-geojson').then(({ data }) => setHazardsFC(data)).catch(() => {});
+      api.get('/assembly/planning/hazard-stats').then(({ data }) => setHazardStats(data)).catch(() => {});
+      setShowHazardPanel(true);
+    });
+    return unsub;
+  }, [onWsEvent]);
+
   // Expose functions for Leaflet popup buttons (updated when parcels change)
   useEffect(() => {
     window.__editParcel = (parcelId) => {
@@ -529,10 +556,16 @@ export default function PlanningDashboard() {
       if (parcel) startParcelEdit(parcelId, parcel.properties);
     };
     window.__deleteParcel = (parcelId, name) => deleteParcel(parcelId, name);
+    window.__verifyHazard = (hazardId) => updateHazardStatus(hazardId, 'verified');
+    window.__resolveHazard = (hazardId) => updateHazardStatus(hazardId, 'resolved');
+    window.__falsePosHazard = (hazardId) => updateHazardStatus(hazardId, 'false_positive');
 
     return () => {
       delete window.__editParcel;
       delete window.__deleteParcel;
+      delete window.__verifyHazard;
+      delete window.__resolveHazard;
+      delete window.__falsePosHazard;
     };
   }, [parcelsFC]);
 
@@ -543,13 +576,15 @@ export default function PlanningDashboard() {
 
   const loadAll = async () => {
     try {
-      const [org, parcels, buildings, protectedAreas, district, ownersRes] = await Promise.all([
+      const [org, parcels, buildings, protectedAreas, district, ownersRes, hazards, hStats] = await Promise.all([
         api.get('/assembly/organization'),
         api.get('/assembly/planning/parcels-geojson'),
         api.get('/assembly/planning/buildings-geojson'),
         api.get('/assembly/planning/protected-areas-geojson'),
         api.get('/assembly/planning/district-boundary'),
         api.get('/assembly/planning/owners'),
+        api.get('/assembly/planning/hazards-geojson').catch(() => ({ data: { type: 'FeatureCollection', features: [] } })),
+        api.get('/assembly/planning/hazard-stats').catch(() => ({ data: null })),
       ]);
 
       setOrgInfo(org.data);
@@ -558,6 +593,8 @@ export default function PlanningDashboard() {
       setProtectedFC(protectedAreas.data);
       setDistrictBoundary(district.data);
       setOwners(ownersRes.data);
+      setHazardsFC(hazards.data);
+      setHazardStats(hStats.data);
 
       // Compute map bounds from all features
       const allCoords = [];
@@ -694,6 +731,84 @@ export default function PlanningDashboard() {
       const { data } = await api.get('/assembly/planning/change-detection/history');
       setChangeHistory(data);
     } catch {}
+  };
+
+  // ── Run environmental hazard detection via EE ──
+  const runHazardDetection = async () => {
+    if (!mapBounds) { showToast('Map not loaded yet', 'error'); return; }
+
+    setDetectingHazards(true);
+    setShowHazardPanel(true);
+    setActivePanel(null);
+    setHazardResult(null);
+
+    try {
+      const bbox = {
+        minLng: mapBounds.minLng, minLat: mapBounds.minLat,
+        maxLng: mapBounds.maxLng, maxLat: mapBounds.maxLat,
+      };
+
+      const { data } = await api.post('/assembly/planning/detect-hazards', { bbox });
+
+      if (data.detected) {
+        setHazardResult(data);
+        setBaseLayer('hazard');
+        showToast(`Hazard detection complete: ${data.total_hazards} hazard(s) found!`);
+        // Reload hazards + stats
+        const [hazardsRes, statsRes] = await Promise.all([
+          api.get('/assembly/planning/hazards-geojson'),
+          api.get('/assembly/planning/hazard-stats'),
+        ]);
+        setHazardsFC(hazardsRes.data);
+        setHazardStats(statsRes.data);
+      } else {
+        setHazardResult(data);
+        showToast(data.error || 'No hazards detected in this area');
+      }
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Hazard detection failed', 'error');
+    } finally {
+      setDetectingHazards(false);
+    }
+  };
+
+  // ── Manual hazard query with parameters ──
+  const runHazardQuery = async () => {
+    setQueryingHazards(true);
+    try {
+      const params = { ...hazardQuery };
+      // Convert empty strings to undefined
+      Object.keys(params).forEach(k => { if (params[k] === '') delete params[k]; });
+      // Convert lat/lng/radius to numbers
+      if (params.lat) params.lat = parseFloat(params.lat);
+      if (params.lng) params.lng = parseFloat(params.lng);
+      if (params.radius_km) params.radius_km = parseFloat(params.radius_km);
+
+      const { data } = await api.post('/assembly/planning/hazards/query', params);
+      setHazardsFC(data);
+      showToast(`Query returned ${data.total} hazard(s)`);
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Query failed', 'error');
+    } finally {
+      setQueryingHazards(false);
+    }
+  };
+
+  // ── Update hazard status ──
+  const updateHazardStatus = async (hazardId, newStatus) => {
+    try {
+      await api.patch(`/assembly/planning/hazards/${hazardId}`, { status: newStatus });
+      showToast(`Hazard marked as ${newStatus}`);
+      // Reload hazards
+      const [hazardsRes, statsRes] = await Promise.all([
+        api.get('/assembly/planning/hazards-geojson'),
+        api.get('/assembly/planning/hazard-stats'),
+      ]);
+      setHazardsFC(hazardsRes.data);
+      setHazardStats(statsRes.data);
+    } catch (err) {
+      showToast('Failed to update hazard', 'error');
+    }
   };
 
   // ── Building click ──
@@ -853,6 +968,21 @@ export default function PlanningDashboard() {
   };
   const drawnParcelStyle = () => ({ color: '#5ce1ff', fillColor: '#1677ff', fillOpacity: 0.25, weight: 3 });
 
+  // ── Hazard style by type + severity ──
+  const hazardTypeColors = {
+    water_pollution: { color: '#06b6d4', fillColor: '#06b6d4' },
+    flood_prone: { color: '#3b82f6', fillColor: '#3b82f6' },
+    illegal_mining: { color: '#a855f7', fillColor: '#a855f7' },
+    open_dump: { color: '#ef4444', fillColor: '#ef4444' },
+  };
+  const severityOpacity = { low: 0.2, moderate: 0.35, high: 0.5, critical: 0.6 };
+  const hazardStyle = (feature) => {
+    const p = feature.properties || {};
+    const typeColor = hazardTypeColors[p.hazard_type] || { color: '#fbbf24', fillColor: '#fbbf24' };
+    const opacity = severityOpacity[p.severity] || 0.3;
+    return { ...typeColor, fillOpacity: opacity, weight: 2 };
+  };
+
   // ── Building list ──
   const buildingList = buildingsFC?.features || [];
   const filteredBuildings = buildingList.filter(b => {
@@ -925,7 +1055,42 @@ export default function PlanningDashboard() {
               <Checkbox type="checkbox" checked={showDistrict} onChange={(e) => setShowDistrict(e.target.checked)} />
               <MapPin size={14} color="#5ce1ff" /> District Boundary
             </LayerToggle>
+            <LayerToggle>
+              <Checkbox type="checkbox" checked={showHazards} onChange={(e) => setShowHazards(e.target.checked)} />
+              <AlertTriangle size={14} color="#ef4444" /> Env. Hazards ({hazardsFC?.features?.length || 0})
+            </LayerToggle>
           </SidebarSection>
+
+          {/* ── Environmental Hazard Stats ── */}
+          {hazardStats && (
+            <SidebarSection>
+              <SectionTitle><AlertTriangle size={14} color="#ef4444" /> Hazard Summary</SectionTitle>
+              <StatsGrid>
+                <StatCard>
+                  <StatValue $color="#ef4444">{hazardStats.total_active || 0}</StatValue>
+                  <StatLabel>Active</StatLabel>
+                </StatCard>
+                <StatCard>
+                  <StatValue $color="#f97316">{hazardStats.by_severity?.find(s => s.severity === 'high')?.count || 0}</StatValue>
+                  <StatLabel>High Risk</StatLabel>
+                </StatCard>
+                <StatCard>
+                  <StatValue $color="#fbbf24">{hazardStats.by_severity?.find(s => s.severity === 'moderate')?.count || 0}</StatValue>
+                  <StatLabel>Moderate</StatLabel>
+                </StatCard>
+                <StatCard>
+                  <StatValue $color="#16a34a">{hazardStats.total_verified || 0}</StatValue>
+                  <StatLabel>Verified</StatLabel>
+                </StatCard>
+              </StatsGrid>
+              {hazardStats.by_type?.map(t => (
+                <div key={t.hazard_type} style={{ fontSize: '0.75rem', color: '#aab7d4', marginTop: 4, display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ textTransform: 'capitalize' }}>{t.hazard_type.replace(/_/g, ' ')}</span>
+                  <span>{t.count} ({Math.round((t.total_area || 0) / 10000).toLocaleString()} ha)</span>
+                </div>
+              ))}
+            </SidebarSection>
+          )}
 
           <SidebarSection>
             <SectionTitle><Building2 size={14} /> Building Stats</SectionTitle>
@@ -1082,6 +1247,41 @@ export default function PlanningDashboard() {
                 />
               )}
 
+              {/* Environmental Hazards */}
+              {showHazards && hazardsFC && hazardsFC.features && hazardsFC.features.length > 0 && (
+                <GeoJSON data={hazardsFC} style={hazardStyle}
+                  onEachFeature={(feature, layer) => {
+                    if (feature.properties) {
+                      const p = feature.properties;
+                      const typeLabels = { water_pollution: 'Water Pollution', flood_prone: 'Flood-Prone Area', illegal_mining: 'Illegal Mining', open_dump: 'Open Dump' };
+                      const sevColors = { low: '#fbbf24', moderate: '#f97316', high: '#ef4444', critical: '#991b1b' };
+                      const label = typeLabels[p.hazard_type] || p.hazard_type;
+                      const sevColor = sevColors[p.severity] || '#fbbf24';
+                      layer.bindPopup(`
+                        <b style="color:${sevColor}">${label}</b><br/>
+                        <b>Severity: ${p.severity?.toUpperCase()}</b><br/>
+                        Area: ${Math.round(p.area_sqm).toLocaleString()} m²<br/>
+                        ${p.centroid_lat ? 'Location: ' + p.centroid_lat.toFixed(4) + ', ' + p.centroid_lng.toFixed(4) + '<br/>' : ''}
+                        Detected: ${p.detected_at ? new Date(p.detected_at).toLocaleDateString() : '—'}<br/>
+                        Status: ${p.status}<br/>
+                        ${p.confidence ? 'Confidence: ' + (p.confidence * 100).toFixed(0) + '%<br/>' : ''}
+                        ${p.description ? '<br/>' + p.description + '<br/>' : ''}
+                        <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">
+                          <button onclick="window.__verifyHazard('${p.id}')" style="cursor:pointer;padding:2px 8px;background:#16a34a;color:white;border:none;border-radius:4px">Verify</button>
+                          <button onclick="window.__resolveHazard('${p.id}')" style="cursor:pointer;padding:2px 8px;background:#6b7280;color:white;border:none;border-radius:4px">Resolve</button>
+                          <button onclick="window.__falsePosHazard('${p.id}')" style="cursor:pointer;padding:2px 8px;background:#dc2626;color:white;border:none;border-radius:4px">False Positive</button>
+                        </div>
+                      `);
+                    }
+                  }}
+                />
+              )}
+
+              {/* Hazard detection tile overlay */}
+              {baseLayer === 'hazard' && hazardResult?.tileUrl && (
+                <TileLayer url={hazardResult.tileUrl} attribution="Hazard detection &copy; Sentinel-2 via EE" maxZoom={19} opacity={0.6} />
+              )}
+
               {/* Drawn boundary preview */}
               {drawnBoundary && (
                 <GeoJSON data={{ type: 'Feature', geometry: drawnBoundary, properties: {} }} style={drawnParcelStyle} />
@@ -1103,6 +1303,15 @@ export default function PlanningDashboard() {
                 style={{ borderColor: 'rgba(239,68,68,0.4)', color: '#f87171' }}>
                 {changeDetecting ? <Loader size={16} className="animate-spin" /> : <Activity size={16} />}
                 {changeDetecting ? 'Analyzing...' : 'Change Detection (ML)'}
+              </MapButton>
+              <MapButton onClick={runHazardDetection} disabled={detectingHazards}
+                style={{ borderColor: 'rgba(168,85,247,0.4)', color: '#c084fc' }}>
+                {detectingHazards ? <Loader size={16} className="animate-spin" /> : <AlertTriangle size={16} />}
+                {detectingHazards ? 'Scanning...' : 'Detect Hazards (EE)'}
+              </MapButton>
+              <MapButton onClick={() => setShowHazardPanel(!showHazardPanel)}
+                style={{ borderColor: 'rgba(168,85,247,0.3)', color: '#c084fc' }}>
+                <Search size={16} /> Hazard Query
               </MapButton>
               <MapButton onClick={loadAll}><RefreshCw size={16} /> Refresh Data</MapButton>
               <MapButton onClick={exportKML}><Download size={16} /> Export KML</MapButton>
@@ -1146,6 +1355,12 @@ export default function PlanningDashboard() {
                 <LayerToggle>
                   <input type="radio" name="baseLayer" checked={baseLayer === 'change'} onChange={() => setBaseLayer('change')} />
                   <Activity size={14} color="#f87171" /> Changes (red)
+                </LayerToggle>
+              )}
+              {hazardResult?.tileUrl && (
+                <LayerToggle>
+                  <input type="radio" name="baseLayer" checked={baseLayer === 'hazard'} onChange={() => setBaseLayer('hazard')} />
+                  <AlertTriangle size={14} color="#c084fc" /> Hazard Detection
                 </LayerToggle>
               )}
             </LayerControl>
@@ -1298,6 +1513,172 @@ export default function PlanningDashboard() {
                   Click "Change Detection (ML)" to compare satellite imagery over time and find new buildings.
                   <div style={{ fontSize: '0.75rem', marginTop: 8, color: '#6b7280' }}>
                     Runs automatically every Sunday at 4 AM UTC. Real-time alerts push via WebSocket.
+                  </div>
+                </div>
+              )}
+            </FloatingPanel>
+
+            {/* ── Environmental Hazard Panel ── */}
+            <FloatingPanel $show={showHazardPanel}>
+              <PanelTitle>
+                <AlertTriangle size={18} color="#c084fc" /> Environmental Hazards
+                <button onClick={() => setShowHazardPanel(false)}
+                  style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#aab7d4', cursor: 'pointer' }}>
+                  <X size={16} />
+                </button>
+              </PanelTitle>
+
+              {/* Detection Result */}
+              {detectingHazards && (
+                <div style={{ textAlign: 'center', padding: 20 }}>
+                  <Loader size={28} className="animate-spin" style={{ margin: '0 auto 12px' }} />
+                  <div style={{ fontSize: '0.85rem', color: '#aab7d4' }}>
+                    Running Earth Engine spectral analysis...
+                    <div style={{ fontSize: '0.75rem', marginTop: 4 }}>NDWI, MNDWI, NDBI, BSI, NDVI, Iron Oxide, Turbidity</div>
+                  </div>
+                </div>
+              )}
+
+              {!detectingHazards && hazardResult && (
+                <div>
+                  {hazardResult.detected ? (
+                    <>
+                      <div style={{ padding: 12, background: 'rgba(239,68,68,0.1)', borderRadius: 8, marginBottom: 12 }}>
+                        <AlertTriangle size={16} color="#ef4444" />
+                        <span style={{ marginLeft: 8, fontWeight: 600, color: '#ef4444' }}>
+                          {hazardResult.total_hazards} hazard(s) detected
+                        </span>
+                      </div>
+                      {Object.entries(hazardResult.results || {}).map(([type, info]) => (
+                        info.detected_clusters > 0 && (
+                          <div key={type} style={{ marginBottom: 8, padding: 10, background: 'rgba(8,15,36,0.4)', borderRadius: 8 }}>
+                            <div style={{ fontWeight: 600, fontSize: '0.85rem', textTransform: 'capitalize' }}>
+                              {info.label} ({info.severity})
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: '#aab7d4', marginTop: 4 }}>
+                              {info.detected_clusters} cluster(s) | {Math.round(info.area_sqm).toLocaleString()} m² affected
+                            </div>
+                          </div>
+                        )
+                      ))}
+                      <div style={{ marginTop: 8 }}>
+                        <ActionBtn onClick={() => setBaseLayer('hazard')}>
+                          <Satellite size={12} /> View Detection Overlay
+                        </ActionBtn>
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ padding: 20, textAlign: 'center', color: '#4ade80' }}>
+                      <CheckCircle2 size={28} style={{ margin: '0 auto 8px' }} />
+                      <div>No hazards detected in this area.</div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Manual Query Form */}
+              {!detectingHazards && (
+                <div style={{ marginTop: 16, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 16 }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: 8, color: '#c084fc' }}>
+                    Manual Query — Search Hazard Database
+                  </div>
+                  <FormGroup>
+                    <Label>Hazard Type</Label>
+                    <Select value={hazardQuery.hazard_type} onChange={(e) => setHazardQuery({ ...hazardQuery, hazard_type: e.target.value })}>
+                      <option value="">All Types</option>
+                      <option value="water_pollution">Water Pollution</option>
+                      <option value="flood_prone">Flood-Prone Area</option>
+                      <option value="illegal_mining">Illegal Mining</option>
+                      <option value="open_dump">Open Dump</option>
+                    </Select>
+                  </FormGroup>
+                  <FormGroup>
+                    <Label>Severity</Label>
+                    <Select value={hazardQuery.severity} onChange={(e) => setHazardQuery({ ...hazardQuery, severity: e.target.value })}>
+                      <option value="">All Severities</option>
+                      <option value="low">Low</option>
+                      <option value="moderate">Moderate</option>
+                      <option value="high">High</option>
+                      <option value="critical">Critical</option>
+                    </Select>
+                  </FormGroup>
+                  <FormGroup>
+                    <Label>Status</Label>
+                    <Select value={hazardQuery.status} onChange={(e) => setHazardQuery({ ...hazardQuery, status: e.target.value })}>
+                      <option value="">Active + Verified</option>
+                      <option value="active">Active Only</option>
+                      <option value="verified">Verified Only</option>
+                      <option value="resolved">Resolved</option>
+                      <option value="false_positive">False Positive</option>
+                    </Select>
+                  </FormGroup>
+                  <FormGroup>
+                    <Label>Region</Label>
+                    <Input value={hazardQuery.region} onChange={(e) => setHazardQuery({ ...hazardQuery, region: e.target.value })}
+                      placeholder="e.g., Greater Accra" />
+                  </FormGroup>
+                  <FormGroup>
+                    <Label>Search by Location (lat, lng, radius km)</Label>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <Input value={hazardQuery.lat} onChange={(e) => setHazardQuery({ ...hazardQuery, lat: e.target.value })}
+                        placeholder="Lat" style={{ flex: 1 }} />
+                      <Input value={hazardQuery.lng} onChange={(e) => setHazardQuery({ ...hazardQuery, lng: e.target.value })}
+                        placeholder="Lng" style={{ flex: 1 }} />
+                      <Input value={hazardQuery.radius_km} onChange={(e) => setHazardQuery({ ...hazardQuery, radius_km: e.target.value })}
+                        placeholder="km" style={{ width: 60 }} />
+                    </div>
+                  </FormGroup>
+                  <FormGroup>
+                    <Label>Date Range</Label>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <Input type="date" value={hazardQuery.date_from} onChange={(e) => setHazardQuery({ ...hazardQuery, date_from: e.target.value })} />
+                      <Input type="date" value={hazardQuery.date_to} onChange={(e) => setHazardQuery({ ...hazardQuery, date_to: e.target.value })} />
+                    </div>
+                  </FormGroup>
+                  <BtnRow>
+                    <PrimaryBtn onClick={runHazardQuery} disabled={queryingHazards}>
+                      {queryingHazards ? <Loader size={14} className="animate-spin" /> : <Search size={14} />}
+                      {queryingHazards ? 'Searching...' : 'Search Hazards'}
+                    </PrimaryBtn>
+                  </BtnRow>
+                </div>
+              )}
+
+              {/* Hazard List */}
+              {hazardsFC?.features && hazardsFC.features.length > 0 && (
+                <div style={{ marginTop: 16, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 16 }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: 8 }}>
+                    Hazards on Map ({hazardsFC.features.length})
+                  </div>
+                  <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+                    {hazardsFC.features.map((f, i) => {
+                      const p = f.properties;
+                      const typeLabels = { water_pollution: 'Water Pollution', flood_prone: 'Flood', illegal_mining: 'Mining', open_dump: 'Dump' };
+                      const sevColors = { low: '#fbbf24', moderate: '#f97316', high: '#ef4444', critical: '#991b1b' };
+                      return (
+                        <div key={i} style={{ padding: 8, marginBottom: 4, background: 'rgba(8,15,36,0.4)', borderRadius: 6, fontSize: '0.8rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: sevColors[p.severity] || '#fbbf24', fontWeight: 600 }}>
+                              {typeLabels[p.hazard_type] || p.hazard_type}
+                            </span>
+                            <span style={{ color: '#aab7d4', fontSize: '0.7rem' }}>{p.severity}</span>
+                          </div>
+                          <div style={{ color: '#6b7280', fontSize: '0.7rem', marginTop: 2 }}>
+                            {Math.round(p.area_sqm).toLocaleString()} m² | {p.detected_at ? new Date(p.detected_at).toLocaleDateString() : '—'}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {!detectingHazards && !hazardResult && hazardsFC?.features?.length === 0 && (
+                <div style={{ fontSize: '0.85rem', color: '#aab7d4', textAlign: 'center', padding: 20 }}>
+                  <AlertTriangle size={32} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
+                  Click "Detect Hazards (EE)" to scan for environmental hazards, or use the manual query form below to search the database.
+                  <div style={{ fontSize: '0.75rem', marginTop: 8, color: '#6b7280' }}>
+                    Detects: water pollution, flood-prone areas, illegal mining, open dumps via Sentinel-2 spectral analysis.
                   </div>
                 </div>
               )}

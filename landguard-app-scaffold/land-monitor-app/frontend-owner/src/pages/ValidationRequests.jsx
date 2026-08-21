@@ -374,6 +374,37 @@ export default function ValidationRequests() {
               </ResultBox>
             )}
 
+            {/* Environmental hazard warning for certified requests */}
+            {req.status === 'certified' && req.nearby_hazards && req.nearby_hazards.length > 0 && (
+              <div style={{ marginTop: 12, padding: 12, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#f87171', fontWeight: 600, fontSize: '0.85rem' }}>
+                  <AlertTriangle size={16} /> {req.nearby_hazards.length} Environmental Hazard(s) Nearby
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#aab7d4', marginTop: 6 }}>
+                  The PDF report includes a full hazard assessment. Hazards detected within 5km of this parcel:
+                </div>
+                <div style={{ marginTop: 6 }}>
+                  {req.nearby_hazards.slice(0, 5).map((h, i) => {
+                    const labels = { water_pollution: 'Water Pollution', flood_prone: 'Flood-Prone', illegal_mining: 'Illegal Mining', open_dump: 'Open Dump' };
+                    const sevColors = { low: '#fbbf24', moderate: '#f97316', high: '#ef4444', critical: '#991b1b' };
+                    return (
+                      <div key={i} style={{ fontSize: '0.75rem', marginTop: 3, display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: sevColors[h.severity] || '#fbbf24' }}>
+                          {labels[h.hazard_type] || h.hazard_type} ({h.severity})
+                        </span>
+                        <span style={{ color: '#6b7280' }}>{(h.distance_m / 1000).toFixed(2)} km away</span>
+                      </div>
+                    );
+                  })}
+                  {req.nearby_hazards.length > 5 && (
+                    <div style={{ fontSize: '0.7rem', color: '#6b7280', marginTop: 4 }}>
+                      +{req.nearby_hazards.length - 5} more — see full report
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Downloads for certified requests */}
             {req.status === 'certified' && (
               <DownloadRow>
