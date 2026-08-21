@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt');
 const bus = require('../realtime/eventBus');
 const { notifyOwnerOfAlert } = require('../services/notificationService');
 const { ee, init: initEE, isReady: eeReady } = require('../config/earthEngine');
+const { runBuildingChangeDetection } = require('../jobs/buildingChangeDetection');
 
 // ── Helper: get org_id from authenticated assembly user ──
 function getOrgId(req) {
@@ -1197,5 +1198,112 @@ exports.deleteParcel = async (req, res, next) => {
     );
     if (!result.rows[0]) return res.status(404).json({ error: 'Parcel not found in your organization' });
     res.json({ success: true, deleted: result.rows[0] });
+  } catch (err) { next(err); }
+};
+
+// ═══════════════════════════════════════════════════════════
+// PLANNING OFFICER — BUILDING CHANGE DETECTION
+// ═══════════════════════════════════════════════════════════
+
+// POST /assembly/planning/change-detection — run building change detection
+// Compares satellite imagery between two time periods to find new buildings
+exports.runChangeDetection = async (req, res, next) => {
+  try {
+    const orgId = getOrgId(req);
+    const { bbox, baselineStart, baselineEnd, periodStart, periodEnd } = req.body;
+
+    if (!bbox) return res.status(400).json({ error: 'bbox is required' });
+
+    // Default date ranges: current = last 3 months, baseline = previous 3 months
+    const now = new Date();
+    const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    const sixMonthsAgo = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
+
+    const finalBaselineStart = baselineStart || new Date(sixMonthsAgo.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const finalBaselineEnd = baselineEnd || sixMonthsAgo.toISOString().slice(0, 10);
+    const finalPeriodStart = periodStart || threeMonthsAgo.toISOString().slice(0, 10);
+    const finalPeriodEnd = periodEnd || now.toISOString().slice(0, 10);
+
+    const result = await runBuildingChangeDetection({
+      orgId,
+      bbox,
+      baselineStart: finalBaselineStart,
+      baselineEnd: finalBaselineEnd,
+      periodStart: finalPeriodStart,
+      periodEnd: finalPeriodEnd,
+      startedBy: req.user.id,
+    });
+
+    res.json(result);
+  } catch (err) {
+    console.error('Change detection error:', err.message);
+    res.status(500).json({ error: err.message || 'Change detection failed' });
+  }
+};
+
+// GET /assembly/planning/change-detection/history — list past detection runs
+exports.listChangeDetections = async (req, res, next) => {
+  try {
+    const orgId = getOrgId(req);
+    const result = await db.query(
+      `SELECT id, status, period_start, period_end, baseline_start, baseline_end,
+              new_buildings_count, new_builtup_area_sqm, method,
+              before_tile_url, after_tile_url, change_tile_url,
+              error_message, started_at, completed_at
+       FROM building_change_detections
+       WHERE organization_id = $1
+       ORDER BY started_at DESC LIMIT 20`,
+      [orgId]
+    );
+    res.json(result.rows);
+  } catch (err) { next(err); }
+};
+
+// GET /assembly/planning/change-detection/:id — get a specific detection run
+exports.getChangeDetection = async (req, res, next) => {
+  try {
+    const orgId = getOrgId(req);
+    const result = await db.query(
+      `SELECT * FROM building_change_detections WHERE id = $1 AND organization_id = $2`,
+      [req.params.id, orgId]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'Detection run not found' });
+    res.json(result.rows[0]);
+  } catch (err) { next(err); }
+};
+
+// GET /assembly/planning/new-buildings — get buildings from the latest change detection
+exports.getNewBuildings = async (req, res, next) => {
+  try {
+    const orgId = getOrgId(req);
+    const result = await db.query(
+      `SELECT b.id, b.area_sqm, b.status, b.in_protected_area, b.detected_at,
+              b.metadata, b.centroid_lat, b.centroid_lng, b.change_detection_id,
+              ST_AsGeoJSON(b.footprint) as geojson,
+              (SELECT name FROM parcels WHERE id = b.parcel_id) as parcel_name
+       FROM buildings b
+       WHERE b.organization_id = $1 AND b.change_detection_id IS NOT NULL
+       ORDER BY b.detected_at DESC LIMIT 200`,
+      [orgId]
+    );
+
+    const features = result.rows.map((row) => ({
+      type: 'Feature',
+      geometry: JSON.parse(row.geojson),
+      properties: {
+        id: row.id,
+        area_sqm: parseFloat(row.area_sqm) || 0,
+        status: row.status,
+        in_protected_area: row.in_protected_area,
+        detected_at: row.detected_at,
+        parcel_name: row.parcel_name,
+        centroid_lat: row.centroid_lat,
+        centroid_lng: row.centroid_lng,
+        metadata: row.metadata || {},
+        change_detection_id: row.change_detection_id,
+      },
+    }));
+
+    res.json({ type: 'FeatureCollection', features });
   } catch (err) { next(err); }
 };

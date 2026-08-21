@@ -73,4 +73,10 @@ router.post('/planning/parcels', requireAssemblyRole('assembly_admin', 'planning
 router.patch('/planning/parcels/:id', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.updateParcel);
 router.delete('/planning/parcels/:id', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.deleteParcel);
 
+// Building change detection (ML-based time-series comparison)
+router.post('/planning/change-detection', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.runChangeDetection);
+router.get('/planning/change-detection/history', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.listChangeDetections);
+router.get('/planning/change-detection/:id', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.getChangeDetection);
+router.get('/planning/new-buildings', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.getNewBuildings);
+
 module.exports = router;

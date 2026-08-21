@@ -20,6 +20,7 @@ const adminRoutes = require('./routes/admin.routes');
 const { createWebSocketServer } = require('./realtime/socketServer');
 const cron = require('node-cron');
 const { run: runNdviJob } = require('./jobs/ndviChangeDetection');
+const { runScheduled: runBuildingChangeJob } = require('./jobs/buildingChangeDetection');
 const db = require('./config/db');
 
 // ── Auto-migrate on startup ──
@@ -93,8 +94,17 @@ runMigrations().then(() => {
         runNdviJob().catch((err) => console.error('[Cron] NDVI job error:', err.message));
       });
       console.log('NDVI change detection scheduled: every 2 days at 3:00 AM UTC');
+
+      // Schedule building change detection — runs weekly on Sundays at 4:00 AM UTC
+      // Compares the last 3 months of imagery vs. the previous 3 months to detect
+      // new buildings that have appeared in each organization's district.
+      cron.schedule('0 4 * * 0', () => {
+        console.log('[Cron] Starting scheduled building change detection...');
+        runBuildingChangeJob().catch((err) => console.error('[Cron] Building change job error:', err.message));
+      });
+      console.log('Building change detection scheduled: weekly on Sundays at 4:00 AM UTC');
     } else {
-      console.log('NDVI cron disabled in dev — set ENABLE_NDVI_CRON=true to enable');
+      console.log('Cron jobs disabled in dev — set ENABLE_NDVI_CRON=true to enable');
     }
   });
 });

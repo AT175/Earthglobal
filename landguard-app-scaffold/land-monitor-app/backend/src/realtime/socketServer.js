@@ -6,14 +6,16 @@ const bus = require('./eventBus');
  * Create and attach a socket.io server to an existing http.Server-like app.
  *
  * Room model:
- *   - owner:<id>     — events scoped to a specific owner
- *   - agent:<id>     — events scoped to a specific agent
- *   - role:admin     — events for all admin users
+ *   - owner:<id>          — events scoped to a specific owner
+ *   - agent:<id>          — events scoped to a specific agent
+ *   - role:admin          — events for all admin users
+ *   - org:<orgId>         — events for all assembly users in an organization
  *
  * Event types forwarded to clients:
- *   - alert:new           { alert, parcelId, ownerId }
- *   - visit:status        { visit, ownerId, agentId }
- *   - notification:new    { notification, ownerId, agentId }
+ *   - alert:new                    { alert, parcelId, ownerId }
+ *   - visit:status                 { visit, ownerId, agentId }
+ *   - notification:new             { notification, ownerId, agentId }
+ *   - building_change:detected     { orgId, newBuildingsCount, buildings, ... }
  */
 function createWebSocketServer(server) {
   const io = new Server(server, {
@@ -28,7 +30,7 @@ function createWebSocketServer(server) {
     }
     try {
       const payload = jwt.verify(token, process.env.JWT_SECRET);
-      socket.user = payload; // { id, role }
+      socket.user = payload; // { id, role, organizationId, assemblyRole }
       next();
     } catch (err) {
       next(new Error('Invalid or expired token'));
@@ -36,14 +38,18 @@ function createWebSocketServer(server) {
   });
 
   io.on('connection', (socket) => {
-    const { id, role } = socket.user;
+    const { id, role, organizationId } = socket.user;
 
     // Join role-based and user-based rooms
     socket.join(`role:${role}`);
     if (role === 'owner') socket.join(`owner:${id}`);
     if (role === 'agent') socket.join(`agent:${id}`);
+    // Assembly users join their organization room for org-scoped events
+    if (role === 'assembly' && organizationId) {
+      socket.join(`org:${organizationId}`);
+    }
 
-    socket.emit('connected', { userId: id, role });
+    socket.emit('connected', { userId: id, role, organizationId });
 
     socket.on('disconnect', () => {
       // Rooms are cleaned up automatically by socket.io
@@ -66,6 +72,21 @@ function createWebSocketServer(server) {
   bus.on('notification:new', ({ notification, ownerId, agentId }) => {
     if (ownerId) io.to(`owner:${ownerId}`).emit('notification:new', { notification });
     if (agentId) io.to(`agent:${agentId}`).emit('notification:new', { notification });
+  });
+
+  // Building change detection — push to all assembly users in the org
+  bus.on('building_change:detected', ({ orgId, newBuildingsCount, newBuiltupAreaSqm, buildings, beforeTileUrl, afterTileUrl, changeTileUrl, detectionId }) => {
+    io.to(`org:${orgId}`).emit('building_change:detected', {
+      orgId,
+      detectionId,
+      newBuildingsCount,
+      newBuiltupAreaSqm,
+      buildings: (buildings || []).slice(0, 50), // cap payload size
+      beforeTileUrl,
+      afterTileUrl,
+      changeTileUrl,
+      timestamp: new Date().toISOString(),
+    });
   });
 
   return io;

@@ -41,7 +41,7 @@ export default function useRealTime({ url, token } = {}) {
     socket.on('disconnect', onDisconnect);
 
     // Bridge all registered handlers to the socket
-    const eventTypes = ['alert:new', 'visit:status', 'notification:new'];
+    const eventTypes = ['alert:new', 'visit:status', 'notification:new', 'building_change:detected'];
     const socketListeners = eventTypes.map((event) => {
       const listener = (payload) => {
         const handlers = handlersRef.current.get(event);

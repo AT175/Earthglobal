@@ -11,9 +11,10 @@ import {
   Building2, MapPin, Trees, Satellite, Loader, RefreshCw, CheckCircle2,
   XCircle, AlertTriangle, LogOut, Landmark, Search, Save, X, Layers,
   Ruler, Download, Upload, UserPlus, Trash2, Edit3, Plus, FileText,
-  ChevronRight, Map as MapIcon, Navigation,
+  ChevronRight, Map as MapIcon, Navigation, Clock, Zap, Activity,
 } from 'lucide-react';
 import api from '../../services/api';
+import { useRealTime } from '@earthglobal/design-system';
 
 // Fix Leaflet default icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -450,6 +451,17 @@ export default function PlanningDashboard() {
   const [toast, setToast] = useState(null);
   const [owners, setOwners] = useState([]);
 
+  // Change detection
+  const [changeDetecting, setChangeDetecting] = useState(false);
+  const [changeResult, setChangeResult] = useState(null);
+  const [changeHistory, setChangeHistory] = useState([]);
+  const [showChangePanel, setShowChangePanel] = useState(false);
+  const [realtimeAlert, setRealtimeAlert] = useState(null);
+
+  // Real-time WebSocket subscription
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
+  const { connected: wsConnected, on: onWsEvent } = useRealTime({ token });
+
   // Layer visibility
   const [showParcels, setShowParcels] = useState(true);
   const [showBuildings, setShowBuildings] = useState(true);
@@ -484,7 +496,31 @@ export default function PlanningDashboard() {
     const userStr = localStorage.getItem('user');
     if (userStr) setUser(JSON.parse(userStr));
     loadAll();
+    loadChangeHistory();
   }, []);
+
+  // ── Real-time WebSocket: listen for building change detections ──
+  useEffect(() => {
+    if (!onWsEvent) return;
+    const unsub = onWsEvent('building_change:detected', (payload) => {
+      setRealtimeAlert(payload);
+      showToast(`REAL-TIME ALERT: ${payload.newBuildingsCount} new buildings detected!`, 'error');
+      // Reload buildings to show the newly detected ones
+      api.get('/assembly/planning/buildings-geojson').then(({ data }) => setBuildingsFC(data)).catch(() => {});
+      api.get('/assembly/planning/change-detection/history').then(({ data }) => setChangeHistory(data)).catch(() => {});
+      // Auto-show the change panel
+      setChangeResult({
+        newBuildingsCount: payload.newBuildingsCount,
+        newBuiltupAreaSqm: payload.newBuiltupAreaSqm,
+        beforeTileUrl: payload.beforeTileUrl,
+        afterTileUrl: payload.afterTileUrl,
+        changeTileUrl: payload.changeTileUrl,
+        detectionId: payload.detectionId,
+      });
+      setShowChangePanel(true);
+    });
+    return unsub;
+  }, [onWsEvent]);
 
   // Expose functions for Leaflet popup buttons (updated when parcels change)
   useEffect(() => {
@@ -613,6 +649,51 @@ export default function PlanningDashboard() {
     } catch (err) {
       showToast('KML export failed', 'error');
     }
+  };
+
+  // ── Run building change detection (ML time-series comparison) ──
+  const runChangeDetection = async () => {
+    if (!mapBounds) { showToast('Map not loaded yet', 'error'); return; }
+
+    setChangeDetecting(true);
+    setShowChangePanel(true);
+    setActivePanel(null);
+    setChangeResult(null);
+
+    try {
+      const bbox = {
+        minLng: mapBounds.minLng, minLat: mapBounds.minLat,
+        maxLng: mapBounds.maxLng, maxLat: mapBounds.maxLat,
+      };
+
+      const { data } = await api.post('/assembly/planning/change-detection', { bbox });
+
+      if (data.status === 'completed') {
+        setChangeResult(data);
+        showToast(`Change detection complete: ${data.newBuildingsCount} new buildings found!`);
+        // Reload buildings + history
+        const [buildingsRes, historyRes] = await Promise.all([
+          api.get('/assembly/planning/buildings-geojson'),
+          api.get('/assembly/planning/change-detection/history'),
+        ]);
+        setBuildingsFC(buildingsRes.data);
+        setChangeHistory(historyRes.data);
+      } else {
+        showToast(data.error || 'Change detection failed', 'error');
+      }
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Change detection failed', 'error');
+    } finally {
+      setChangeDetecting(false);
+    }
+  };
+
+  // ── Load change detection history ──
+  const loadChangeHistory = async () => {
+    try {
+      const { data } = await api.get('/assembly/planning/change-detection/history');
+      setChangeHistory(data);
+    } catch {}
   };
 
   // ── Building click ──
@@ -799,6 +880,17 @@ export default function PlanningDashboard() {
               <span>{user.assemblyRole?.replace(/_/g, ' ')}</span>
             </UserBadge>
           )}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            fontSize: '0.75rem', color: wsConnected ? '#4ade80' : '#6b7280',
+          }}>
+            <span style={{
+              width: 8, height: 8, borderRadius: '50%',
+              background: wsConnected ? '#4ade80' : '#6b7280',
+              boxShadow: wsConnected ? '0 0 8px #4ade80' : 'none',
+            }} />
+            {wsConnected ? 'Live' : 'Offline'}
+          </div>
           <LogoutBtn onClick={handleLogout}><LogOut size={16} /> Logout</LogoutBtn>
         </UserInfo>
       </TopBar>
@@ -929,6 +1021,20 @@ export default function PlanningDashboard() {
                 </>
               )}
 
+              {/* Change detection tile layers */}
+              {baseLayer === 'before' && changeResult?.beforeTileUrl && (
+                <TileLayer url={changeResult.beforeTileUrl} attribution="&copy; Copernicus Sentinel-2 via EE" maxZoom={19} />
+              )}
+              {baseLayer === 'after' && changeResult?.afterTileUrl && (
+                <TileLayer url={changeResult.afterTileUrl} attribution="&copy; Copernicus Sentinel-2 via EE" maxZoom={19} />
+              )}
+              {baseLayer === 'change' && changeResult?.changeTileUrl && (
+                <>
+                  <TileLayer url={changeResult.afterTileUrl || fallbackSatellite} attribution="" maxZoom={19} />
+                  <TileLayer url={changeResult.changeTileUrl} attribution="Building changes &copy; Sentinel-2 via EE" maxZoom={19} opacity={0.7} />
+                </>
+              )}
+
               {/* District boundary */}
               {showDistrict && districtBoundary?.boundary && (
                 <GeoJSON data={districtBoundary.boundary} style={districtStyle} />
@@ -993,6 +1099,11 @@ export default function PlanningDashboard() {
                 {detecting ? <Loader size={16} className="animate-spin" /> : <Satellite size={16} />}
                 {detecting ? 'Detecting...' : 'Detect + Vectorize Buildings'}
               </MapButton>
+              <MapButton onClick={runChangeDetection} disabled={changeDetecting}
+                style={{ borderColor: 'rgba(239,68,68,0.4)', color: '#f87171' }}>
+                {changeDetecting ? <Loader size={16} className="animate-spin" /> : <Activity size={16} />}
+                {changeDetecting ? 'Analyzing...' : 'Change Detection (ML)'}
+              </MapButton>
               <MapButton onClick={loadAll}><RefreshCw size={16} /> Refresh Data</MapButton>
               <MapButton onClick={exportKML}><Download size={16} /> Export KML</MapButton>
               {drawMode && (
@@ -1019,6 +1130,24 @@ export default function PlanningDashboard() {
                   <Building2 size={14} /> Detection Overlay
                 </LayerToggle>
               )}
+              {changeResult?.beforeTileUrl && (
+                <LayerToggle>
+                  <input type="radio" name="baseLayer" checked={baseLayer === 'before'} onChange={() => setBaseLayer('before')} />
+                  <Clock size={14} /> Before (baseline)
+                </LayerToggle>
+              )}
+              {changeResult?.afterTileUrl && (
+                <LayerToggle>
+                  <input type="radio" name="baseLayer" checked={baseLayer === 'after'} onChange={() => setBaseLayer('after')} />
+                  <Clock size={14} /> After (current)
+                </LayerToggle>
+              )}
+              {changeResult?.changeTileUrl && (
+                <LayerToggle>
+                  <input type="radio" name="baseLayer" checked={baseLayer === 'change'} onChange={() => setBaseLayer('change')} />
+                  <Activity size={14} color="#f87171" /> Changes (red)
+                </LayerToggle>
+              )}
             </LayerControl>
 
             {/* Detection results panel */}
@@ -1037,6 +1166,142 @@ export default function PlanningDashboard() {
               </DetectionStats>
               <div style={{ marginTop: 8, fontSize: '0.75rem', color: '#aab7d4' }}>{detectionResult?.method}</div>
             </DetectionPanel>
+
+            {/* ── Real-time alert banner (WebSocket) ── */}
+            {realtimeAlert && (
+              <div style={{
+                position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 3000,
+                background: 'rgba(239,68,68,0.95)', backdropFilter: 'blur(12px)',
+                border: '1px solid rgba(239,68,68,0.5)', borderRadius: 12,
+                padding: '12px 20px', color: 'white', fontSize: '0.9rem', fontWeight: 600,
+                display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 4px 20px rgba(239,68,68,0.3)',
+              }}>
+                <Zap size={18} />
+                REAL-TIME: {realtimeAlert.newBuildingsCount} new buildings detected!
+                <button onClick={() => setRealtimeAlert(null)}
+                  style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', cursor: 'pointer', borderRadius: 4, padding: '2px 6px' }}>
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+
+            {/* ── Building Change Detection Panel ── */}
+            <FloatingPanel $show={showChangePanel}>
+              <PanelTitle>
+                <Activity size={18} color="#f87171" /> Building Change Detection
+                <button onClick={() => setShowChangePanel(false)}
+                  style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#aab7d4', cursor: 'pointer' }}>
+                  <X size={16} />
+                </button>
+              </PanelTitle>
+
+              {changeDetecting && (
+                <div style={{ textAlign: 'center', padding: 20 }}>
+                  <Loader size={32} className="animate-spin" style={{ margin: '0 auto 12px' }} />
+                  <div style={{ fontSize: '0.9rem', color: '#aab7d4' }}>
+                    Running ML change detection...
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: 8 }}>
+                    Comparing satellite imagery between time periods using NDBI/NDVI/BSI indices
+                  </div>
+                </div>
+              )}
+
+              {!changeDetecting && changeResult && (
+                <>
+                  <div style={{
+                    background: changeResult.newBuildingsCount > 0 ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)',
+                    border: `1px solid ${changeResult.newBuildingsCount > 0 ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.3)'}`,
+                    borderRadius: 8, padding: 12, marginBottom: 12,
+                  }}>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: changeResult.newBuildingsCount > 0 ? '#f87171' : '#4ade80' }}>
+                      {changeResult.newBuildingsCount} new buildings
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: '#aab7d4', marginTop: 4 }}>
+                      {(changeResult.newBuiltupAreaSqm || 0).toLocaleString()} m² of new built-up area detected
+                    </div>
+                  </div>
+
+                  {/* Before / After / Change tile layer switcher */}
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+                    {changeResult.beforeTileUrl && (
+                      <button onClick={() => setBaseLayer('before')}
+                        style={{
+                          flex: 1, padding: '6px 8px', fontSize: '0.75rem', cursor: 'pointer',
+                          background: baseLayer === 'before' ? 'rgba(22,119,255,0.2)' : 'rgba(8,15,36,0.8)',
+                          border: `1px solid ${baseLayer === 'before' ? '#1677ff' : 'rgba(92,225,255,0.15)'}`,
+                          borderRadius: 6, color: '#e6edf7',
+                        }}>
+                        Before
+                      </button>
+                    )}
+                    {changeResult.afterTileUrl && (
+                      <button onClick={() => setBaseLayer('after')}
+                        style={{
+                          flex: 1, padding: '6px 8px', fontSize: '0.75rem', cursor: 'pointer',
+                          background: baseLayer === 'after' ? 'rgba(22,119,255,0.2)' : 'rgba(8,15,36,0.8)',
+                          border: `1px solid ${baseLayer === 'after' ? '#1677ff' : 'rgba(92,225,255,0.15)'}`,
+                          borderRadius: 6, color: '#e6edf7',
+                        }}>
+                        After
+                      </button>
+                    )}
+                    {changeResult.changeTileUrl && (
+                      <button onClick={() => setBaseLayer('change')}
+                        style={{
+                          flex: 1, padding: '6px 8px', fontSize: '0.75rem', cursor: 'pointer',
+                          background: baseLayer === 'change' ? 'rgba(239,68,68,0.2)' : 'rgba(8,15,36,0.8)',
+                          border: `1px solid ${baseLayer === 'change' ? '#f87171' : 'rgba(92,225,255,0.15)'}`,
+                          borderRadius: 6, color: '#e6edf7',
+                        }}>
+                        Changes (red)
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 12 }}>
+                    {changeResult.method || 'Sentinel-2 multi-temporal NDBI/NDVI/BSI change detection'}
+                  </div>
+
+                  {/* Detection history */}
+                  {changeHistory.length > 0 && (
+                    <div>
+                      <Label>Detection History</Label>
+                      <div style={{ maxHeight: 150, overflowY: 'auto' }}>
+                        {changeHistory.slice(0, 10).map((h, i) => (
+                          <div key={h.id || i} style={{
+                            padding: '6px 8px', marginBottom: 4, fontSize: '0.75rem',
+                            background: 'rgba(8,15,36,0.6)', borderRadius: 6,
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          }}>
+                            <div>
+                              <span style={{ color: h.status === 'completed' ? '#4ade80' : h.status === 'failed' ? '#f87171' : '#fbbf24' }}>
+                                {h.status}
+                              </span>
+                              {' — '}
+                              {h.new_buildings_count || 0} buildings
+                            </div>
+                            <span style={{ color: '#6b7280' }}>
+                              {h.completed_at ? new Date(h.completed_at).toLocaleDateString() : '...'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {!changeDetecting && !changeResult && (
+                <div style={{ fontSize: '0.85rem', color: '#aab7d4', textAlign: 'center', padding: 20 }}>
+                  <Activity size={32} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
+                  Click "Change Detection (ML)" to compare satellite imagery over time and find new buildings.
+                  <div style={{ fontSize: '0.75rem', marginTop: 8, color: '#6b7280' }}>
+                    Runs automatically every Sunday at 4 AM UTC. Real-time alerts push via WebSocket.
+                  </div>
+                </div>
+              )}
+            </FloatingPanel>
 
             {/* ── Building Edit Panel (with metadata) ── */}
             <FloatingPanel $show={activePanel === 'building'}>
@@ -1263,6 +1528,16 @@ export default function PlanningDashboard() {
               <LoadingOverlay>
                 <Satellite size={32} className="animate-pulse" color="#5ce1ff" />
                 Running Earth Engine building detection + vectorization...
+              </LoadingOverlay>
+            )}
+            {changeDetecting && (
+              <LoadingOverlay>
+                <Activity size={32} className="animate-pulse" color="#f87171" />
+                Running ML building change detection...
+                <div style={{ fontSize: '0.75rem', color: '#aab7d4', maxWidth: 400, textAlign: 'center' }}>
+                  Comparing Sentinel-2 satellite imagery between time periods using NDBI, NDVI, BSI indices
+                  + morphological cleaning to identify new buildings
+                </div>
               </LoadingOverlay>
             )}
           </MapWrapper>
