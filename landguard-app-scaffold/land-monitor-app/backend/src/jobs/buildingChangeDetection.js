@@ -23,6 +23,7 @@ require('dotenv').config();
 const db = require('../config/db');
 const bus = require('../realtime/eventBus');
 const { ee, init, isReady } = require('../config/earthEngine');
+const { resolveFAOBoundary, getGeometryBbox } = require('../config/faoBoundary');
 
 /**
  * Run building change detection for a specific organization + bbox.
@@ -382,13 +383,13 @@ async function runScheduled() {
     return;
   }
 
-  // Get all organizations with boundaries
+  // Get all organizations (with or without boundaries — FAO GAUL 2015 is used as fallback)
   const { rows: orgs } = await db.query(
-    `SELECT id, name, ST_AsGeoJSON(boundary) as boundary_geojson FROM organizations WHERE boundary IS NOT NULL`
+    `SELECT id, name, region, ST_AsGeoJSON(boundary) as boundary_geojson FROM organizations WHERE active = true`
   );
 
   if (orgs.length === 0) {
-    console.log('[BuildingChangeDetection] No organizations with boundaries found.');
+    console.log('[BuildingChangeDetection] No active organizations found.');
     return;
   }
 
@@ -404,18 +405,32 @@ async function runScheduled() {
 
   for (const org of orgs) {
     try {
-      if (!org.boundary_geojson) continue;
+      let bbox;
 
-      // Compute bbox from boundary
-      const coords = JSON.parse(org.boundary_geojson).coordinates[0];
-      const lngs = coords.map(c => c[0]);
-      const lats = coords.map(c => c[1]);
-      const bbox = {
-        minLng: Math.min(...lngs),
-        minLat: Math.min(...lats),
-        maxLng: Math.max(...lngs),
-        maxLat: Math.max(...lats),
-      };
+      if (org.boundary_geojson) {
+        // Use the org's stored boundary
+        const coords = JSON.parse(org.boundary_geojson).coordinates[0];
+        const lngs = coords.map(c => c[0]);
+        const lats = coords.map(c => c[1]);
+        bbox = {
+          minLng: Math.min(...lngs),
+          minLat: Math.min(...lats),
+          maxLng: Math.max(...lngs),
+          maxLat: Math.max(...lats),
+        };
+      } else {
+        // Use FAO GAUL 2015 boundary as default
+        console.log(`[BuildingChangeDetection] No stored boundary for ${org.name}, resolving FAO GAUL 2015 boundary...`);
+        const faoGeometry = await resolveFAOBoundary(org);
+
+        if (!faoGeometry) {
+          console.warn(`[BuildingChangeDetection] Could not resolve FAO boundary for org: ${org.name} — skipping.`);
+          continue;
+        }
+
+        bbox = await getGeometryBbox(faoGeometry);
+        console.log(`[BuildingChangeDetection] Using FAO GAUL 2015 boundary for: ${org.name}`);
+      }
 
       console.log(`[BuildingChangeDetection] Running for org: ${org.name} (${org.id})`);
       const result = await runBuildingChangeDetection({

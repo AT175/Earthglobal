@@ -11,7 +11,7 @@ import {
   Building2, MapPin, Trees, Satellite, Loader, RefreshCw, CheckCircle2,
   XCircle, AlertTriangle, LogOut, Landmark, Search, Save, X, Layers,
   Ruler, Download, Upload, UserPlus, Trash2, Edit3, Plus, FileText,
-  ChevronRight, Map as MapIcon, Navigation, Clock, Zap, Activity,
+  ChevronRight, Map as MapIcon, Navigation, Clock, Zap, Activity, Globe,
 } from 'lucide-react';
 import api from '../../services/api';
 import { useRealTime } from '@earthglobal/design-system';
@@ -634,23 +634,27 @@ export default function PlanningDashboard() {
   };
 
   // ── Run building detection + vectorize ──
-  const runDetection = async () => {
-    if (!mapBounds) { showToast('Map not loaded yet', 'error'); return; }
+  // If useFAOBoundary is true, no bbox is sent — the backend uses the
+  // FAO GAUL 2015 boundary for the organization's district/region.
+  const runDetection = async (useFAOBoundary = false) => {
+    if (!useFAOBoundary && !mapBounds) { showToast('Map not loaded yet', 'error'); return; }
 
     setDetecting(true);
     setActivePanel(null);
     try {
-      const bbox = {
-        minLng: mapBounds.minLng, minLat: mapBounds.minLat,
-        maxLng: mapBounds.maxLng, maxLat: mapBounds.maxLat,
-      };
-      const { data } = await api.post('/assembly/planning/detect-buildings', { bbox });
+      const payload = useFAOBoundary
+        ? { useFAOBoundary: true }
+        : { bbox: { minLng: mapBounds.minLng, minLat: mapBounds.minLat, maxLng: mapBounds.maxLng, maxLat: mapBounds.maxLat } };
+      const { data } = await api.post('/assembly/planning/detect-buildings', payload);
 
       if (data.detected) {
         setDetectionResult(data);
         setBaseLayer('detection');
         const savedCount = data.stats?.vectorized_buildings || 0;
-        showToast(`Detected ~${data.stats.estimated_buildings} buildings. ${savedCount} vectorized & saved to database.`);
+        const boundaryLabel = data.boundary_source?.startsWith('fao_gaul')
+          ? ` (${data.boundary})`
+          : '';
+        showToast(`Detected ~${data.stats.estimated_buildings} buildings${boundaryLabel}. ${savedCount} vectorized & saved.`);
         // Reload buildings to show the newly saved ones
         const { data: newBuildings } = await api.get('/assembly/planning/buildings-geojson');
         setBuildingsFC(newBuildings);
@@ -1295,9 +1299,14 @@ export default function PlanningDashboard() {
 
             {/* Map overlay buttons */}
             <MapOverlay>
-              <MapButton onClick={runDetection} disabled={detecting}>
+              <MapButton onClick={() => runDetection(true)} disabled={detecting}
+                style={{ borderColor: 'rgba(34,197,94,0.4)', color: '#4ade80' }}>
+                {detecting ? <Loader size={16} className="animate-spin" /> : <Globe size={16} />}
+                {detecting ? 'Detecting...' : 'Detect Buildings (FAO Boundary)'}
+              </MapButton>
+              <MapButton onClick={() => runDetection(false)} disabled={detecting}>
                 {detecting ? <Loader size={16} className="animate-spin" /> : <Satellite size={16} />}
-                {detecting ? 'Detecting...' : 'Detect + Vectorize Buildings'}
+                {detecting ? 'Detecting...' : 'Detect (Map Viewport)'}
               </MapButton>
               <MapButton onClick={runChangeDetection} disabled={changeDetecting}
                 style={{ borderColor: 'rgba(239,68,68,0.4)', color: '#f87171' }}>

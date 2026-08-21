@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt');
 const bus = require('../realtime/eventBus');
 const { notifyOwnerOfAlert } = require('../services/notificationService');
 const { ee, init: initEE, isReady: eeReady } = require('../config/earthEngine');
+const { resolveFAOBoundary, getGeometryBbox } = require('../config/faoBoundary');
 const { runBuildingChangeDetection } = require('../jobs/buildingChangeDetection');
 
 // ── Helper: get org_id from authenticated assembly user ──
@@ -575,14 +576,14 @@ exports.getDistrictBoundary = async (req, res, next) => {
 };
 
 // POST /assembly/planning/detect-buildings — run EE building detection over an area
-// Uses Google Earth Engine to detect buildings via ML in the requested bbox.
+// Uses Google Earth Engine to detect buildings via ML.
+// If no bbox is provided, uses the FAO GAUL 2015 boundary for the organization's
+// district/region as the default area for initial building extraction.
 // Vectorizes detected built-up clusters into polygons, saves to DB with centroid + metadata.
 exports.detectBuildings = async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
-    const { bbox } = req.body; // { minLng, minLat, maxLng, maxLat }
-
-    if (!bbox) return res.status(400).json({ error: 'bbox is required' });
+    const { bbox, useFAOBoundary } = req.body;
 
     const ready = await initEE();
     if (!ready) {
@@ -592,8 +593,65 @@ exports.detectBuildings = async (req, res, next) => {
       });
     }
 
-    const [minLng, minLat, maxLng, maxLat] = [bbox.minLng, bbox.minLat, bbox.maxLng, bbox.maxLat];
-    const region = ee.Geometry.Rectangle([minLng, minLat, maxLng, maxLat], 'EPSG:4326', false);
+    // ── Resolve the region geometry ──
+    // Priority:
+    //   1. Explicit bbox from the request (map viewport)
+    //   2. FAO GAUL 2015 boundary (default for initial extraction)
+    //   3. Organization's stored boundary
+    let region;
+    let resolvedBbox = bbox;
+    let boundarySource = 'bbox';
+
+    if (bbox) {
+      const [minLng, minLat, maxLng, maxLat] = [bbox.minLng, bbox.minLat, bbox.maxLng, bbox.maxLat];
+      region = ee.Geometry.Rectangle([minLng, minLat, maxLng, maxLat], 'EPSG:4326', false);
+      boundarySource = 'map_bbox';
+    } else {
+      // Use FAO GAUL 2015 boundary as default
+      boundarySource = 'fao_gaul_2015';
+
+      // Get org info for FAO boundary resolution
+      const orgResult = await db.query(
+        'SELECT name, region, ST_AsGeoJSON(boundary) as boundary_geojson FROM organizations WHERE id = $1',
+        [orgId]
+      );
+      const org = orgResult.rows[0];
+
+      if (!org) {
+        return res.status(404).json({ error: 'Organization not found', detected: false });
+      }
+
+      // Try FAO GAUL 2015 boundary first
+      const faoGeometry = await resolveFAOBoundary(org);
+
+      if (faoGeometry) {
+        region = faoGeometry;
+        // Get the bbox of the FAO boundary for stats/tile purposes
+        try {
+          resolvedBbox = await getGeometryBbox(faoGeometry);
+        } catch (e) {
+          console.error('[detectBuildings] Failed to get FAO bbox:', e.message);
+        }
+
+        // Determine which FAO level matched
+        const orgNameNorm = org.name?.toLowerCase() || '';
+        const hasDistrict = orgNameNorm.includes('district') || orgNameNorm.includes('municipal') || orgNameNorm.includes('metro');
+        boundarySource = hasDistrict ? 'fao_gaul_2015_level2' : 'fao_gaul_2015_level1';
+
+        console.log(`[detectBuildings] Using FAO GAUL 2015 boundary (${boundarySource}) for org: ${org.name}`);
+      } else if (org.boundary_geojson) {
+        // Fall back to org's stored boundary
+        const orgGeojson = JSON.parse(org.boundary_geojson);
+        region = ee.Geometry(orgGeojson);
+        boundarySource = 'org_boundary';
+        console.log(`[detectBuildings] FAO boundary not found, using org boundary for: ${org.name}`);
+      } else {
+        return res.status(400).json({
+          error: 'No bbox provided and could not resolve FAO GAUL 2015 boundary or org boundary. Provide a bbox or set up the organization boundary.',
+          detected: false,
+        });
+      }
+    }
 
     // ── Building detection approach ──
     // 1. Use Sentinel-2 composite for the area
@@ -695,7 +753,8 @@ exports.detectBuildings = async (req, res, next) => {
                   [orgId, JSON.stringify(geojson), centroidLat, centroidLng, JSON.stringify({
                     detection_method: 'sentinel2_ndbi_ndvi_bsi',
                     detection_date: new Date().toISOString(),
-                    detection_bbox: bbox,
+                    detection_bbox: resolvedBbox,
+                    boundary_source: boundarySource,
                     pixel_count: feat.properties?.count || 0,
                     source: 'earth_engine',
                   })]
@@ -717,7 +776,8 @@ exports.detectBuildings = async (req, res, next) => {
             detected: true,
             tileUrl,
             token: map.token,
-            bbox,
+            bbox: resolvedBbox,
+            boundary_source: boundarySource,
             stats: {
               builtup_pixels: builtupPixels,
               builtup_area_sqm: builtupAreaSqm,
@@ -726,7 +786,16 @@ exports.detectBuildings = async (req, res, next) => {
             },
             saved_buildings: savedBuildings,
             method: 'Sentinel-2 NDBI + NDVI + BSI classification + vectorization via Google Earth Engine',
-            attribution: 'Building detection &copy; Copernicus Sentinel-2 via Google Earth Engine',
+            boundary: boundarySource === 'fao_gaul_2015_level2'
+              ? 'FAO GAUL 2015 Level 2 (District) boundary'
+              : boundarySource === 'fao_gaul_2015_level1'
+              ? 'FAO GAUL 2015 Level 1 (Region) boundary'
+              : boundarySource === 'fao_gaul_2015'
+              ? 'FAO GAUL 2015 boundary'
+              : boundarySource === 'org_boundary'
+              ? 'Organization boundary'
+              : 'Map viewport bbox',
+            attribution: 'Building detection &copy; Copernicus Sentinel-2 via Google Earth Engine. Boundary &copy; FAO GAUL 2015.',
           });
         });
       });
