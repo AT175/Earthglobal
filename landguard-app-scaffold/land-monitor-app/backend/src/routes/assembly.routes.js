@@ -61,4 +61,16 @@ router.post('/planning/detect-buildings', requireAssemblyRole('assembly_admin', 
 router.post('/planning/buildings', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.createBuilding);
 router.patch('/planning/buildings/:id', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.updateBuilding);
 
+// KML export — download all geospatial data as KML for Google Earth
+router.get('/planning/export.kml', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.exportKML);
+
+// Land ownership transfer
+router.get('/planning/owners', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.listOrgOwners);
+router.post('/planning/transfer-land', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.transferLand);
+
+// Parcel geospatial CRUD (draw/edit/delete parcels with accurate boundaries)
+router.post('/planning/parcels', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.createParcel);
+router.patch('/planning/parcels/:id', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.updateParcel);
+router.delete('/planning/parcels/:id', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.deleteParcel);
+
 module.exports = router;
