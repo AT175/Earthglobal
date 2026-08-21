@@ -16,6 +16,7 @@ const notificationRoutes = require('./routes/notifications.routes');
 const paymentRoutes = require('./routes/payments.routes');
 const mapTilesRoutes = require('./routes/mapTiles.routes');
 const assemblyRoutes = require('./routes/assembly.routes');
+const validationRoutes = require('./routes/validation.routes');
 const adminRoutes = require('./routes/admin.routes');
 const { createWebSocketServer } = require('./realtime/socketServer');
 const cron = require('node-cron');
@@ -68,6 +69,7 @@ app.use('/notifications', notificationRoutes);
 app.use('/payments', paymentRoutes);
 app.use('/map-tiles', mapTilesRoutes);
 app.use('/assembly', assemblyRoutes);
+app.use('/validation', validationRoutes);
 app.use('/admin', adminRoutes);
 
 app.use((err, _req, res, _next) => {

@@ -12,6 +12,7 @@ import Signup from './pages/Signup';
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const ParcelDetail = lazy(() => import('./pages/ParcelDetail'));
 const RequestVisit = lazy(() => import('./pages/RequestVisit'));
+const ValidationRequests = lazy(() => import('./pages/ValidationRequests'));
 
 // Agent pages
 const VisitList = lazy(() => import('./pages/agent/VisitList'));
@@ -28,6 +29,7 @@ const OrganizationManagement = lazy(() => import('./pages/admin/OrganizationMana
 // Assembly pages
 const AssemblyDashboard = lazy(() => import('./pages/assembly/AssemblyDashboard'));
 const PlanningDashboard = lazy(() => import('./pages/assembly/PlanningDashboard'));
+const ValidationPage = lazy(() => import('./pages/assembly/ValidationPage'));
 
 const PageFallback = () => (
   <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem' }}>
@@ -76,6 +78,7 @@ export default function App() {
             <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
             <Route path="/parcels/:id" element={<RequireAuth><ParcelDetail /></RequireAuth>} />
             <Route path="/parcels/:id/request-visit" element={<RequireAuth><RequestVisit /></RequireAuth>} />
+            <Route path="/validation" element={<RequireAuth><ValidationRequests /></RequireAuth>} />
 
             {/* Agent routes */}
             <Route path="/agent" element={<RequireAuth><VisitList /></RequireAuth>} />
@@ -92,6 +95,7 @@ export default function App() {
             {/* Assembly routes */}
             <Route path="/assembly" element={<RequireAuth><AssemblyDashboard /></RequireAuth>} />
             <Route path="/assembly/planning" element={<RequireAuth><PlanningDashboard /></RequireAuth>} />
+            <Route path="/assembly/validation" element={<RequireAuth><ValidationPage /></RequireAuth>} />
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />

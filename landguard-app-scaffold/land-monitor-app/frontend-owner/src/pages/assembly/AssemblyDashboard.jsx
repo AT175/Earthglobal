@@ -482,6 +482,11 @@ export default function AssemblyDashboard() {
               <Map size={16} /> Planning Map
             </LogoutBtn>
           )}
+          {(user?.assemblyRole === 'planning_officer' || user?.assemblyRole === 'assembly_admin') && (
+            <LogoutBtn onClick={() => navigate('/assembly/validation')} style={{ borderColor: 'rgba(92,225,255,0.3)', color: '#5ce1ff' }}>
+              <FileCheck size={16} /> Search Validation
+            </LogoutBtn>
+          )}
           <LogoutBtn onClick={handleLogout}>
             <LogOut size={16} /> Logout
           </LogoutBtn>

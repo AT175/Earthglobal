@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LayoutDashboard, MapPin, Bell, Settings } from 'lucide-react';
+import { LayoutDashboard, MapPin, Bell, Settings, FileCheck } from 'lucide-react';
 import {
   AppShell,
   Sidebar,
@@ -15,6 +15,7 @@ import {
 
 const NAV_ITEMS = [
   { to: '/', labelKey: 'nav.dashboard', icon: LayoutDashboard },
+  { to: '/validation', labelKey: 'nav.validation', icon: FileCheck },
   { to: '/notifications', labelKey: 'nav.notifications', icon: Bell },
   { to: '/settings', labelKey: 'nav.settings', icon: Settings },
 ];
