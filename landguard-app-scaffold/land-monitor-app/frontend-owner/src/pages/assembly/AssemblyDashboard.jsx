@@ -6,7 +6,7 @@ import {
   Building2, FileCheck, FileX, AlertTriangle, DollarSign, Shield,
   Trees, MapPin, LogOut, RefreshCw, TrendingUp, Home, Landmark,
   CheckCircle2, XCircle, Clock, ArrowRight, Search,
-  Users, Plus, Trash2, X, Save, Mail, Phone as PhoneIcon, UserCog,
+  Users, Plus, Trash2, X, Save, Mail, Phone as PhoneIcon, UserCog, Map,
 } from 'lucide-react';
 import api from '../../services/api';
 
@@ -301,15 +301,15 @@ const ErrorState = styled.div`
 // Component
 // ═══════════════════════════════════════════════════════════
 const TABS = [
-  { id: 'overview', label: 'Overview', icon: TrendingUp },
-  { id: 'permits', label: 'Building Permits', icon: FileCheck },
-  { id: 'buildings', label: 'Detected Buildings', icon: Building2 },
-  { id: 'transactions', label: 'Land Transactions', icon: Landmark },
-  { id: 'designs', label: 'Building Designs', icon: Home },
-  { id: 'protected', label: 'Protected Areas', icon: Trees },
-  { id: 'revenue', label: 'Revenue', icon: DollarSign },
-  { id: 'alerts', label: 'Alerts', icon: AlertTriangle },
-  { id: 'users', label: 'User Management', icon: UserCog },
+  { id: 'overview', label: 'Overview', icon: TrendingUp, roles: ['assembly_admin', 'planning_officer', 'revenue_officer', 'inspector'] },
+  { id: 'permits', label: 'Building Permits', icon: FileCheck, roles: ['assembly_admin', 'planning_officer', 'inspector'] },
+  { id: 'buildings', label: 'Detected Buildings', icon: Building2, roles: ['assembly_admin', 'planning_officer', 'inspector'] },
+  { id: 'transactions', label: 'Land Transactions', icon: Landmark, roles: ['assembly_admin', 'planning_officer', 'revenue_officer'] },
+  { id: 'designs', label: 'Building Designs', icon: Home, roles: ['assembly_admin', 'planning_officer'] },
+  { id: 'protected', label: 'Protected Areas', icon: Trees, roles: ['assembly_admin', 'planning_officer', 'inspector'] },
+  { id: 'revenue', label: 'Revenue', icon: DollarSign, roles: ['assembly_admin', 'revenue_officer'] },
+  { id: 'alerts', label: 'Alerts', icon: AlertTriangle, roles: ['assembly_admin', 'planning_officer', 'inspector'] },
+  { id: 'users', label: 'User Management', icon: UserCog, roles: ['assembly_admin'] },
 ];
 
 const statusColors = {
@@ -477,6 +477,11 @@ export default function AssemblyDashboard() {
               <span>{user.assemblyRole?.replace(/_/g, ' ')}</span>
             </UserBadge>
           )}
+          {user?.assemblyRole === 'planning_officer' && (
+            <LogoutBtn onClick={() => navigate('/assembly/planning')} style={{ borderColor: 'rgba(92,225,255,0.3)', color: '#5ce1ff' }}>
+              <Map size={16} /> Planning Map
+            </LogoutBtn>
+          )}
           <LogoutBtn onClick={handleLogout}>
             <LogOut size={16} /> Logout
           </LogoutBtn>
@@ -485,7 +490,7 @@ export default function AssemblyDashboard() {
 
       <Container>
         <Tabs>
-          {TABS.map(({ id, label, icon: Icon }) => (
+          {TABS.filter(tab => !user?.assemblyRole || tab.roles.includes(user.assemblyRole)).map(({ id, label, icon: Icon }) => (
             <Tab key={id} $active={activeTab === id} onClick={() => { setActiveTab(id); setFilter(''); }}>
               <Icon size={16} /> {label}
             </Tab>

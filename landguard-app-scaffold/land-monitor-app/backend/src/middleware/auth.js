@@ -24,4 +24,17 @@ function requireRole(...roles) {
   };
 }
 
-module.exports = { requireAuth, requireRole };
+// Fine-grained assembly role check (assembly_admin, planning_officer, etc.)
+function requireAssemblyRole(...assemblyRoles) {
+  return (req, res, next) => {
+    if (!req.user || req.user.role !== 'assembly') {
+      return res.status(403).json({ error: 'Forbidden — assembly account required' });
+    }
+    if (!assemblyRoles.includes(req.user.assemblyRole)) {
+      return res.status(403).json({ error: 'Forbidden — insufficient permissions for this action' });
+    }
+    next();
+  };
+}
+
+module.exports = { requireAuth, requireRole, requireAssemblyRole };

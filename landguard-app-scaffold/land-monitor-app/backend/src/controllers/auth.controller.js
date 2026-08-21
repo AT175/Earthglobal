@@ -116,7 +116,11 @@ exports.login = async (req, res, next) => {
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(401).json({ error: 'Invalid email or password' });
 
-    const token = jwt.sign({ id: user.id, role: user.role, organizationId: user.organization_id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+    const token = jwt.sign(
+      { id: user.id, role: user.role, organizationId: user.organization_id, assemblyRole: user.assembly_role },
+      process.env.JWT_SECRET,
+      { expiresIn: '30d' }
+    );
 
     // Return user info + role — frontend auto-routes based on role
     const userInfo = { id: user.id, name: user.name, email: user.email };

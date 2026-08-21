@@ -27,6 +27,7 @@ const OrganizationManagement = lazy(() => import('./pages/admin/OrganizationMana
 
 // Assembly pages
 const AssemblyDashboard = lazy(() => import('./pages/assembly/AssemblyDashboard'));
+const PlanningDashboard = lazy(() => import('./pages/assembly/PlanningDashboard'));
 
 const PageFallback = () => (
   <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem' }}>
@@ -90,6 +91,7 @@ export default function App() {
 
             {/* Assembly routes */}
             <Route path="/assembly" element={<RequireAuth><AssemblyDashboard /></RequireAuth>} />
+            <Route path="/assembly/planning" element={<RequireAuth><PlanningDashboard /></RequireAuth>} />
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />

@@ -2,6 +2,7 @@ const db = require('../config/db');
 const bcrypt = require('bcrypt');
 const bus = require('../realtime/eventBus');
 const { notifyOwnerOfAlert } = require('../services/notificationService');
+const { ee, init: initEE, isReady: eeReady } = require('../config/earthEngine');
 
 // ── Helper: get org_id from authenticated assembly user ──
 function getOrgId(req) {
@@ -441,5 +442,294 @@ exports.getOrganization = async (req, res, next) => {
     );
     if (!result.rows[0]) return res.status(404).json({ error: 'Organization not found' });
     res.json(result.rows[0]);
+  } catch (err) { next(err); }
+};
+
+// ═══════════════════════════════════════════════════════════
+// PLANNING OFFICER — GEODATABASE + BUILDING DETECTION
+// ═══════════════════════════════════════════════════════════
+
+// GET /assembly/planning/parcels-geojson — all parcels as GeoJSON FeatureCollection
+exports.getParcelsGeoJSON = async (req, res, next) => {
+  try {
+    const orgId = getOrgId(req);
+    const result = await db.query(
+      `SELECT id, name, region, area_sqm, survey_date, owner_id,
+              ST_AsGeoJSON(boundary) as geojson,
+              (SELECT name FROM owners WHERE id = p.owner_id) as owner_name
+       FROM parcels p WHERE p.organization_id = $1 ORDER BY p.created_at DESC`,
+      [orgId]
+    );
+
+    const features = result.rows.map((row) => ({
+      type: 'Feature',
+      geometry: JSON.parse(row.geojson),
+      properties: {
+        id: row.id,
+        name: row.name,
+        region: row.region,
+        area_sqm: parseFloat(row.area_sqm) || 0,
+        owner_name: row.owner_name,
+        survey_date: row.survey_date,
+      },
+    }));
+
+    res.json({ type: 'FeatureCollection', features });
+  } catch (err) { next(err); }
+};
+
+// GET /assembly/planning/buildings-geojson — all detected buildings as GeoJSON
+exports.getBuildingsGeoJSON = async (req, res, next) => {
+  try {
+    const orgId = getOrgId(req);
+    const result = await db.query(
+      `SELECT b.id, b.area_sqm, b.status, b.in_protected_area, b.detected_at,
+              b.verified_at, b.notes, b.permit_id, b.parcel_id,
+              ST_AsGeoJSON(b.footprint) as geojson,
+              (SELECT name FROM parcels WHERE id = b.parcel_id) as parcel_name
+       FROM buildings b WHERE b.organization_id = $1 ORDER BY b.detected_at DESC`,
+      [orgId]
+    );
+
+    const features = result.rows.map((row) => ({
+      type: 'Feature',
+      geometry: JSON.parse(row.geojson),
+      properties: {
+        id: row.id,
+        area_sqm: parseFloat(row.area_sqm) || 0,
+        status: row.status,
+        in_protected_area: row.in_protected_area,
+        detected_at: row.detected_at,
+        verified_at: row.verified_at,
+        notes: row.notes,
+        parcel_name: row.parcel_name,
+      },
+    }));
+
+    res.json({ type: 'FeatureCollection', features });
+  } catch (err) { next(err); }
+};
+
+// GET /assembly/planning/protected-areas-geojson — protected areas as GeoJSON
+exports.getProtectedAreasGeoJSON = async (req, res, next) => {
+  try {
+    const orgId = getOrgId(req);
+    const result = await db.query(
+      `SELECT id, name, type, description, regulations, active,
+              ST_AsGeoJSON(boundary) as geojson
+       FROM protected_areas WHERE organization_id = $1 AND active = true`,
+      [orgId]
+    );
+
+    const features = result.rows.map((row) => ({
+      type: 'Feature',
+      geometry: JSON.parse(row.geojson),
+      properties: {
+        id: row.id,
+        name: row.name,
+        type: row.type,
+        description: row.description,
+        regulations: row.regulations,
+      },
+    }));
+
+    res.json({ type: 'FeatureCollection', features });
+  } catch (err) { next(err); }
+};
+
+// GET /assembly/planning/district-boundary — org boundary as GeoJSON (for map overlay)
+exports.getDistrictBoundary = async (req, res, next) => {
+  try {
+    const orgId = getOrgId(req);
+    const result = await db.query(
+      `SELECT id, name, region, type,
+              ST_AsGeoJSON(boundary) as geojson
+       FROM organizations WHERE id = $1 AND boundary IS NOT NULL`,
+      [orgId]
+    );
+
+    if (!result.rows[0]) {
+      // No boundary set — return org info without geometry
+      const orgResult = await db.query('SELECT id, name, region, type FROM organizations WHERE id = $1', [orgId]);
+      return res.json({ ...orgResult.rows[0], boundary: null });
+    }
+
+    res.json({
+      id: result.rows[0].id,
+      name: result.rows[0].name,
+      region: result.rows[0].region,
+      type: result.rows[0].type,
+      boundary: JSON.parse(result.rows[0].geojson),
+    });
+  } catch (err) { next(err); }
+};
+
+// POST /assembly/planning/detect-buildings — run EE building detection over an area
+// Uses Google Earth Engine to detect buildings via ML in the requested bbox
+exports.detectBuildings = async (req, res, next) => {
+  try {
+    const orgId = getOrgId(req);
+    const { bbox } = req.body; // { minLng, minLat, maxLng, maxLat }
+
+    if (!bbox) return res.status(400).json({ error: 'bbox is required' });
+
+    const ready = await initEE();
+    if (!ready) {
+      return res.status(503).json({
+        error: 'Earth Engine is not configured. Set EE_SERVICE_ACCOUNT_JSON to enable building detection.',
+        detected: false,
+      });
+    }
+
+    const [minLng, minLat, maxLng, maxLat] = [bbox.minLng, bbox.minLat, bbox.maxLng, bbox.maxLat];
+    const region = ee.Geometry.Rectangle([minLng, minLat, maxLng, maxLat], 'EPSG:4326', false);
+
+    // ── Building detection approach ──
+    // 1. Use Sentinel-2 composite for the area
+    const s2 = ee.ImageCollection('COPERNICUS/S2_HARMONIZED')
+      .filterDate('2024-01-01', '2025-12-31')
+      .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 15))
+      .filterBounds(region)
+      .median();
+
+    // 2. Compute building indices:
+    //    - NDBI (Normalized Difference Built-up Index) = (SWIR1 - NIR) / (SWIR1 + NIR)
+    //      B11 (SWIR1) = 1610nm, B8 (NIR) = 842nm
+    //    - NDVI to mask out vegetation
+    //    - BSI (Bare Soil Index)
+    const ndbi = s2.normalizedDifference(['B11', 'B8']).rename('ndbi');
+    const ndvi = s2.normalizedDifference(['B8', 'B4']).rename('ndvi');
+    const bsi = s2.expression(
+      '((SWIR1 + Red) - (NIR + Blue)) / ((SWIR1 + Red) + (NIR + Blue))',
+      { SWIR1: s2.select('B11'), Red: s2.select('B4'), NIR: s2.select('B8'), Blue: s2.select('B2') }
+    ).rename('bsi');
+
+    // 3. Built-up mask: high NDBI + low NDVI (not vegetation) + high BSI
+    const builtup = ndbi.gt(0.05).and(ndvi.lt(0.2)).and(bsi.gt(0.1));
+
+    // 4. Get pixel-by-pixel classification as an image for visualization
+    const builtupVis = builtup.visualize({ palette: ['000000', 'ff0000'], min: 0, max: 1 });
+
+    // 5. Get map ID for tile serving (so frontend can overlay the detection result)
+    builtupVis.getMapId({ min: 0, max: 255 }, (err, map) => {
+      if (err) {
+        console.error('EE building detection getMapId failed:', err.message);
+        return res.status(500).json({ error: 'Building detection failed', detected: false });
+      }
+
+      const tileUrl = `https://earthengine.googleapis.com/v1/${map.mapid}/tiles/{z}/{x}/{y}`;
+
+      // 6. Also compute statistics: count of built-up pixels in the region
+      //    Each Sentinel-2 pixel = 10m x 10m = 100 sqm
+      const stats = builtup.reduceRegion({
+        reducer: ee.Reducer.count(),
+        geometry: region,
+        scale: 10,
+        maxPixels: 1e13,
+      });
+
+      stats.evaluate((result, evalErr) => {
+        const builtupPixels = result?.ndbi || 0;
+        const builtupAreaSqm = builtupPixels * 100; // 10m x 10m pixels
+        const estimatedBuildings = Math.max(1, Math.round(builtupAreaSqm / 120)); // avg building ~120sqm
+
+        res.json({
+          detected: true,
+          tileUrl,
+          token: map.token,
+          bbox,
+          stats: {
+            builtup_pixels: builtupPixels,
+            builtup_area_sqm: builtupAreaSqm,
+            estimated_buildings: estimatedBuildings,
+          },
+          method: 'Sentinel-2 NDBI + NDVI + BSI classification via Google Earth Engine',
+          attribution: 'Building detection &copy; Copernicus Sentinel-2 via Google Earth Engine',
+        });
+      });
+    });
+  } catch (err) {
+    console.error('Building detection error:', err.message);
+    res.status(500).json({ error: 'Building detection failed', detected: false });
+  }
+};
+
+// GET /assembly/planning/satellite-tiles — get EE satellite tile URL for the org area
+exports.getSatelliteTiles = async (req, res, next) => {
+  try {
+    const { bbox } = req.query;
+    const ready = await initEE();
+    if (!ready) return res.json({ url: null, provider: 'fallback' });
+
+    const collection = ee.ImageCollection('COPERNICUS/S2_HARMONIZED')
+      .filterDate('2024-01-01', '2025-12-31')
+      .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20));
+
+    let filtered = collection;
+    if (bbox) {
+      const [minLng, minLat, maxLng, maxLat] = bbox.split(',').map(parseFloat);
+      const region = ee.Geometry.Rectangle([minLng, minLat, maxLng, maxLat], 'EPSG:4326', false);
+      filtered = collection.filterBounds(region);
+    }
+
+    const composite = filtered.median();
+    const visualized = composite.visualize({ bands: ['B4', 'B3', 'B2'], min: 0, max: 3000, gamma: 1.4 });
+
+    visualized.getMapId({ min: 0, max: 255 }, (err, map) => {
+      if (err) return res.json({ url: null, provider: 'fallback' });
+      res.json({
+        url: `https://earthengine.googleapis.com/v1/${map.mapid}/tiles/{z}/{x}/{y}`,
+        token: map.token,
+        provider: 'earth-engine',
+        attribution: 'Imagery &copy; Copernicus Sentinel-2 via Google Earth Engine',
+      });
+    });
+  } catch (err) {
+    res.json({ url: null, provider: 'fallback' });
+  }
+};
+
+// PATCH /assembly/planning/buildings/:id — planner updates building info
+exports.updateBuilding = async (req, res, next) => {
+  try {
+    const orgId = getOrgId(req);
+    const { status, notes, permit_id, parcel_id, in_protected_area } = req.body;
+
+    // Verify building belongs to this org
+    const existing = await db.query('SELECT id FROM buildings WHERE id = $1 AND organization_id = $2', [req.params.id, orgId]);
+    if (!existing.rows[0]) return res.status(404).json({ error: 'Building not found in your organization' });
+
+    const result = await db.query(
+      `UPDATE buildings SET
+         status = COALESCE($1::building_status, status),
+         notes = COALESCE($2, notes),
+         permit_id = COALESCE($3, permit_id),
+         parcel_id = COALESCE($4, parcel_id),
+         in_protected_area = COALESCE($5, in_protected_area),
+         verified_by = $6,
+         verified_at = now()
+       WHERE id = $7 AND organization_id = $8
+       RETURNING id, status, notes, verified_at`,
+      [status, notes, permit_id, parcel_id, in_protected_area, req.user.id, req.params.id, orgId]
+    );
+    res.json(result.rows[0]);
+  } catch (err) { next(err); }
+};
+
+// POST /assembly/planning/buildings — manually add a building footprint
+exports.createBuilding = async (req, res, next) => {
+  try {
+    const orgId = getOrgId(req);
+    const { footprint, parcel_id, status, notes, in_protected_area } = req.body;
+
+    if (!footprint) return res.status(400).json({ error: 'footprint (GeoJSON Polygon) is required' });
+
+    const result = await db.query(
+      `INSERT INTO buildings (organization_id, parcel_id, footprint, status, notes, in_protected_area, detected_at)
+       VALUES ($1, $2, ST_SetSRID(ST_GeomFromGeoJSON($3), 4326), COALESCE($4::building_status, 'unverified'), $5, COALESCE($6, false), now())
+       RETURNING id, status, detected_at`,
+      [orgId, parcel_id, JSON.stringify(footprint), status, notes, in_protected_area]
+    );
+    res.status(201).json(result.rows[0]);
   } catch (err) { next(err); }
 };

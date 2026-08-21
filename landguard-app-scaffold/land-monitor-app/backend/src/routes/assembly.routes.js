@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { requireAuth, requireRole } = require('../middleware/auth');
+const { requireAuth, requireRole, requireAssemblyRole } = require('../middleware/auth');
 const ctrl = require('../controllers/assembly.controller');
 
 // All assembly routes require auth + assembly role
@@ -47,5 +47,18 @@ router.get('/users', ctrl.listUsers);
 router.post('/users', ctrl.createUser);
 router.patch('/users/:id', ctrl.updateUser);
 router.delete('/users/:id', ctrl.deleteUser);
+
+// ═══════════════════════════════════════════════════════════
+// PLANNING OFFICER — geodatabase, building detection, map data
+// Access: assembly_admin + planning_officer
+// ═══════════════════════════════════════════════════════════
+router.get('/planning/parcels-geojson', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.getParcelsGeoJSON);
+router.get('/planning/buildings-geojson', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.getBuildingsGeoJSON);
+router.get('/planning/protected-areas-geojson', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.getProtectedAreasGeoJSON);
+router.get('/planning/district-boundary', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.getDistrictBoundary);
+router.get('/planning/satellite-tiles', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.getSatelliteTiles);
+router.post('/planning/detect-buildings', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.detectBuildings);
+router.post('/planning/buildings', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.createBuilding);
+router.patch('/planning/buildings/:id', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.updateBuilding);
 
 module.exports = router;
