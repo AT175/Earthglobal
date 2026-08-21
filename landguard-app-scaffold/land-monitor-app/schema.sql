@@ -673,6 +673,77 @@ CREATE TABLE IF NOT EXISTS land_receipts (
 
 CREATE INDEX IF NOT EXISTS idx_lr_purchase ON land_receipts(purchase_id);
 
+-- =========================================================
+-- PLANNING SCHEMES
+-- Uploaded by planning officers for the assembly. Each scheme
+-- contains parcels (zoned land use areas) that form the basis
+-- for building extraction per parcel. Schemes may be uploaded
+-- in a local datum/projection and are reprojected to WGS84
+-- (EPSG:4326) for map visualization.
+-- =========================================================
+CREATE TABLE IF NOT EXISTS planning_schemes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    -- Source projection info (what the planner uploaded in)
+    source_crs VARCHAR(100),          -- e.g. 'EPSG:2136' (Accra / Ghana Grid)
+    source_crs_name VARCHAR(255),     -- human-readable, e.g. 'Accra / Ghana Grid'
+    source_format VARCHAR(50),        -- 'geojson', 'kml', 'shapefile'
+    -- The scheme boundary in WGS84 (EPSG:4326) — always stored in web-friendly projection
+    boundary GEOMETRY(POLYGON, 4326),
+    -- Full scheme data as GeoJSON FeatureCollection (all parcels/zones in WGS84)
+    geojson JSONB NOT NULL,
+    -- Original uploaded file metadata
+    original_filename VARCHAR(255),
+    original_file_size INTEGER,
+    -- Stats
+    parcel_count INTEGER DEFAULT 0,
+    total_area_sqm DOUBLE PRECISION,
+    -- Status
+    status VARCHAR(30) NOT NULL DEFAULT 'active',  -- active, superseded, draft
+    version VARCHAR(50),
+    -- Who uploaded
+    uploaded_by UUID REFERENCES assembly_users(id) ON DELETE SET NULL,
+    uploaded_by_name VARCHAR(255),
+    -- Timestamps
+    uploaded_at TIMESTAMPTZ DEFAULT now(),
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ps_org ON planning_schemes(organization_id);
+CREATE INDEX IF NOT EXISTS idx_ps_status ON planning_schemes(status);
+CREATE INDEX IF NOT EXISTS idx_ps_boundary ON planning_schemes USING GIST (boundary);
+
+-- =========================================================
+-- SCHEME PARCELS — individual parcels/zones within a scheme
+-- Each parcel can be used as the area for building extraction
+-- =========================================================
+CREATE TABLE IF NOT EXISTS scheme_parcels (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    scheme_id UUID NOT NULL REFERENCES planning_schemes(id) ON DELETE CASCADE,
+    organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+    parcel_label VARCHAR(255),        -- e.g. 'Plot 42', 'Zone A'
+    land_use VARCHAR(100),            -- e.g. 'residential', 'commercial', 'mixed'
+    -- Parcel geometry in WGS84 (EPSG:4326)
+    boundary GEOMETRY(POLYGON, 4326),
+    area_sqm DOUBLE PRECISION,
+    -- Original coordinates (before reprojection, for reference)
+    original_coordinates JSONB,
+    -- Building extraction results
+    last_extraction_at TIMESTAMPTZ,
+    last_extraction_count INTEGER DEFAULT 0,
+    last_extraction_area_sqm DOUBLE PRECISION,
+    -- Metadata
+    metadata JSONB,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_sp_scheme ON scheme_parcels(scheme_id);
+CREATE INDEX IF NOT EXISTS idx_sp_org ON scheme_parcels(organization_id);
+CREATE INDEX IF NOT EXISTS idx_sp_boundary ON scheme_parcels USING GIST (boundary);
+
 -- Reset search_path to the app default (pooled connections reuse this session)
 SET search_path TO earthglobal, public, extensions;
 

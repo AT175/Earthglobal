@@ -13,8 +13,9 @@ import {
   Ruler, Download, Upload, UserPlus, Trash2, Edit3, Plus, FileText,
   ChevronRight, Map as MapIcon, Navigation, Clock, Zap, Activity, Globe,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import api from '../../services/api';
-import { useRealTime } from '@earthglobal/design-system';
+import { useRealTime, NavList, NavItem } from '@earthglobal/design-system';
 
 // Fix Leaflet default icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -1032,6 +1033,18 @@ export default function PlanningDashboard() {
       <Content>
         {/* ── Sidebar ── */}
         <Sidebar>
+          <SidebarSection>
+            <SectionTitle><Layers size={14} /> Planning</SectionTitle>
+            <NavList style={{ marginTop: 0, gap: 2 }}>
+              <NavItem as={Link} to="/assembly/planning" $active>
+                <MapIcon size={16} aria-hidden="true" /> Planning Map
+              </NavItem>
+              <NavItem as={Link} to="/assembly/planning/schemes">
+                <FileText size={16} aria-hidden="true" /> Scheme Management
+              </NavItem>
+            </NavList>
+          </SidebarSection>
+
           {orgInfo && (
             <SidebarSection>
               <SectionTitle><MapPin size={14} /> {orgInfo.name}</SectionTitle>

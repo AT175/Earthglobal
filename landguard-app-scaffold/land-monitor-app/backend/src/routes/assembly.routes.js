@@ -1,7 +1,11 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const { requireAuth, requireRole, requireAssemblyRole } = require('../middleware/auth');
 const ctrl = require('../controllers/assembly.controller');
+const schemeCtrl = require('../controllers/scheme.controller');
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 // All assembly routes require auth + assembly role
 router.use(requireAuth, requireRole('assembly'));
@@ -78,5 +82,19 @@ router.post('/planning/change-detection', requireAssemblyRole('assembly_admin', 
 router.get('/planning/change-detection/history', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.listChangeDetections);
 router.get('/planning/change-detection/:id', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.getChangeDetection);
 router.get('/planning/new-buildings', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.getNewBuildings);
+
+// ═══════════════════════════════════════════════════════════
+// PLANNING SCHEMES — upload, manage, and extract buildings per parcel
+// Access: assembly_admin + planning_officer
+// ═══════════════════════════════════════════════════════════
+router.get('/planning/projections', requireAssemblyRole('assembly_admin', 'planning_officer'), schemeCtrl.listProjections);
+router.get('/planning/schemes', requireAssemblyRole('assembly_admin', 'planning_officer'), schemeCtrl.listSchemes);
+router.get('/planning/schemes/:id', requireAssemblyRole('assembly_admin', 'planning_officer'), schemeCtrl.getScheme);
+router.get('/planning/schemes/:id/geojson', requireAssemblyRole('assembly_admin', 'planning_officer'), schemeCtrl.getSchemeGeoJSON);
+router.get('/planning/schemes/:id/parcels', requireAssemblyRole('assembly_admin', 'planning_officer'), schemeCtrl.getSchemeParcelsGeoJSON);
+router.post('/planning/schemes', requireAssemblyRole('assembly_admin', 'planning_officer'), upload.single('file'), schemeCtrl.uploadScheme);
+router.patch('/planning/schemes/:id', requireAssemblyRole('assembly_admin', 'planning_officer'), schemeCtrl.updateScheme);
+router.delete('/planning/schemes/:id', requireAssemblyRole('assembly_admin', 'planning_officer'), schemeCtrl.deleteScheme);
+router.post('/planning/schemes/:id/parcels/:parcelId/extract-buildings', requireAssemblyRole('assembly_admin', 'planning_officer'), schemeCtrl.extractBuildingsForParcel);
 
 module.exports = router;

@@ -6,7 +6,7 @@ import {
   Building2, FileCheck, FileX, AlertTriangle, DollarSign, Shield,
   Trees, MapPin, LogOut, RefreshCw, TrendingUp, Home, Landmark,
   CheckCircle2, XCircle, Clock, ArrowRight, Search,
-  Users, Plus, Trash2, X, Save, Mail, Phone as PhoneIcon, UserCog, Map,
+  Users, Plus, Trash2, X, Save, Mail, Phone as PhoneIcon, UserCog, Map, FileText,
 } from 'lucide-react';
 import api from '../../services/api';
 
@@ -480,6 +480,11 @@ export default function AssemblyDashboard() {
           {user?.assemblyRole === 'planning_officer' && (
             <LogoutBtn onClick={() => navigate('/assembly/planning')} style={{ borderColor: 'rgba(92,225,255,0.3)', color: '#5ce1ff' }}>
               <Map size={16} /> Planning Map
+            </LogoutBtn>
+          )}
+          {(user?.assemblyRole === 'planning_officer' || user?.assemblyRole === 'assembly_admin') && (
+            <LogoutBtn onClick={() => navigate('/assembly/planning/schemes')} style={{ borderColor: 'rgba(92,225,255,0.3)', color: '#5ce1ff' }}>
+              <FileText size={16} /> Scheme Management
             </LogoutBtn>
           )}
           {(user?.assemblyRole === 'planning_officer' || user?.assemblyRole === 'assembly_admin') && (
