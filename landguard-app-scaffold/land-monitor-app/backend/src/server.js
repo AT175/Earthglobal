@@ -83,8 +83,8 @@ app.use('/marketplace', marketplaceRoutes);
 app.use('/admin', adminRoutes);
 
 app.use((err, _req, res, _next) => {
-  console.error(err);
-  res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
+  console.error('[API Error]', err);
+  res.status(err.status || 500).json({ error: err.message || 'Internal server error', stack: process.env.NODE_ENV !== 'production' ? err.stack : undefined });
 });
 
 const server = http.createServer(app);

@@ -304,8 +304,7 @@ exports.browseListings = async (req, res, next) => {
     const { region, min_price, max_price, min_area, max_area } = req.query;
     let query = `SELECT id, title, region, area_sqm, price, currency,
                         centroid_lat, centroid_lng,
-                        images, view_count, inquiry_count, published_at,
-                        EXTRACT(EPOCH FROM published_at) * 1000 as published_timestamp
+                        images, view_count, inquiry_count, published_at
                  FROM land_listings WHERE status = 'published'`;
     const params = [];
     let conditions = [];
@@ -339,7 +338,10 @@ exports.browseListings = async (req, res, next) => {
       })),
       total: result.rows.length,
     });
-  } catch (err) { next(err); }
+  } catch (err) {
+    console.error('[browseListings] Error:', err.message, err.code, err.detail);
+    next(err);
+  }
 };
 
 // GET /marketplace/listings/:id — get listing details (requires registration)
