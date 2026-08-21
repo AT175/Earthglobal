@@ -942,6 +942,7 @@ export default function Landing() {
           <NavLinks>
             <NavLink onClick={() => scrollTo('features')}>Features</NavLink>
             <NavLink onClick={() => scrollTo('how')}>How It Works</NavLink>
+            <NavLink onClick={() => navigate('/buy-land')}>Buy a Land</NavLink>
             <NavLink onClick={() => scrollTo('cta')}>Get Started</NavLink>
             <Button size="sm" onClick={() => navigate('/login')}>Sign In</Button>
           </NavLinks>
@@ -963,6 +964,7 @@ export default function Landing() {
             >
               <MobileLink onClick={() => scrollTo('features')}>Features</MobileLink>
               <MobileLink onClick={() => scrollTo('how')}>How It Works</MobileLink>
+              <MobileLink onClick={() => navigate('/buy-land')}>Buy a Land</MobileLink>
               <MobileLink onClick={() => scrollTo('cta')}>Get Started</MobileLink>
               <Button fullWidth onClick={() => navigate('/login')}>Sign In</Button>
             </MobileMenu>
@@ -1015,6 +1017,14 @@ export default function Landing() {
                 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
               >
                 Get Started Free <ArrowRight size={18} aria-hidden="true" />
+              </Button>
+              <Button
+                size="lg"
+                variant="secondary"
+                onClick={() => navigate('/buy-land')}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+              >
+                Buy a Land <MapPin size={18} aria-hidden="true" />
               </Button>
               <Button
                 size="lg"

@@ -104,9 +104,14 @@ export default function ParcelDetail() {
     <OwnerLayout>
       <Header>
         <Title>{parcel.name}</Title>
-        <Button onClick={() => navigate(`/parcels/${id}/request-visit`)}>
-          {t('parcelDetail.requestVisit')}
-        </Button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Button onClick={() => navigate(`/parcels/${id}/request-visit`)}>
+            {t('parcelDetail.requestVisit')}
+          </Button>
+          <Button variant="secondary" onClick={() => navigate('/sell')}>
+            List for Sale
+          </Button>
+        </div>
       </Header>
 
       <StatsRow>

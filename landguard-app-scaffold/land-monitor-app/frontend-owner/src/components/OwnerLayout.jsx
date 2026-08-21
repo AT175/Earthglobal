@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LayoutDashboard, MapPin, Bell, Settings, FileCheck } from 'lucide-react';
+import { LayoutDashboard, MapPin, Bell, Settings, FileCheck, Landmark } from 'lucide-react';
 import {
   AppShell,
   Sidebar,
@@ -15,6 +15,7 @@ import {
 
 const NAV_ITEMS = [
   { to: '/', labelKey: 'nav.dashboard', icon: LayoutDashboard },
+  { to: '/sell', labelKey: 'nav.sell', fallbackLabel: 'Sell Land', icon: Landmark },
   { to: '/validation', labelKey: 'nav.validation', icon: FileCheck },
   { to: '/notifications', labelKey: 'nav.notifications', icon: Bell },
   { to: '/settings', labelKey: 'nav.settings', icon: Settings },
@@ -24,7 +25,7 @@ export default function OwnerLayout({ children }) {
   const location = useLocation();
   const { t } = useTranslation('common');
 
-  const navItems = NAV_ITEMS.map((item) => ({ ...item, label: t(item.labelKey) }));
+  const navItems = NAV_ITEMS.map((item) => ({ ...item, label: t(item.labelKey, { defaultValue: item.fallbackLabel || item.labelKey }) }));
 
   const navContent = (
     <NavList aria-label="Primary navigation">

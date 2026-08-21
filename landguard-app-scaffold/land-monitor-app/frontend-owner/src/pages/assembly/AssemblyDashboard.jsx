@@ -487,6 +487,11 @@ export default function AssemblyDashboard() {
               <FileCheck size={16} /> Search Validation
             </LogoutBtn>
           )}
+          {(user?.assemblyRole === 'planning_officer' || user?.assemblyRole === 'assembly_admin') && (
+            <LogoutBtn onClick={() => navigate('/assembly/marketplace')} style={{ borderColor: 'rgba(168,85,247,0.3)', color: '#c084fc' }}>
+              <Landmark size={16} /> Land Sale Approvals
+            </LogoutBtn>
+          )}
           <LogoutBtn onClick={handleLogout}>
             <LogOut size={16} /> Logout
           </LogoutBtn>

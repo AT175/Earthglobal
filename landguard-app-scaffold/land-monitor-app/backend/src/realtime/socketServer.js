@@ -101,6 +101,37 @@ function createWebSocketServer(server) {
     });
   });
 
+  // ── Marketplace events ──
+  // New listing created → notify planners
+  bus.on('listing:created', ({ orgId, listingId, title, sellerName }) => {
+    io.to(`org:${orgId}`).emit('listing:created', { listingId, title, sellerName, timestamp: new Date().toISOString() });
+  });
+
+  // Listing confirmed/rejected → notify seller
+  bus.on('listing:confirmed', ({ orgId, listingId, sellerId, title, status }) => {
+    io.to(`owner:${sellerId}`).emit('listing:confirmed', { listingId, title, status, timestamp: new Date().toISOString() });
+  });
+
+  // Inquiry on a listing → notify seller
+  bus.on('listing:inquiry', ({ orgId, listingId, sellerId, listingTitle, buyerName, message }) => {
+    io.to(`owner:${sellerId}`).emit('listing:inquiry', { listingId, listingTitle, buyerName, message, timestamp: new Date().toISOString() });
+  });
+
+  // Purchase initiated → notify seller
+  bus.on('purchase:initiated', ({ orgId, purchaseId, sellerId, listingTitle, buyerName }) => {
+    io.to(`owner:${sellerId}`).emit('purchase:initiated', { purchaseId, listingTitle, buyerName, timestamp: new Date().toISOString() });
+  });
+
+  // Purchase accepted → notify buyer
+  bus.on('purchase:accepted', ({ orgId, purchaseId, buyerId }) => {
+    io.to(`owner:${buyerId}`).emit('purchase:accepted', { purchaseId, timestamp: new Date().toISOString() });
+  });
+
+  // Receipt generated → notify buyer
+  bus.on('purchase:receipt', ({ orgId, purchaseId, buyerId, receiptNumber }) => {
+    io.to(`owner:${buyerId}`).emit('purchase:receipt', { purchaseId, receiptNumber, timestamp: new Date().toISOString() });
+  });
+
   return io;
 }
 

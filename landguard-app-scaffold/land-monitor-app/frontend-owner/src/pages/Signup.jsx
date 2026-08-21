@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import styled, { keyframes } from 'styled-components';
 import {
   MapPin, Mail, Lock, ArrowRight, AlertCircle, Eye, EyeOff,
-  User, Phone, ArrowLeft, CheckCircle2, Loader,
+  User, Phone, ArrowLeft, CheckCircle2, Loader, Landmark,
 } from 'lucide-react';
 import api from '../services/api';
 
@@ -281,9 +281,18 @@ const LoginLink = styled.div`
   }
 `;
 
+const RoleOption = styled.button`
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 10px; border: 1px solid ${p => p.$selected ? 'rgba(92,225,255,0.5)' : 'rgba(255,255,255,0.1)'};
+  background: ${p => p.$selected ? 'rgba(92,225,255,0.1)' : 'transparent'};
+  color: ${p => p.$selected ? '#5ce1ff' : '#aab7d4'};
+  border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: 600;
+  transition: all 0.2s;
+`;
+
 export default function Signup() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ name: '', email: '', phone: '', password: '' });
+  const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', account_type: 'owner' });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -389,11 +398,19 @@ export default function Signup() {
         <FormCard initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <BackLink to="/login"><ArrowLeft size={16} /> Back to login</BackLink>
           <FormTitle>Create Account</FormTitle>
-          <FormSubtitle>Sign up as a land owner — your account will be reviewed by an administrator.</FormSubtitle>
+          <FormSubtitle>Choose your account type — your account will be reviewed by an administrator.</FormSubtitle>
 
           {error && <ErrorBox style={{ marginBottom: 16 }}><AlertCircle size={16} /> {error}</ErrorBox>}
 
           <Form onSubmit={handleSubmit}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              <RoleOption $selected={form.account_type === 'owner'} onClick={() => setForm({ ...form, account_type: 'owner' })}>
+                <User size={18} /> Land Owner
+              </RoleOption>
+              <RoleOption $selected={form.account_type === 'seller'} onClick={() => setForm({ ...form, account_type: 'seller' })}>
+                <Landmark size={18} /> Land Seller
+              </RoleOption>
+            </div>
             <InputGroup>
               <InputIcon><User size={18} /></InputIcon>
               <TextInput

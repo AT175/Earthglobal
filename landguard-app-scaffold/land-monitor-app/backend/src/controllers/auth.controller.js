@@ -28,7 +28,7 @@ async function findUserByEmail(email) {
 
 exports.signup = async (req, res, next) => {
   try {
-    const { name, email, phone, password } = req.body;
+    const { name, email, phone, password, account_type } = req.body;
     if (!name || !email || !password) return res.status(400).json({ error: 'Name, email, and password are required' });
 
     const passwordHash = await bcrypt.hash(password, 10);
@@ -37,17 +37,22 @@ exports.signup = async (req, res, next) => {
     const existing = await findUserByEmail(email);
     if (existing) return res.status(409).json({ error: 'An account with this email already exists' });
 
+    // account_type: 'owner' (default, for monitoring) or 'seller' (for land sale marketplace)
+    const acctType = account_type === 'seller' ? 'seller' : 'owner';
+
     const result = await db.query(
-      `INSERT INTO owners (name, email, phone, password_hash, approved) VALUES ($1, $2, $3, $4, false) RETURNING id, name, email, phone`,
-      [name, email, phone, passwordHash]
+      `INSERT INTO owners (name, email, phone, password_hash, approved, account_type) VALUES ($1, $2, $3, $4, false, $5) RETURNING id, name, email, phone, account_type`,
+      [name, email, phone, passwordHash, acctType]
     );
 
     const owner = result.rows[0];
     // Don't return a token — account must be approved by admin first
     res.status(201).json({
       success: true,
-      message: 'Account created successfully. An administrator must approve your account before you can log in.',
-      owner: { id: owner.id, name: owner.name, email: owner.email, phone: owner.phone },
+      message: account_type === 'seller'
+        ? 'Seller account created successfully. An administrator must approve your account before you can list land for sale.'
+        : 'Account created successfully. An administrator must approve your account before you can log in.',
+      owner: { id: owner.id, name: owner.name, email: owner.email, phone: owner.phone, account_type: owner.account_type },
     });
   } catch (err) {
     next(err);

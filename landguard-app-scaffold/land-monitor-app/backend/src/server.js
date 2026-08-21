@@ -18,6 +18,7 @@ const mapTilesRoutes = require('./routes/mapTiles.routes');
 const assemblyRoutes = require('./routes/assembly.routes');
 const hazardRoutes = require('./routes/hazard.routes');
 const validationRoutes = require('./routes/validation.routes');
+const marketplaceRoutes = require('./routes/marketplace.routes');
 const adminRoutes = require('./routes/admin.routes');
 const { createWebSocketServer } = require('./realtime/socketServer');
 const cron = require('node-cron');
@@ -72,6 +73,7 @@ app.use('/map-tiles', mapTilesRoutes);
 app.use('/assembly', assemblyRoutes);
 app.use('/assembly/planning', hazardRoutes);
 app.use('/validation', validationRoutes);
+app.use('/marketplace', marketplaceRoutes);
 app.use('/admin', adminRoutes);
 
 app.use((err, _req, res, _next) => {
