@@ -9,6 +9,8 @@ import {
   CheckCircle2, XCircle, Loader, Map as MapIcon, Building2, Globe,
   ChevronRight, X, Plus, Ruler,
 } from 'lucide-react';
+import shp from 'shpjs';
+import { kml } from '@tmcw/togeojson';
 import api from '../../services/api';
 import { NavList, NavItem } from '@earthglobal/design-system';
 
@@ -236,6 +238,7 @@ export default function SchemeManagement() {
   // Upload form state
   const [uploadForm, setUploadForm] = useState({ name: '', description: '', source_crs: 'EPSG:4326', version: '1.0' });
   const [selectedFile, setSelectedFile] = useState(null);
+  const [fileFormat, setFileFormat] = useState(null); // 'shapefile' | 'kml' | 'geojson'
   const [uploading, setUploading] = useState(false);
 
   const fileInputRef = useRef(null);
@@ -297,46 +300,115 @@ export default function SchemeManagement() {
     }
   }
 
+  // Detect uploaded file's format from its extension
+  function detectFileFormat(file) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (ext === 'zip') return 'shapefile';
+    if (ext === 'kml') return 'kml';
+    if (ext === 'geojson' || ext === 'json') return 'geojson';
+    return null;
+  }
+
   function handleFileChange(e) {
     const file = e.target.files?.[0];
     if (!file) return;
+    const format = detectFileFormat(file);
+    if (!format) {
+      showToast('Unsupported file type. Upload a .zip (Shapefile), .kml, or .geojson/.json file.', 'error');
+      e.target.value = '';
+      return;
+    }
     setSelectedFile(file);
+    setFileFormat(format);
     if (!uploadForm.name) {
       setUploadForm((f) => ({ ...f, name: file.name.replace(/\.[^/.]+$/, '') }));
     }
+    // Shapefiles (.prj) and KML are self-describing coordinate systems —
+    // both are parsed/reprojected to WGS84 client-side, so no manual
+    // projection selection is needed for them.
+    if (format === 'shapefile' || format === 'kml') {
+      setUploadForm((f) => ({ ...f, source_crs: 'EPSG:4326' }));
+    }
+  }
+
+  // Normalize any GeoJSON-like value into a FeatureCollection
+  function toFeatureCollection(geojson) {
+    if (geojson.type === 'FeatureCollection') return geojson;
+    if (geojson.type === 'Feature') return { type: 'FeatureCollection', features: [geojson] };
+    return { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: geojson, properties: {} }] };
+  }
+
+  /**
+   * Parse the selected file into a GeoJSON FeatureCollection, based on its
+   * detected format:
+   *   - Shapefile (.zip containing .shp/.dbf/.prj): parsed with shpjs, which
+   *     reads the .prj and reprojects to WGS84 automatically.
+   *   - KML (.kml): parsed with @tmcw/togeojson — KML is always WGS84 per spec.
+   *   - GeoJSON (.geojson/.json): parsed as-is; may be in a local
+   *     projection if mislabeled, so the user selects the source CRS
+   *     and the backend reprojects it.
+   */
+  async function parseSelectedFile(file, format) {
+    if (format === 'shapefile') {
+      const buffer = await file.arrayBuffer();
+      const result = await shp(buffer);
+      // shpjs returns a single FeatureCollection, or an array of them
+      // if the zip contains multiple layers — merge into one.
+      if (Array.isArray(result)) {
+        const features = result.flatMap((fc) => fc.features || []);
+        return { type: 'FeatureCollection', features };
+      }
+      return result;
+    }
+
+    if (format === 'kml') {
+      const text = await file.text();
+      const dom = new DOMParser().parseFromString(text, 'text/xml');
+      return kml(dom);
+    }
+
+    // geojson
+    const text = await file.text();
+    let geojson;
+    try {
+      geojson = JSON.parse(text);
+    } catch {
+      throw new Error('File is not valid GeoJSON');
+    }
+    return toFeatureCollection(geojson);
   }
 
   async function handleUpload() {
-    if (!selectedFile) { showToast('Select a GeoJSON file to upload', 'error'); return; }
+    if (!selectedFile) { showToast('Select a scheme file to upload', 'error'); return; }
     if (!uploadForm.name) { showToast('Scheme name is required', 'error'); return; }
 
     setUploading(true);
     try {
-      const text = await selectedFile.text();
       let geojson;
       try {
-        geojson = JSON.parse(text);
-      } catch {
-        showToast('File must be valid GeoJSON. Convert Shapefile/KML to GeoJSON first.', 'error');
+        geojson = await parseSelectedFile(selectedFile, fileFormat);
+      } catch (parseErr) {
+        showToast(`Could not parse file: ${parseErr.message}`, 'error');
         setUploading(false);
         return;
       }
 
-      // Accept either a FeatureCollection or a single Feature/Geometry
-      if (geojson.type === 'Feature') {
-        geojson = { type: 'FeatureCollection', features: [geojson] };
-      } else if (geojson.type && geojson.type !== 'FeatureCollection') {
-        geojson = { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: geojson, properties: {} }] };
+      if (!geojson.features || geojson.features.length === 0) {
+        showToast('No parcels/features found in the uploaded file', 'error');
+        setUploading(false);
+        return;
       }
 
-      const selectedProjection = projections.find((p) => p.code === uploadForm.source_crs);
+      // Shapefile + KML are already reprojected to WGS84 during parsing
+      const effectiveCrs = (fileFormat === 'shapefile' || fileFormat === 'kml') ? 'EPSG:4326' : uploadForm.source_crs;
+      const selectedProjection = projections.find((p) => p.code === effectiveCrs);
 
       const { data } = await api.post('/assembly/planning/schemes', {
         name: uploadForm.name,
         description: uploadForm.description,
-        source_crs: uploadForm.source_crs,
+        source_crs: effectiveCrs,
         source_crs_name: selectedProjection?.name,
-        format: 'geojson',
+        format: fileFormat,
         version: uploadForm.version,
         geojson,
       });
@@ -348,10 +420,11 @@ export default function SchemeManagement() {
       );
       setShowUploadForm(false);
       setSelectedFile(null);
+      setFileFormat(null);
       setUploadForm({ name: '', description: '', source_crs: 'EPSG:4326', version: '1.0' });
       loadSchemes();
     } catch (err) {
-      showToast(err.response?.data?.error || 'Upload failed', 'error');
+      showToast(err.response?.data?.error || err.message || 'Upload failed', 'error');
     } finally {
       setUploading(false);
     }
@@ -617,41 +690,60 @@ export default function SchemeManagement() {
             </FormGroup>
 
             <FormGroup>
-              <Label>Source Datum / Projection *</Label>
-              <Select value={uploadForm.source_crs} onChange={(e) => setUploadForm({ ...uploadForm, source_crs: e.target.value })}>
-                {projections.map((p) => (
-                  <option key={p.code} value={p.code}>{p.name} ({p.code})</option>
-                ))}
-              </Select>
-              <div style={{ fontSize: '0.72rem', color: '#aab7d4', marginTop: 4 }}>
-                If the scheme file's coordinates are in a local grid (not lat/lng), select the matching
-                projection so it can be reprojected to WGS84 for map display.
-              </div>
-            </FormGroup>
-
-            <FormGroup>
               <Label>Version</Label>
               <Input value={uploadForm.version} onChange={(e) => setUploadForm({ ...uploadForm, version: e.target.value })} placeholder="1.0" />
             </FormGroup>
 
             <FormGroup>
-              <Label>Scheme File (GeoJSON) *</Label>
+              <Label>Scheme File * (Shapefile .zip, KML, or GeoJSON)</Label>
               <FileDropZone htmlFor="scheme-file-input">
                 <FileText size={28} />
                 {selectedFile ? (
-                  <span style={{ color: '#e6edf7' }}>{selectedFile.name}</span>
+                  <span style={{ color: '#e6edf7' }}>
+                    {selectedFile.name}
+                    <span style={{ display: 'block', fontSize: '0.7rem', color: '#aab7d4', marginTop: 2 }}>
+                      Detected format: {fileFormat === 'shapefile' ? 'Shapefile (zipped)' : fileFormat === 'kml' ? 'KML' : 'GeoJSON'}
+                    </span>
+                  </span>
                 ) : (
                   <>
-                    <span>Click to select a GeoJSON file</span>
-                    <span style={{ fontSize: '0.7rem' }}>Convert Shapefile/KML/DXF to GeoJSON before uploading</span>
+                    <span>Click to select a scheme file</span>
+                    <span style={{ fontSize: '0.7rem' }}>
+                      Shapefile — zip together .shp, .shx, .dbf and .prj. KML and GeoJSON are also supported.
+                    </span>
                   </>
                 )}
               </FileDropZone>
               <input
-                id="scheme-file-input" ref={fileInputRef} type="file" accept=".json,.geojson,application/geo+json"
+                id="scheme-file-input" ref={fileInputRef} type="file"
+                accept=".zip,application/zip,.kml,application/vnd.google-earth.kml+xml,.json,.geojson,application/geo+json"
                 style={{ display: 'none' }} onChange={handleFileChange}
               />
             </FormGroup>
+
+            {fileFormat === 'geojson' && (
+              <FormGroup>
+                <Label>Source Datum / Projection *</Label>
+                <Select value={uploadForm.source_crs} onChange={(e) => setUploadForm({ ...uploadForm, source_crs: e.target.value })}>
+                  {projections.map((p) => (
+                    <option key={p.code} value={p.code}>{p.name} ({p.code})</option>
+                  ))}
+                </Select>
+                <div style={{ fontSize: '0.72rem', color: '#aab7d4', marginTop: 4 }}>
+                  If the scheme file's coordinates are in a local grid (not lat/lng), select the matching
+                  projection so it can be reprojected to WGS84 for map display.
+                </div>
+              </FormGroup>
+            )}
+
+            {(fileFormat === 'shapefile' || fileFormat === 'kml') && (
+              <InfoBox>
+                <CheckCircle2 size={14} style={{ verticalAlign: -2, marginRight: 6, color: '#4ade80' }} />
+                {fileFormat === 'shapefile'
+                  ? "This shapefile's .prj projection will be detected automatically and reprojected to WGS84."
+                  : 'KML files are always in WGS84 (lat/lng) per the KML spec — no reprojection needed.'}
+              </InfoBox>
+            )}
 
             <BtnRow>
               <PrimaryBtn onClick={handleUpload} disabled={uploading}>
