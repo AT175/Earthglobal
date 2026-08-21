@@ -30,6 +30,7 @@ const db = require('./config/db');
 // Runs schema.sql (idempotent — uses IF NOT EXISTS + DO blocks).
 // This replaces the need for a separate migration job service.
 async function runMigrations() {
+  let client;
   try {
     const schemaPath = path.join(__dirname, '..', '..', 'schema.sql');
     if (!fs.existsSync(schemaPath)) {
@@ -37,11 +38,16 @@ async function runMigrations() {
       return;
     }
     const schema = fs.readFileSync(schemaPath, 'utf8');
-    await db.query(schema);
+    // Use a dedicated client (not from the pool's normal rotation) so the
+    // schema's SET/RESET search_path doesn't leak into pooled connections.
+    client = await db.pool.connect();
+    await client.query(schema);
     console.log('[Migration] Schema applied successfully');
   } catch (err) {
     console.error('[Migration] Error:', err.message);
     // Don't crash — the DB might already be up to date
+  } finally {
+    if (client) client.release();
   }
 }
 

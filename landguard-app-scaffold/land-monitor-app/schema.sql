@@ -272,7 +272,8 @@ CREATE INDEX IF NOT EXISTS idx_notifications_agent ON notifications (agent_id);
 -- =========================================================
 -- Reset search_path to default after schema setup
 -- =========================================================
-RESET search_path;
+-- Reset search_path to the app default (pooled connections reuse this session)
+SET search_path TO earthglobal, public, extensions;
 
 -- =========================================================
 -- MULTI-TENANT: ORGANIZATIONS (District Assemblies)
@@ -672,7 +673,8 @@ CREATE TABLE IF NOT EXISTS land_receipts (
 
 CREATE INDEX IF NOT EXISTS idx_lr_purchase ON land_receipts(purchase_id);
 
-RESET search_path;
+-- Reset search_path to the app default (pooled connections reuse this session)
+SET search_path TO earthglobal, public, extensions;
 
 -- =========================================================
 -- USEFUL SPATIAL QUERIES (examples, not part of schema)
