@@ -12,6 +12,7 @@ import {
   XCircle, AlertTriangle, LogOut, Landmark, Search, Save, X, Layers,
   Ruler, Download, Upload, UserPlus, Trash2, Edit3, Plus, FileText,
   ChevronRight, Map as MapIcon, Navigation, Clock, Zap, Activity, Globe,
+  Menu,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
@@ -38,17 +39,30 @@ const Page = styled.div`
 `;
 
 const TopBar = styled.header`
-  position: sticky; top: 0; z-index: 1000;
+  position: sticky; top: 0; z-index: 1600;
   background: ${({ theme }) => theme.colors.background}f0;
   backdrop-filter: blur(12px);
   border-bottom: 1px solid ${({ theme }) => theme.colors.borderDark};
   padding: ${({ theme }) => `${theme.spacing[4]} ${theme.spacing[6]}`};
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  @media (max-width: 768px) { padding: 12px 16px; }
+`;
+
+const MenuToggleBtn = styled.button`
+  display: none;
+  align-items: center; justify-content: center;
+  width: 36px; height: 36px; flex-shrink: 0;
+  background: none; border: 1px solid ${({ theme }) => theme.colors.borderDark};
+  color: ${({ theme }) => theme.colors.text}; border-radius: ${({ theme }) => theme.radii.md};
+  cursor: pointer;
+  @media (max-width: 768px) { display: flex; }
 `;
 
 const Logo = styled.div`
   display: flex; align-items: center; gap: ${({ theme }) => theme.spacing[3]};
   font-size: ${({ theme }) => theme.fontSizes.xl}; font-weight: ${({ theme }) => theme.fontWeights.bold};
+  white-space: nowrap; overflow: hidden;
+  @media (max-width: 640px) { font-size: 1rem; gap: 8px; }
 `;
 
 const LogoIcon = styled.div`
@@ -56,15 +70,25 @@ const LogoIcon = styled.div`
   width: 40px; height: 40px; border-radius: ${({ theme }) => theme.radii.lg};
   background: ${({ theme }) => theme.colors.gradientPrimary};
   box-shadow: ${({ theme }) => theme.shadows.glowSoft};
+  flex-shrink: 0;
+  @media (max-width: 640px) { width: 32px; height: 32px; }
 `;
 
-const UserInfo = styled.div`display: flex; align-items: center; gap: ${({ theme }) => theme.spacing[4]};`;
+const UserInfo = styled.div`
+  display: flex; align-items: center; gap: ${({ theme }) => theme.spacing[4]};
+  @media (max-width: 640px) { gap: 8px; }
+`;
 
 const UserBadge = styled.div`
   display: flex; flex-direction: column; align-items: flex-end;
   font-size: ${({ theme }) => theme.fontSizes.sm};
   span:first-child { font-weight: 600; }
   span:last-child { color: ${({ theme }) => theme.colors.textMuted}; font-size: 0.75rem; }
+  @media (max-width: 480px) { display: none; }
+`;
+
+const LiveIndicatorLabel = styled.span`
+  @media (max-width: 480px) { display: none; }
 `;
 
 const LogoutBtn = styled.button`
@@ -74,17 +98,52 @@ const LogoutBtn = styled.button`
   padding: ${({ theme }) => `${theme.spacing[2]} ${theme.spacing[3]}`};
   border-radius: ${({ theme }) => theme.radii.md}; cursor: pointer;
   font-size: ${({ theme }) => theme.fontSizes.sm}; transition: all 0.2s;
+  white-space: nowrap;
   &:hover { color: ${({ theme }) => theme.colors.error}; border-color: ${({ theme }) => theme.colors.error}40; }
+  @media (max-width: 640px) {
+    padding: 8px; font-size: 0;
+    svg { width: 16px; height: 16px; }
+  }
 `;
 
-const Content = styled.div`display: flex; flex: 1; overflow: hidden;`;
+const Content = styled.div`display: flex; flex: 1; overflow: hidden; position: relative;`;
 
 const Sidebar = styled.aside`
   width: 340px; background: ${({ theme }) => theme.colors.surface};
   border-right: 1px solid ${({ theme }) => theme.colors.borderDark};
   overflow-y: auto; display: flex; flex-direction: column;
   @media (max-width: 1024px) { width: 280px; }
-  @media (max-width: 768px) { display: none; }
+
+  /* On small screens, the sidebar becomes a slide-in drawer (toggled via
+     the hamburger button in the TopBar) instead of disappearing entirely —
+     otherwise nav, layers, stats and tools would be unreachable. */
+  @media (max-width: 768px) {
+    position: fixed; top: 0; bottom: 0; left: 0; z-index: 1900;
+    width: 85vw; max-width: 320px; height: 100%;
+    box-shadow: 8px 0 32px rgba(0,0,0,0.5);
+    transform: translateX(${({ $open }) => ($open ? '0' : '-100%')});
+    transition: transform 0.25s ease;
+  }
+`;
+
+const SidebarBackdrop = styled.div`
+  display: none;
+  @media (max-width: 768px) {
+    display: ${({ $show }) => ($show ? 'block' : 'none')};
+    position: fixed; inset: 0; z-index: 1800;
+    background: rgba(0,0,0,0.55);
+  }
+`;
+
+const SidebarCloseBtn = styled.button`
+  display: none;
+  @media (max-width: 768px) {
+    display: flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; margin-left: auto;
+    background: none; border: 1px solid ${({ theme }) => theme.colors.borderDark};
+    color: ${({ theme }) => theme.colors.text}; border-radius: ${({ theme }) => theme.radii.md};
+    cursor: pointer;
+  }
 `;
 
 const SidebarSection = styled.div`
@@ -177,8 +236,19 @@ const MapWrapper = styled.div`
 `;
 
 const MapOverlay = styled.div`
-  position: absolute; top: 16px; left: 16px; z-index: 1000;
+  position: absolute; top: 16px; left: 16px; right: 16px; z-index: 1000;
   display: flex; flex-direction: column; gap: 8px;
+
+  /* On small screens a vertical stack of ~8 buttons overflows the map
+     viewport and most become unreachable — turn it into a horizontally
+     scrollable row instead so every action stays reachable. */
+  @media (max-width: 768px) {
+    flex-direction: row; overflow-x: auto; right: 16px;
+    padding-bottom: 4px; -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    &::-webkit-scrollbar { height: 4px; }
+    &::-webkit-scrollbar-thumb { background: rgba(92,225,255,0.3); border-radius: 4px; }
+  }
 `;
 
 const MapButton = styled.button`
@@ -189,6 +259,9 @@ const MapButton = styled.button`
   font-weight: 600; cursor: pointer; transition: all 0.2s;
   &:hover { border-color: ${({ theme }) => theme.colors.primary}; background: rgba(22,119,255,0.15); }
   &:disabled { opacity: 0.5; cursor: not-allowed; }
+  @media (max-width: 768px) {
+    flex-shrink: 0; white-space: nowrap; padding: 8px 12px; font-size: 0.78rem;
+  }
 `;
 
 const LayerControl = styled.div`
@@ -196,6 +269,13 @@ const LayerControl = styled.div`
   background: rgba(13,23,51,0.9); backdrop-filter: blur(12px);
   border: 1px solid rgba(92,225,255,0.2); border-radius: ${({ theme }) => theme.radii.md};
   padding: 12px; min-width: 180px;
+
+  /* Move below the (now horizontally-scrolling) action row on mobile so
+     the two overlays don't stack on top of each other. */
+  @media (max-width: 768px) {
+    top: auto; bottom: 16px; right: 16px; left: 16px;
+    min-width: 0; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
 `;
 
 const LayerControlTitle = styled.div`
@@ -209,6 +289,8 @@ const DetectionPanel = styled.div`
   background: rgba(13,23,51,0.95); backdrop-filter: blur(12px);
   border: 1px solid rgba(92,225,255,0.2); border-radius: ${({ theme }) => theme.radii.lg};
   padding: 16px; display: ${({ $show }) => ($show ? 'block' : 'none')};
+  /* LayerControl relocates to the bottom bar on mobile — sit above it */
+  @media (max-width: 768px) { bottom: 76px; }
 `;
 
 const DetectionTitle = styled.div`
@@ -225,8 +307,10 @@ const FloatingPanel = styled.div`
   position: absolute; bottom: 16px; right: 16px; z-index: 1000;
   background: rgba(13,23,51,0.95); backdrop-filter: blur(12px);
   border: 1px solid rgba(92,225,255,0.3); border-radius: ${({ theme }) => theme.radii.lg};
-  padding: 20px; width: 380px; max-height: 70vh; overflow-y: auto;
+  padding: 20px; width: 380px; max-width: calc(100vw - 32px); max-height: 70vh; overflow-y: auto;
   display: ${({ $show }) => ($show ? 'block' : 'none')};
+  /* LayerControl relocates to the bottom bar on mobile — sit above it */
+  @media (max-width: 768px) { left: 16px; bottom: 76px; }
 `;
 
 const PanelTitle = styled.h3`
@@ -505,6 +589,9 @@ export default function PlanningDashboard() {
 
   // Building list search
   const [search, setSearch] = useState('');
+
+  // Mobile sidebar drawer (sidebar is hidden by default on small screens)
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     const userStr = localStorage.getItem('user');
@@ -1004,6 +1091,9 @@ export default function PlanningDashboard() {
   return (
     <Page>
       <TopBar>
+        <MenuToggleBtn onClick={() => setMobileSidebarOpen(true)} aria-label="Open menu">
+          <Menu size={20} />
+        </MenuToggleBtn>
         <Logo>
           <LogoIcon><Landmark size={22} /></LogoIcon>
           EarthGlobal <span style={{ color: '#5ce1ff' }}>Planning</span>
@@ -1023,23 +1113,32 @@ export default function PlanningDashboard() {
               width: 8, height: 8, borderRadius: '50%',
               background: wsConnected ? '#4ade80' : '#6b7280',
               boxShadow: wsConnected ? '0 0 8px #4ade80' : 'none',
+              flexShrink: 0,
             }} />
-            {wsConnected ? 'Live' : 'Offline'}
+            <LiveIndicatorLabel>{wsConnected ? 'Live' : 'Offline'}</LiveIndicatorLabel>
           </div>
           <LogoutBtn onClick={handleLogout}><LogOut size={16} /> Logout</LogoutBtn>
         </UserInfo>
       </TopBar>
 
       <Content>
+        {/* ── Mobile sidebar backdrop ── */}
+        <SidebarBackdrop $show={mobileSidebarOpen} onClick={() => setMobileSidebarOpen(false)} />
+
         {/* ── Sidebar ── */}
-        <Sidebar>
+        <Sidebar $open={mobileSidebarOpen}>
           <SidebarSection>
-            <SectionTitle><Layers size={14} /> Planning</SectionTitle>
-            <NavList style={{ marginTop: 0, gap: 2 }}>
-              <NavItem as={Link} to="/assembly/planning" $active>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <SectionTitle style={{ marginBottom: 0 }}><Layers size={14} /> Planning</SectionTitle>
+              <SidebarCloseBtn onClick={() => setMobileSidebarOpen(false)} aria-label="Close menu">
+                <X size={16} />
+              </SidebarCloseBtn>
+            </div>
+            <NavList style={{ marginTop: 12, gap: 2 }}>
+              <NavItem as={Link} to="/assembly/planning" $active onClick={() => setMobileSidebarOpen(false)}>
                 <MapIcon size={16} aria-hidden="true" /> Planning Map
               </NavItem>
-              <NavItem as={Link} to="/assembly/planning/schemes">
+              <NavItem as={Link} to="/assembly/planning/schemes" onClick={() => setMobileSidebarOpen(false)}>
                 <FileText size={16} aria-hidden="true" /> Scheme Management
               </NavItem>
             </NavList>

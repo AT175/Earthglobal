@@ -7,7 +7,7 @@ import 'leaflet/dist/leaflet.css';
 import {
   Landmark, MapPin, LogOut, Layers, FileText, Upload, Download, Trash2,
   CheckCircle2, XCircle, Loader, Map as MapIcon, Building2, Globe,
-  ChevronRight, X, Plus, Ruler,
+  ChevronRight, X, Plus, Ruler, Menu,
 } from 'lucide-react';
 import shp from 'shpjs';
 import { kml } from '@tmcw/togeojson';
@@ -27,17 +27,30 @@ const Page = styled.div`
 `;
 
 const TopBar = styled.header`
-  position: sticky; top: 0; z-index: 1000;
+  position: sticky; top: 0; z-index: 1600;
   background: ${({ theme }) => theme.colors.background}f0;
   backdrop-filter: blur(12px);
   border-bottom: 1px solid ${({ theme }) => theme.colors.borderDark};
   padding: ${({ theme }) => `${theme.spacing[4]} ${theme.spacing[6]}`};
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  @media (max-width: 768px) { padding: 12px 16px; }
+`;
+
+const MenuToggleBtn = styled.button`
+  display: none;
+  align-items: center; justify-content: center;
+  width: 36px; height: 36px; flex-shrink: 0;
+  background: none; border: 1px solid ${({ theme }) => theme.colors.borderDark};
+  color: ${({ theme }) => theme.colors.text}; border-radius: ${({ theme }) => theme.radii.md};
+  cursor: pointer;
+  @media (max-width: 768px) { display: flex; }
 `;
 
 const Logo = styled.div`
   display: flex; align-items: center; gap: ${({ theme }) => theme.spacing[3]};
   font-size: ${({ theme }) => theme.fontSizes.xl}; font-weight: ${({ theme }) => theme.fontWeights.bold};
+  white-space: nowrap; overflow: hidden;
+  @media (max-width: 640px) { font-size: 1rem; gap: 8px; }
 `;
 
 const LogoIcon = styled.div`
@@ -45,6 +58,13 @@ const LogoIcon = styled.div`
   width: 40px; height: 40px; border-radius: ${({ theme }) => theme.radii.lg};
   background: ${({ theme }) => theme.colors.gradientPrimary};
   box-shadow: ${({ theme }) => theme.shadows.glowSoft};
+  flex-shrink: 0;
+  @media (max-width: 640px) { width: 32px; height: 32px; }
+`;
+
+const UserBadge = styled.div`
+  display: flex; flex-direction: column; align-items: flex-end; font-size: 0.85rem;
+  @media (max-width: 480px) { display: none; }
 `;
 
 const LogoutBtn = styled.button`
@@ -54,17 +74,51 @@ const LogoutBtn = styled.button`
   padding: ${({ theme }) => `${theme.spacing[2]} ${theme.spacing[3]}`};
   border-radius: ${({ theme }) => theme.radii.md}; cursor: pointer;
   font-size: ${({ theme }) => theme.fontSizes.sm}; transition: all 0.2s;
+  white-space: nowrap;
   &:hover { color: ${({ theme }) => theme.colors.error}; border-color: ${({ theme }) => theme.colors.error}40; }
+  @media (max-width: 640px) {
+    padding: 8px; font-size: 0;
+    svg { width: 16px; height: 16px; }
+  }
 `;
 
-const Content = styled.div`display: flex; flex: 1; overflow: hidden;`;
+const Content = styled.div`display: flex; flex: 1; overflow: hidden; position: relative;`;
 
 const Sidebar = styled.aside`
   width: 340px; background: ${({ theme }) => theme.colors.surface};
   border-right: 1px solid ${({ theme }) => theme.colors.borderDark};
   overflow-y: auto; display: flex; flex-direction: column;
   @media (max-width: 1024px) { width: 280px; }
-  @media (max-width: 768px) { display: none; }
+
+  /* Slide-in drawer on small screens, toggled via the TopBar hamburger,
+     instead of disappearing (which hid the nav, scheme list & upload button). */
+  @media (max-width: 768px) {
+    position: fixed; top: 0; bottom: 0; left: 0; z-index: 1900;
+    width: 85vw; max-width: 320px; height: 100%;
+    box-shadow: 8px 0 32px rgba(0,0,0,0.5);
+    transform: translateX(${({ $open }) => ($open ? '0' : '-100%')});
+    transition: transform 0.25s ease;
+  }
+`;
+
+const SidebarBackdrop = styled.div`
+  display: none;
+  @media (max-width: 768px) {
+    display: ${({ $show }) => ($show ? 'block' : 'none')};
+    position: fixed; inset: 0; z-index: 1800;
+    background: rgba(0,0,0,0.55);
+  }
+`;
+
+const SidebarCloseBtn = styled.button`
+  display: none;
+  @media (max-width: 768px) {
+    display: flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; margin-left: auto;
+    background: none; border: 1px solid ${({ theme }) => theme.colors.borderDark};
+    color: ${({ theme }) => theme.colors.text}; border-radius: ${({ theme }) => theme.radii.md};
+    cursor: pointer;
+  }
 `;
 
 const SidebarSection = styled.div`
@@ -79,7 +133,10 @@ const SectionTitle = styled.h3`
   display: flex; align-items: center; gap: 6px;
 `;
 
-const MainArea = styled.div`flex: 1; overflow-y: auto; padding: 24px;`;
+const MainArea = styled.div`
+  flex: 1; overflow-y: auto; padding: 24px;
+  @media (max-width: 640px) { padding: 16px; }
+`;
 
 const SchemeGrid = styled.div`
   display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -232,6 +289,7 @@ export default function SchemeManagement() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [showUploadForm, setShowUploadForm] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [projections, setProjections] = useState([]);
   const [extracting, setExtracting] = useState(null); // parcel id currently extracting
 
@@ -463,31 +521,42 @@ export default function SchemeManagement() {
   return (
     <Page>
       <TopBar>
+        <MenuToggleBtn onClick={() => setMobileSidebarOpen(true)} aria-label="Open menu">
+          <Menu size={20} />
+        </MenuToggleBtn>
         <Logo>
           <LogoIcon><Landmark size={22} /></LogoIcon>
           EarthGlobal <span style={{ color: '#5ce1ff' }}>Planning</span>
         </Logo>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           {user && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', fontSize: '0.85rem' }}>
+            <UserBadge>
               <span style={{ fontWeight: 600 }}>{user.name}</span>
               <span style={{ color: '#aab7d4', fontSize: '0.75rem' }}>{user.assemblyRole?.replace(/_/g, ' ')}</span>
-            </div>
+            </UserBadge>
           )}
           <LogoutBtn onClick={handleLogout}><LogOut size={16} /> Logout</LogoutBtn>
         </div>
       </TopBar>
 
       <Content>
+        {/* ── Mobile sidebar backdrop ── */}
+        <SidebarBackdrop $show={mobileSidebarOpen} onClick={() => setMobileSidebarOpen(false)} />
+
         {/* ── Sidebar (AppShell-style navigation) ── */}
-        <Sidebar>
+        <Sidebar $open={mobileSidebarOpen}>
           <SidebarSection>
-            <SectionTitle><Layers size={14} /> Planning</SectionTitle>
-            <NavList style={{ marginTop: 0, gap: 2 }}>
-              <NavItem as={Link} to="/assembly/planning">
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <SectionTitle style={{ marginBottom: 0 }}><Layers size={14} /> Planning</SectionTitle>
+              <SidebarCloseBtn onClick={() => setMobileSidebarOpen(false)} aria-label="Close menu">
+                <X size={16} />
+              </SidebarCloseBtn>
+            </div>
+            <NavList style={{ marginTop: 12, gap: 2 }}>
+              <NavItem as={Link} to="/assembly/planning" onClick={() => setMobileSidebarOpen(false)}>
                 <MapIcon size={16} aria-hidden="true" /> Planning Map
               </NavItem>
-              <NavItem as={Link} to="/assembly/planning/schemes" $active>
+              <NavItem as={Link} to="/assembly/planning/schemes" $active onClick={() => setMobileSidebarOpen(false)}>
                 <FileText size={16} aria-hidden="true" /> Scheme Management
               </NavItem>
             </NavList>
@@ -664,9 +733,9 @@ export default function SchemeManagement() {
       {showUploadForm && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 3000,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
         }}>
-          <Card style={{ width: 480, maxHeight: '85vh', overflowY: 'auto', position: 'relative' }}>
+          <Card style={{ width: 480, maxWidth: '100%', maxHeight: '85vh', overflowY: 'auto', position: 'relative' }}>
             <button
               onClick={() => setShowUploadForm(false)}
               style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', color: '#aab7d4', cursor: 'pointer' }}
