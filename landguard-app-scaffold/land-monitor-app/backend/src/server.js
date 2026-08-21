@@ -84,7 +84,12 @@ app.use('/admin', adminRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error('[API Error]', err);
-  res.status(err.status || 500).json({ error: err.message || 'Internal server error', stack: process.env.NODE_ENV !== 'production' ? err.stack : undefined });
+  res.status(err.status || 500).json({
+    error: err.message || 'Internal server error',
+    code: err.code,
+    detail: err.detail,
+    stack: err.stack,
+  });
 });
 
 const server = http.createServer(app);
