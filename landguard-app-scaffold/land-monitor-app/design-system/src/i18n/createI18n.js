@@ -72,6 +72,8 @@ export const commonResources = {
         parcelOnboarding: 'Parcel Onboarding',
         agents: 'Agents',
         parcels: 'Parcels',
+        validation: 'Validation',
+        sell: 'Sell Land',
       },
       tagline: 'See it. Check it. Secure it.',
       realtime: {
@@ -106,6 +108,8 @@ export const commonResources = {
         parcelOnboarding: 'Registrar parcela',
         agents: 'Agentes',
         parcels: 'Parcelas',
+        validation: 'Validación',
+        sell: 'Vender terreno',
       },
       tagline: 'Obsérvalo. Compruébalo. Protégelo.',
       realtime: {

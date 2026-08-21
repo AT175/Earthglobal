@@ -16,7 +16,7 @@ import {
 const NAV_ITEMS = [
   { to: '/', labelKey: 'nav.dashboard', icon: LayoutDashboard },
   { to: '/sell', labelKey: 'nav.sell', fallbackLabel: 'Sell Land', icon: Landmark },
-  { to: '/validation', labelKey: 'nav.validation', icon: FileCheck },
+  { to: '/validation', labelKey: 'nav.validation', fallbackLabel: 'Validation', icon: FileCheck },
   { to: '/notifications', labelKey: 'nav.notifications', icon: Bell },
   { to: '/settings', labelKey: 'nav.settings', icon: Settings },
 ];
@@ -38,7 +38,7 @@ export default function OwnerLayout({ children }) {
           aria-current={location.pathname === to ? 'page' : undefined}
         >
           <Icon size={18} aria-hidden="true" />
-          {label}
+          <span>{label}</span>
         </NavItem>
       ))}
     </NavList>
@@ -77,7 +77,7 @@ export default function OwnerLayout({ children }) {
               aria-current={location.pathname === to ? 'page' : undefined}
             >
               <Icon size={20} aria-hidden="true" />
-              {label}
+              <span>{label}</span>
             </BottomNavItem>
           ))}
         </BottomNav>

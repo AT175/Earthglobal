@@ -83,7 +83,17 @@ export const BottomNavItem = styled.a`
   font-weight: ${({ theme }) => theme.fontWeights.medium};
   text-decoration: none;
   flex: 1;
+  min-width: 0;
   transition: color ${({ theme }) => theme.durations.fast} ease;
+
+  /* Keep labels on one line and truncate instead of wrapping/overflowing
+     when several bottom nav items are squeezed onto a narrow screen. */
+  span, small {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
   &:hover {
     color: ${({ theme }) => theme.colors.text};
@@ -95,6 +105,7 @@ export const NavList = styled.nav`
   flex-direction: column;
   gap: ${({ theme }) => theme.spacing[1]};
   margin-top: ${({ theme }) => theme.spacing[8]};
+  min-width: 0;
 `;
 
 export const NavItem = styled.a`
@@ -109,6 +120,15 @@ export const NavItem = styled.a`
   text-decoration: none;
   transition: background ${({ theme }) => theme.durations.fast} ease, color ${({ theme }) => theme.durations.fast} ease;
   box-shadow: ${({ theme, $active }) => ($active ? theme.shadows.glowCard : 'none')};
+  min-width: 0;
+
+  /* Truncate long labels instead of wrapping/overflowing the sidebar */
+  span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
   &:hover {
     color: ${({ theme }) => theme.colors.text};

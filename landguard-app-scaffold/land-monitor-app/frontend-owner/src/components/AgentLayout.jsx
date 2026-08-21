@@ -36,7 +36,7 @@ export default function AgentLayout({ children }) {
           aria-current={location.pathname === to ? 'page' : undefined}
         >
           <Icon size={18} aria-hidden="true" />
-          {label}
+          <span>{label}</span>
         </NavItem>
       ))}
     </NavList>
@@ -75,7 +75,7 @@ export default function AgentLayout({ children }) {
               aria-current={location.pathname === to ? 'page' : undefined}
             >
               <Icon size={20} aria-hidden="true" />
-              {label}
+              <span>{label}</span>
             </BottomNavItem>
           ))}
         </BottomNav>
