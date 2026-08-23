@@ -20,6 +20,7 @@ const Pricing = lazy(() => import('./pages/Pricing'));
 // Agent pages
 const VisitList = lazy(() => import('./pages/agent/VisitList'));
 const VisitDetail = lazy(() => import('./pages/agent/VisitDetail'));
+const AvailableVisits = lazy(() => import('./pages/agent/AvailableVisits'));
 
 // Admin pages
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
@@ -28,6 +29,7 @@ const AgentManagement = lazy(() => import('./pages/admin/AgentManagement'));
 const ParcelsList = lazy(() => import('./pages/admin/ParcelsList'));
 const UserManagement = lazy(() => import('./pages/admin/UserManagement'));
 const OrganizationManagement = lazy(() => import('./pages/admin/OrganizationManagement'));
+const VisitAssignments = lazy(() => import('./pages/admin/VisitAssignments'));
 
 // Assembly pages
 const AssemblyDashboard = lazy(() => import('./pages/assembly/AssemblyDashboard'));
@@ -106,6 +108,7 @@ export default function App() {
 
             {/* Agent routes */}
             <Route path="/agent" element={<RequireAuth><VisitList /></RequireAuth>} />
+            <Route path="/agent/available" element={<RequireAuth><AvailableVisits /></RequireAuth>} />
             <Route path="/agent/visits/:id" element={<RequireAuth><VisitDetail /></RequireAuth>} />
             <Route path="/agent/profile" element={<RequireAuth><Profile /></RequireAuth>} />
 
@@ -116,6 +119,7 @@ export default function App() {
             <Route path="/admin/parcels" element={<RequireAuth><ParcelsList /></RequireAuth>} />
             <Route path="/admin/users" element={<RequireAuth><UserManagement /></RequireAuth>} />
             <Route path="/admin/organizations" element={<RequireAuth><OrganizationManagement /></RequireAuth>} />
+            <Route path="/admin/visits" element={<RequireAuth><VisitAssignments /></RequireAuth>} />
             <Route path="/admin/profile" element={<RequireAuth><Profile /></RequireAuth>} />
 
             {/* Assembly routes */}

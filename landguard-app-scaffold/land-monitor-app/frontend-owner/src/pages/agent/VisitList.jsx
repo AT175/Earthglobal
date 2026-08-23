@@ -1,11 +1,11 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import {
   Camera, Video, Radio, ChevronRight, CheckCircle2, Clock,
-  Loader2, ClipboardList, Film, MapPin, Phone, Calendar,
+  Loader2, ClipboardList, Film, MapPin, Phone, Calendar, Inbox,
 } from 'lucide-react';
 import { Card, Badge, Skeleton, useRealTime, ConnectionStatus } from '@earthglobal/design-system';
 import api from '../../services/api';
@@ -185,6 +185,7 @@ const fmtDate = (d) => d
 export default function VisitList() {
   const { t } = useTranslation();
   const { t: tCommon } = useTranslation('common');
+  const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -222,6 +223,7 @@ export default function VisitList() {
     { label: 'Pending', value: stats?.pending ?? 0, icon: Clock, bg: 'rgba(251,191,36,0.12)', color: '#fbbf24' },
     { label: 'In Progress', value: stats?.in_progress ?? 0, icon: Loader2, bg: 'rgba(92,225,255,0.12)', color: '#5ce1ff' },
     { label: 'Completed', value: stats?.completed ?? 0, icon: CheckCircle2, bg: 'rgba(34,197,94,0.12)', color: '#4ade80' },
+    { label: 'Available', value: stats?.available ?? 0, icon: Inbox, bg: 'rgba(251,146,60,0.12)', color: '#fb923c', link: '/agent/available' },
     { label: 'Media Uploaded', value: stats?.media_count ?? 0, icon: Film, bg: 'rgba(168,85,247,0.12)', color: '#c084fc' },
   ];
 
@@ -249,22 +251,26 @@ export default function VisitList() {
         <StatsGrid>
           {statCards.map((s, i) => {
             const Icon = s.icon;
+            const card = (
+              <StatCard style={s.link ? { cursor: 'pointer', transition: 'transform 0.15s' } : {}}>
+                <StatIcon style={{ background: s.bg, color: s.color }}>
+                  <Icon size={22} />
+                </StatIcon>
+                <div>
+                  <StatValue>{s.value}</StatValue>
+                  <StatLabel>{s.label}</StatLabel>
+                </div>
+              </StatCard>
+            );
             return (
               <motion.div
                 key={s.label}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05 }}
+                onClick={s.link ? () => navigate(s.link) : undefined}
               >
-                <StatCard>
-                  <StatIcon style={{ background: s.bg, color: s.color }}>
-                    <Icon size={22} />
-                  </StatIcon>
-                  <div>
-                    <StatValue>{s.value}</StatValue>
-                    <StatLabel>{s.label}</StatLabel>
-                  </div>
-                </StatCard>
+                {card}
               </motion.div>
             );
           })}

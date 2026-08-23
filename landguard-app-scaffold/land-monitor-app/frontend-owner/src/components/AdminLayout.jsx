@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import {
-  LayoutGrid, Users, MapPinned, Home, LogOut, Building2, UserCog, Shield, DollarSign, User,
+  LayoutGrid, Users, MapPinned, Home, LogOut, Building2, UserCog, Shield, DollarSign, User, ClipboardList,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { to: '/admin', label: 'Onboard Parcel', icon: MapPinned },
   { to: '/admin/parcels', label: 'Parcels', icon: Home },
   { to: '/admin/agents', label: 'Agents', icon: Users },
+  { to: '/admin/visits', label: 'Visit Assignments', icon: ClipboardList },
   { to: '/admin/users', label: 'User Management', icon: UserCog },
   { to: '/admin/organizations', label: 'Organizations', icon: Building2 },
   { to: '/finance', label: 'Finance', icon: DollarSign },

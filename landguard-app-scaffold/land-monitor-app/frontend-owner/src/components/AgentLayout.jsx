@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import styled from 'styled-components';
-import { ClipboardList, User, LogOut, MapPin, Smartphone } from 'lucide-react';
+import { ClipboardList, User, LogOut, MapPin, Smartphone, Inbox } from 'lucide-react';
 import { LanguageSwitcher } from '@earthglobal/design-system';
 
 const NAV_ITEMS = [
   { to: '/agent', labelKey: 'nav.myVisits', fallbackLabel: 'My Visits', icon: ClipboardList },
+  { to: '/agent/available', labelKey: 'nav.available', fallbackLabel: 'Available', icon: Inbox },
   { to: '/agent/profile', labelKey: 'nav.profile', fallbackLabel: 'Profile', icon: User },
 ];
 
