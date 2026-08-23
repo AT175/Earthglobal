@@ -1,6 +1,89 @@
 const db = require('../config/db');
 const bus = require('../realtime/eventBus');
 
+// GET /visit-requests/my-stats — agent's own dashboard stats
+exports.myStats = async (req, res, next) => {
+  try {
+    const agentId = req.user.id;
+
+    // Visit counts by status
+    const statusCounts = await db.query(
+      `SELECT status, COUNT(*) as count
+       FROM visit_requests WHERE agent_id = $1
+       GROUP BY status`,
+      [agentId]
+    );
+
+    // Total visits
+    const totalResult = await db.query(
+      'SELECT COUNT(*) as total FROM visit_requests WHERE agent_id = $1',
+      [agentId]
+    );
+
+    // Completed visits
+    const completedResult = await db.query(
+      "SELECT COUNT(*) as completed FROM visit_requests WHERE agent_id = $1 AND status = 'completed'",
+      [agentId]
+    );
+
+    // Pending visits
+    const pendingResult = await db.query(
+      "SELECT COUNT(*) as pending FROM visit_requests WHERE agent_id = $1 AND status IN ('pending', 'assigned')",
+      [agentId]
+    );
+
+    // In progress
+    const inProgressResult = await db.query(
+      "SELECT COUNT(*) as in_progress FROM visit_requests WHERE agent_id = $1 AND status = 'in_progress'",
+      [agentId]
+    );
+
+    // Recent visits (last 5)
+    const recentResult = await db.query(
+      `SELECT v.id, v.type, v.status, v.requested_at, v.scheduled_at, v.completed_at,
+              p.name as parcel_name, p.region,
+              o.name as owner_name, o.phone as owner_phone
+       FROM visit_requests v
+       JOIN parcels p ON v.parcel_id = p.id
+       JOIN owners o ON v.owner_id = o.id
+       WHERE v.agent_id = $1
+       ORDER BY v.requested_at DESC
+       LIMIT 5`,
+      [agentId]
+    );
+
+    // Media uploaded count
+    const mediaResult = await db.query(
+      `SELECT COUNT(*) as media_count FROM media m
+       JOIN visit_requests v ON m.visit_request_id = v.id
+       WHERE v.agent_id = $1`,
+      [agentId]
+    );
+
+    // Agent info
+    const agentResult = await db.query(
+      'SELECT name, email, phone, region, active FROM agents WHERE id = $1',
+      [agentId]
+    );
+
+    res.json({
+      agent: agentResult.rows[0] || null,
+      total: parseInt(totalResult.rows[0]?.total, 10) || 0,
+      completed: parseInt(completedResult.rows[0]?.completed, 10) || 0,
+      pending: parseInt(pendingResult.rows[0]?.pending, 10) || 0,
+      in_progress: parseInt(inProgressResult.rows[0]?.in_progress, 10) || 0,
+      media_count: parseInt(mediaResult.rows[0]?.media_count, 10) || 0,
+      status_breakdown: statusCounts.rows.reduce((acc, r) => {
+        acc[r.status] = parseInt(r.count, 10);
+        return acc;
+      }, {}),
+      recent_visits: recentResult.rows,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // GET /visit-requests — scoped by role: owner sees own, agent sees assigned, admin sees all
 exports.list = async (req, res, next) => {
   try {
