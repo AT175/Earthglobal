@@ -15,6 +15,7 @@ const RequestVisit = lazy(() => import('./pages/RequestVisit'));
 const ValidationRequests = lazy(() => import('./pages/ValidationRequests'));
 const BuyLand = lazy(() => import('./pages/BuyLand'));
 const SellerDashboard = lazy(() => import('./pages/SellerDashboard'));
+const Pricing = lazy(() => import('./pages/Pricing'));
 
 // Agent pages
 const VisitList = lazy(() => import('./pages/agent/VisitList'));
@@ -34,6 +35,17 @@ const PlanningDashboard = lazy(() => import('./pages/assembly/PlanningDashboard'
 const SchemeManagement = lazy(() => import('./pages/assembly/SchemeManagement'));
 const ValidationPage = lazy(() => import('./pages/assembly/ValidationPage'));
 const MarketplaceApprovals = lazy(() => import('./pages/assembly/MarketplaceApprovals'));
+
+// Finance pages (Finance Officer role + super_admin oversight)
+const FinanceDashboard = lazy(() => import('./pages/finance/FinanceDashboard'));
+const FinancePlans = lazy(() => import('./pages/finance/FinancePlans'));
+const FinancePayments = lazy(() => import('./pages/finance/FinancePayments'));
+const FinanceTenants = lazy(() => import('./pages/finance/FinanceTenants'));
+const FinanceSettings = lazy(() => import('./pages/finance/FinanceSettings'));
+const FinanceSettlements = lazy(() => import('./pages/finance/FinanceSettlements'));
+
+// Shared pages (all roles)
+const Profile = lazy(() => import('./pages/Profile'));
 
 const PageFallback = () => (
   <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem' }}>
@@ -59,7 +71,11 @@ function AutoRoute() {
     try {
       const user = JSON.parse(userStr);
       if (user.role === 'agent') return <Navigate to="/agent" replace />;
-      if (user.role === 'admin') return <Navigate to="/admin" replace />;
+      if (user.role === 'admin') {
+        // Finance officers go to the finance dashboard; super_admins go to admin
+        if (user.adminRole === 'finance_officer') return <Navigate to="/finance" replace />;
+        return <Navigate to="/admin" replace />;
+      }
       if (user.role === 'assembly') return <Navigate to="/assembly" replace />;
     } catch {}
   }
@@ -85,10 +101,13 @@ export default function App() {
             <Route path="/parcels/:id/request-visit" element={<RequireAuth><RequestVisit /></RequireAuth>} />
             <Route path="/validation" element={<RequireAuth><ValidationRequests /></RequireAuth>} />
             <Route path="/sell" element={<RequireAuth><SellerDashboard /></RequireAuth>} />
+            <Route path="/pricing" element={<RequireAuth><Pricing /></RequireAuth>} />
+            <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
 
             {/* Agent routes */}
             <Route path="/agent" element={<RequireAuth><VisitList /></RequireAuth>} />
             <Route path="/agent/visits/:id" element={<RequireAuth><VisitDetail /></RequireAuth>} />
+            <Route path="/agent/profile" element={<RequireAuth><Profile /></RequireAuth>} />
 
             {/* Admin routes */}
             <Route path="/admin" element={<RequireAuth><ParcelOnboarding /></RequireAuth>} />
@@ -97,6 +116,7 @@ export default function App() {
             <Route path="/admin/parcels" element={<RequireAuth><ParcelsList /></RequireAuth>} />
             <Route path="/admin/users" element={<RequireAuth><UserManagement /></RequireAuth>} />
             <Route path="/admin/organizations" element={<RequireAuth><OrganizationManagement /></RequireAuth>} />
+            <Route path="/admin/profile" element={<RequireAuth><Profile /></RequireAuth>} />
 
             {/* Assembly routes */}
             <Route path="/assembly" element={<RequireAuth><AssemblyDashboard /></RequireAuth>} />
@@ -104,6 +124,16 @@ export default function App() {
             <Route path="/assembly/planning/schemes" element={<RequireAuth><SchemeManagement /></RequireAuth>} />
             <Route path="/assembly/validation" element={<RequireAuth><ValidationPage /></RequireAuth>} />
             <Route path="/assembly/marketplace" element={<RequireAuth><MarketplaceApprovals /></RequireAuth>} />
+            <Route path="/assembly/profile" element={<RequireAuth><Profile /></RequireAuth>} />
+
+            {/* Finance routes (finance_officer + super_admin oversight) */}
+            <Route path="/finance" element={<RequireAuth><FinanceDashboard /></RequireAuth>} />
+            <Route path="/finance/plans" element={<RequireAuth><FinancePlans /></RequireAuth>} />
+            <Route path="/finance/payments" element={<RequireAuth><FinancePayments /></RequireAuth>} />
+            <Route path="/finance/tenants" element={<RequireAuth><FinanceTenants /></RequireAuth>} />
+            <Route path="/finance/settings" element={<RequireAuth><FinanceSettings /></RequireAuth>} />
+            <Route path="/finance/settlements" element={<RequireAuth><FinanceSettlements /></RequireAuth>} />
+            <Route path="/finance/profile" element={<RequireAuth><Profile /></RequireAuth>} />
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />

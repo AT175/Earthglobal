@@ -246,6 +246,14 @@ export default function UserManagement() {
   const [toast, setToast] = useState(null);
   const [adminForm, setAdminForm] = useState({ name: '', email: '', password: '' });
 
+  // Only super_admin can create/delete admin accounts
+  const [currentUser, setCurrentUser] = useState(null);
+  useEffect(() => {
+    const u = localStorage.getItem('user');
+    if (u) setCurrentUser(JSON.parse(u));
+  }, []);
+  const isSuperAdmin = currentUser?.adminRole === 'super_admin';
+
   useEffect(() => { loadUsers(); }, []);
 
   const loadUsers = async () => {
@@ -320,7 +328,7 @@ export default function UserManagement() {
       <Page>
         <Header>
           <PageTitle>User Management</PageTitle>
-          {activeTab === 'admin' && (
+          {activeTab === 'admin' && isSuperAdmin && (
             <AddBtn onClick={() => setShowAddAdmin(true)}><Plus size={18} /> Add Admin</AddBtn>
           )}
         </Header>
@@ -413,9 +421,13 @@ export default function UserManagement() {
                         </ActionBtn>
                       </>
                     ) : activeTab === 'admin' ? (
-                      <ActionBtn $danger title="Delete" onClick={() => deleteAdmin(u.id)}>
-                        <Trash2 size={15} />
-                      </ActionBtn>
+                      isSuperAdmin ? (
+                        <ActionBtn $danger title="Delete" onClick={() => deleteAdmin(u.id)}>
+                          <Trash2 size={15} />
+                        </ActionBtn>
+                      ) : (
+                        <span style={{ color: '#aab7d4', fontSize: '0.75rem' }}>Super admin only</span>
+                      )
                     ) : activeTab === 'owner' ? (
                       <ActionBtn $danger title="Delete" onClick={() => rejectOwner(u.id)}>
                         <Trash2 size={15} />

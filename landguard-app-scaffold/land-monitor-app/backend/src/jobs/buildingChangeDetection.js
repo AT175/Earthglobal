@@ -24,6 +24,7 @@ const db = require('../config/db');
 const bus = require('../realtime/eventBus');
 const { ee, init, isReady } = require('../config/earthEngine');
 const { resolveFAOBoundary, getGeometryBbox } = require('../config/faoBoundary');
+const { estimateBuildingHeight, compareNearbyBuildings } = require('../utils/buildingHeight');
 
 /**
  * Run building change detection for a specific organization + bbox.
@@ -264,16 +265,33 @@ async function runBuildingChangeDetection(options) {
           parcelId = parcelCheck.rows[0]?.id || null;
         } catch {}
 
+        // ── Estimate building height (shadow + DEM) ──
+        let heightData = { height_m: null, estimated_floors: null, confidence: 0, method: 'none' };
+        try {
+          heightData = await estimateBuildingHeight(currentComposite, region, { lat: centroidLat, lng: centroidLng });
+        } catch (e) {
+          // Height estimation is best-effort
+        }
+
+        // ── Compare to nearby existing buildings ──
+        let comparisonData = null;
+        try {
+          comparisonData = await compareNearbyBuildings(db, orgId, { lat: centroidLat, lng: centroidLng }, 0, 500);
+        } catch (e) {
+          // Comparison is best-effort
+        }
+
         // Save building to DB
         const insertResult = await db.query(
           `INSERT INTO buildings
              (organization_id, parcel_id, footprint, area_sqm, status,
               in_protected_area, detected_at, centroid_lat, centroid_lng,
-              metadata, change_detection_id)
+              metadata, change_detection_id,
+              estimated_height_m, estimated_floors, height_method, height_confidence)
            VALUES ($1, $2, ST_SetSRID(ST_GeomFromGeoJSON($3), 4326),
                    ST_Area(ST_SetSRID(ST_GeomFromGeoJSON($3), 4326)::geography),
-                   'unverified', $4, now(), $5, $6, $7, $8)
-           RETURNING id, area_sqm, centroid_lat, centroid_lng`,
+                   'unverified', $4, now(), $5, $6, $7, $8, $9, $10, $11, $12)
+           RETURNING id, area_sqm, centroid_lat, centroid_lng, estimated_height_m, estimated_floors`,
           [
             orgId, parcelId, JSON.stringify(geojson), inProtected,
             centroidLat, centroidLng,
@@ -285,8 +303,11 @@ async function runBuildingChangeDetection(options) {
               pixel_count: feat.properties?.count || 0,
               source: 'earth_engine_change_detection',
               change_detection_id: detectionId,
+              height_estimation: heightData,
+              nearby_comparison: comparisonData,
             }),
             detectionId,
+            heightData.height_m, heightData.estimated_floors, heightData.method, heightData.confidence,
           ]
         );
 
@@ -298,6 +319,10 @@ async function runBuildingChangeDetection(options) {
           centroid_lng: building.centroid_lng,
           in_protected_area: inProtected,
           parcel_id: parcelId,
+          estimated_height_m: building.estimated_height_m ? parseFloat(building.estimated_height_m) : null,
+          estimated_floors: building.estimated_floors || null,
+          height_method: heightData.method,
+          nearby_comparison: comparisonData,
         });
 
         // Create an alert for each new building (especially if in protected area)

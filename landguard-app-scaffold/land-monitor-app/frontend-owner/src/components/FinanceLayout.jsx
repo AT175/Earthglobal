@@ -2,23 +2,19 @@ import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import {
-  LayoutGrid, Users, MapPinned, Home, LogOut, Building2, UserCog, Shield, DollarSign, User,
+  LayoutGrid, CreditCard, Wallet, Building2, Settings, LogOut, Shield, DollarSign, User, Split,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
-  { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutGrid },
-  { to: '/admin', label: 'Onboard Parcel', icon: MapPinned },
-  { to: '/admin/parcels', label: 'Parcels', icon: Home },
-  { to: '/admin/agents', label: 'Agents', icon: Users },
-  { to: '/admin/users', label: 'User Management', icon: UserCog },
-  { to: '/admin/organizations', label: 'Organizations', icon: Building2 },
-  { to: '/finance', label: 'Finance', icon: DollarSign },
-  { to: '/admin/profile', label: 'My Profile', icon: User },
+  { to: '/finance', label: 'Dashboard', icon: LayoutGrid },
+  { to: '/finance/plans', label: 'Plans & Subscriptions', icon: CreditCard },
+  { to: '/finance/payments', label: 'Payments & Commissions', icon: Wallet },
+  { to: '/finance/settlements', label: 'Settlements & Wallets', icon: Split },
+  { to: '/finance/tenants', label: 'Tenant Billing', icon: Building2 },
+  { to: '/finance/settings', label: 'Fee Settings', icon: Settings },
+  { to: '/finance/profile', label: 'My Profile', icon: User },
 ];
 
-// ═══════════════════════════════════════════════════════════
-// Layout
-// ═══════════════════════════════════════════════════════════
 const Page = styled.div`
   min-height: 100vh;
   background: ${({ theme }) => theme.colors.background};
@@ -122,7 +118,7 @@ const Tab = styled.button`
   &:hover { color: ${({ theme }) => theme.colors.text}; }
 `;
 
-export default function AdminLayout({ children }) {
+export default function FinanceLayout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -138,18 +134,20 @@ export default function AdminLayout({ children }) {
     navigate('/');
   };
 
+  const isSuperAdmin = user?.adminRole === 'super_admin';
+
   return (
     <Page>
       <TopBar>
         <Logo>
-          <LogoIcon><Shield size={22} /></LogoIcon>
-          EarthGlobal <span style={{ color: '#5ce1ff' }}>Admin</span>
+          <LogoIcon><DollarSign size={22} /></LogoIcon>
+          EarthGlobal <span style={{ color: '#4ade80' }}>Finance</span>
         </Logo>
         <UserInfo>
           {user && (
             <UserBadge>
               <span>{user.name}</span>
-              <span>System Admin</span>
+              <span>{isSuperAdmin ? 'Super Admin (Finance Oversight)' : 'Finance Officer'}</span>
             </UserBadge>
           )}
           <LogoutBtn onClick={handleLogout}>
@@ -161,7 +159,11 @@ export default function AdminLayout({ children }) {
       <Container>
         <Tabs>
           {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
-            <Tab key={to} $active={location.pathname === to} onClick={() => navigate(to)}>
+            <Tab
+              key={to}
+              $active={location.pathname === to}
+              onClick={() => navigate(to)}
+            >
               <Icon size={16} /> {label}
             </Tab>
           ))}

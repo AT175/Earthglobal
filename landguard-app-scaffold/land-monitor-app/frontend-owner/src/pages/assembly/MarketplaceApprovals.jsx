@@ -17,11 +17,13 @@ const TopBar = styled.header`
   background: rgba(10,21,53,0.95); backdrop-filter: blur(12px);
   border-bottom: 1px solid rgba(255,255,255,0.1);
   padding: 12px 24px; display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; flex-wrap: wrap;
+  @media (max-width: 768px) { padding: 12px 16px; }
 `;
 
 const Logo = styled.div`display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 1.1rem;`;
 
-const Container = styled.div`max-width: 1000px; margin: 0 auto; padding: 24px;`;
+const Container = styled.div`max-width: 1000px; margin: 0 auto; padding: 24px; @media (max-width: 768px) { padding: 16px; }`;
 
 const Title = styled.h1`font-size: 1.5rem; display: flex; align-items: center; gap: 8px; margin-bottom: 8px;`;
 const Subtitle = styled.p`color: #aab7d4; margin-bottom: 24px;`;

@@ -23,6 +23,8 @@ const TopBar = styled.header`
   border-bottom: 1px solid ${({ theme }) => theme.colors.borderDark};
   padding: ${({ theme }) => `${theme.spacing[4]} ${theme.spacing[6]}`};
   display: flex; align-items: center; justify-content: space-between;
+  gap: ${({ theme }) => theme.spacing[3]};
+  @media (max-width: 768px) { padding: 12px 16px; flex-wrap: wrap; }
 `;
 
 const Logo = styled.div`
@@ -37,7 +39,7 @@ const LogoIcon = styled.div`
   box-shadow: ${({ theme }) => theme.shadows.glowSoft};
 `;
 
-const TopNav = styled.nav`display: flex; gap: 8px;`;
+const TopNav = styled.nav`display: flex; gap: 8px; flex-wrap: wrap;`;
 
 const NavBtn = styled.button`
   display: flex; align-items: center; gap: 6px;
@@ -50,6 +52,7 @@ const NavBtn = styled.button`
 
 const Content = styled.div`
   max-width: 1200px; margin: 0 auto; padding: ${({ theme }) => theme.spacing[6]};
+  @media (max-width: 768px) { padding: ${({ theme }) => theme.spacing[4]}; }
 `;
 
 const TitleRow = styled.div`
@@ -65,6 +68,7 @@ const PageTitle = styled.h1`
 const Tabs = styled.div`
   display: flex; gap: 4px; margin-bottom: ${({ theme }) => theme.spacing[6]};
   border-bottom: 1px solid ${({ theme }) => theme.colors.borderDark};
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
 `;
 
 const Tab = styled.button`

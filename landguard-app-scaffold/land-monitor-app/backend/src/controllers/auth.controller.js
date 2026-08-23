@@ -15,8 +15,8 @@ async function findUserByEmail(email) {
   result = await db.query('SELECT id, name, email, phone, password_hash, active FROM agents WHERE email = $1', [email]);
   if (result.rows[0]) return { ...result.rows[0], role: 'agent' };
 
-  // Check admins
-  result = await db.query('SELECT id, name, email, password_hash FROM admins WHERE email = $1', [email]);
+  // Check admins (role: 'super_admin' | 'finance_officer')
+  result = await db.query('SELECT id, name, email, password_hash, role as admin_role FROM admins WHERE email = $1', [email]);
   if (result.rows[0]) return { ...result.rows[0], role: 'admin' };
 
   // Check assembly users
@@ -122,7 +122,7 @@ exports.login = async (req, res, next) => {
     if (!valid) return res.status(401).json({ error: 'Invalid email or password' });
 
     const token = jwt.sign(
-      { id: user.id, role: user.role, organizationId: user.organization_id, assemblyRole: user.assembly_role },
+      { id: user.id, role: user.role, organizationId: user.organization_id, assemblyRole: user.assembly_role, adminRole: user.admin_role },
       process.env.JWT_SECRET,
       { expiresIn: '30d' }
     );
@@ -133,6 +133,7 @@ exports.login = async (req, res, next) => {
     if (user.region) userInfo.region = user.region;
     if (user.organization_id) userInfo.organizationId = user.organization_id;
     if (user.assembly_role) userInfo.assemblyRole = user.assembly_role;
+    if (user.admin_role) userInfo.adminRole = user.admin_role;
 
     res.json({ token, owner: userInfo, role: user.role });
   } catch (err) {

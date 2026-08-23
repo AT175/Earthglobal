@@ -20,6 +20,8 @@ const hazardRoutes = require('./routes/hazard.routes');
 const validationRoutes = require('./routes/validation.routes');
 const marketplaceRoutes = require('./routes/marketplace.routes');
 const adminRoutes = require('./routes/admin.routes');
+const financeRoutes = require('./routes/finance.routes');
+const profileRoutes = require('./routes/profile.routes');
 const { createWebSocketServer } = require('./realtime/socketServer');
 const cron = require('node-cron');
 const { run: runNdviJob } = require('./jobs/ndviChangeDetection');
@@ -81,6 +83,8 @@ app.use('/assembly/planning', hazardRoutes);
 app.use('/validation', validationRoutes);
 app.use('/marketplace', marketplaceRoutes);
 app.use('/admin', adminRoutes);
+app.use('/finance', financeRoutes);
+app.use('/profile', profileRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error('[API Error]', err);

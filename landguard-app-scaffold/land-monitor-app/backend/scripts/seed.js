@@ -13,14 +13,27 @@ const pool = new Pool({
 (async () => {
   const hash = await bcrypt.hash('password123', 10);
 
-  // Seed admin
+  // Seed super admin (full platform access, including finance oversight + admin creation)
   try {
     await pool.query(
-      'INSERT INTO earthglobal.admins (name, email, password_hash) VALUES ($1, $2, $3) ON CONFLICT (email) DO NOTHING',
+      `INSERT INTO earthglobal.admins (name, email, password_hash, role)
+       VALUES ($1, $2, $3, 'super_admin')
+       ON CONFLICT (email) DO UPDATE SET role = 'super_admin'`,
       ['Admin User', 'admin@earthglobal.com', hash]
     );
-    console.log('Admin seeded: admin@earthglobal.com / password123');
-  } catch (e) { console.log('Admin error:', e.message.substring(0, 120)); }
+    console.log('Super admin seeded: admin@earthglobal.com / password123 (role: super_admin)');
+  } catch (e) { console.log('Super admin error:', e.message.substring(0, 120)); }
+
+  // Seed finance officer (finance dashboard only — cannot create/delete admins)
+  try {
+    await pool.query(
+      `INSERT INTO earthglobal.admins (name, email, password_hash, role)
+       VALUES ($1, $2, $3, 'finance_officer')
+       ON CONFLICT (email) DO UPDATE SET role = 'finance_officer'`,
+      ['Finance Officer', 'finance@earthglobal.com', hash]
+    );
+    console.log('Finance officer seeded: finance@earthglobal.com / password123 (role: finance_officer)');
+  } catch (e) { console.log('Finance officer error:', e.message.substring(0, 120)); }
 
   // Seed agent
   try {
@@ -41,8 +54,8 @@ const pool = new Pool({
   } catch (e) { console.log('Owner error:', e.message.substring(0, 120)); }
 
   // Verify
-  const admins = await pool.query('SELECT email FROM earthglobal.admins');
-  console.log('Admins:', admins.rows.map(r => r.email));
+  const admins = await pool.query('SELECT email, role FROM earthglobal.admins ORDER BY created_at');
+  console.log('Admins:', admins.rows.map(r => `${r.email} (${r.role})`));
   const agents = await pool.query('SELECT email FROM earthglobal.agents');
   console.log('Agents:', agents.rows.map(r => r.email));
   const owners = await pool.query('SELECT email FROM earthglobal.owners');

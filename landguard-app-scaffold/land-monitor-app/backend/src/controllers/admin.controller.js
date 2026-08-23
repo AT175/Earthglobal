@@ -80,7 +80,7 @@ exports.listUsers = async (req, res, next) => {
       results.agents = agents.rows;
     }
     if (!role || role === 'admin') {
-      const admins = await db.query('SELECT id, name, email, created_at FROM admins ORDER BY created_at DESC');
+      const admins = await db.query('SELECT id, name, email, role, created_at FROM admins ORDER BY created_at DESC');
       results.admins = admins.rows;
     }
     if (!role || role === 'assembly') {
@@ -125,15 +125,18 @@ exports.deleteOwner = async (req, res, next) => {
 };
 
 // POST /admin/users/admin — create admin account
+// role: 'super_admin' (full platform access) | 'finance_officer' (finance dashboard only)
 exports.createAdmin = async (req, res, next) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, role } = req.body;
     if (!name || !email || !password) return res.status(400).json({ error: 'Name, email, and password are required' });
+
+    const adminRole = role === 'finance_officer' ? 'finance_officer' : 'super_admin';
 
     const hash = await bcrypt.hash(password, 10);
     const result = await db.query(
-      'INSERT INTO admins (name, email, password_hash) VALUES ($1, $2, $3) RETURNING id, name, email, created_at',
-      [name, email, hash]
+      'INSERT INTO admins (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, name, email, role, created_at',
+      [name, email, hash, adminRole]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {

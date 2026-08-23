@@ -4,6 +4,7 @@ const multer = require('multer');
 const { requireAuth, requireRole, requireAssemblyRole } = require('../middleware/auth');
 const ctrl = require('../controllers/assembly.controller');
 const schemeCtrl = require('../controllers/scheme.controller');
+const refBuildingsCtrl = require('../controllers/referenceBuildings.controller');
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -96,5 +97,12 @@ router.post('/planning/schemes', requireAssemblyRole('assembly_admin', 'planning
 router.patch('/planning/schemes/:id', requireAssemblyRole('assembly_admin', 'planning_officer'), schemeCtrl.updateScheme);
 router.delete('/planning/schemes/:id', requireAssemblyRole('assembly_admin', 'planning_officer'), schemeCtrl.deleteScheme);
 router.post('/planning/schemes/:id/parcels/:parcelId/extract-buildings', requireAssemblyRole('assembly_admin', 'planning_officer'), schemeCtrl.extractBuildingsForParcel);
+
+// ═══════════════════════════════════════════════════════════
+// REFERENCE BUILDINGS — Google Open Buildings + OSM for overlay comparison
+// ═══════════════════════════════════════════════════════════
+router.get('/planning/google-buildings', requireAssemblyRole('assembly_admin', 'planning_officer'), refBuildingsCtrl.getGoogleBuildings);
+router.get('/planning/osm-buildings', requireAssemblyRole('assembly_admin', 'planning_officer'), refBuildingsCtrl.getOSMBuildings);
+router.post('/planning/buildings-comparison', requireAssemblyRole('assembly_admin', 'planning_officer'), refBuildingsCtrl.compareBuildingSources);
 
 module.exports = router;

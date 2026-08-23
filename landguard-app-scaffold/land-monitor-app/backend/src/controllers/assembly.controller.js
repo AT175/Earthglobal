@@ -5,6 +5,7 @@ const { notifyOwnerOfAlert } = require('../services/notificationService');
 const { ee, init: initEE, isReady: eeReady } = require('../config/earthEngine');
 const { resolveFAOBoundary, getGeometryBbox } = require('../config/faoBoundary');
 const { runBuildingChangeDetection } = require('../jobs/buildingChangeDetection');
+const { estimateBuildingHeight, compareNearbyBuildings } = require('../utils/buildingHeight');
 
 // ── Helper: get org_id from authenticated assembly user ──
 function getOrgId(req) {
@@ -128,6 +129,7 @@ exports.listBuildings = async (req, res, next) => {
     const { status, in_protected_area } = req.query;
     let query = `SELECT b.id, b.detected_at, b.area_sqm, b.status, b.in_protected_area, b.verified_at,
                  b.permit_id, b.parcel_id, b.latest_image,
+                 b.estimated_height_m, b.estimated_floors, b.height_method,
                  ST_AsGeoJSON(b.footprint) as footprint_geojson,
                  p.name as parcel_name
                  FROM buildings b LEFT JOIN parcels p ON b.parcel_id = p.id
@@ -493,6 +495,7 @@ exports.getBuildingsGeoJSON = async (req, res, next) => {
       `SELECT b.id, b.area_sqm, b.status, b.in_protected_area, b.detected_at,
               b.verified_at, b.notes, b.permit_id, b.parcel_id, b.metadata,
               b.centroid_lat, b.centroid_lng,
+              b.estimated_height_m, b.estimated_floors, b.height_method, b.height_confidence,
               ST_AsGeoJSON(b.footprint) as geojson,
               (SELECT name FROM parcels WHERE id = b.parcel_id) as parcel_name
        FROM buildings b WHERE b.organization_id = $1 ORDER BY b.detected_at DESC`,
@@ -513,6 +516,10 @@ exports.getBuildingsGeoJSON = async (req, res, next) => {
         parcel_name: row.parcel_name,
         centroid_lat: row.centroid_lat,
         centroid_lng: row.centroid_lng,
+        estimated_height_m: row.estimated_height_m ? parseFloat(row.estimated_height_m) : null,
+        estimated_floors: row.estimated_floors || null,
+        height_method: row.height_method || null,
+        height_confidence: row.height_confidence ? parseFloat(row.height_confidence) : null,
         metadata: row.metadata || {},
       },
     }));
@@ -726,6 +733,7 @@ exports.detectBuildings = async (req, res, next) => {
 
           if (!featErr && features && features.length > 0) {
             // Save each detected building polygon to the database
+            // Process in batches of 25 for height estimation (EE calls are rate-limited)
             for (const feat of features.slice(0, 200)) { // cap at 200 per detection
               try {
                 const geom = feat.geometry;
@@ -745,11 +753,28 @@ exports.detectBuildings = async (req, res, next) => {
                 const centroidLat = lats.reduce((a, b) => a + b, 0) / lats.length;
                 const centroidLng = lngs.reduce((a, b) => a + b, 0) / lngs.length;
 
+                // ── Estimate building height (shadow + DEM) ──
+                let heightData = { height_m: null, estimated_floors: null, confidence: 0, method: 'none' };
+                try {
+                  heightData = await estimateBuildingHeight(s2, region, { lat: centroidLat, lng: centroidLng });
+                } catch (e) {
+                  // Height estimation is best-effort — don't fail the whole detection
+                }
+
+                // ── Compare to nearby existing buildings ──
+                let comparisonData = null;
+                try {
+                  comparisonData = await compareNearbyBuildings(db, orgId, { lat: centroidLat, lng: centroidLng }, 0, 500);
+                } catch (e) {
+                  // Comparison is best-effort
+                }
+
                 // Compute area in sqm using ST_Area on geography
                 const insertResult = await db.query(
-                  `INSERT INTO buildings (organization_id, footprint, area_sqm, status, in_protected_area, detected_at, centroid_lat, centroid_lng, metadata)
-                   VALUES ($1, ST_SetSRID(ST_GeomFromGeoJSON($2), 4326), ST_Area(ST_SetSRID(ST_GeomFromGeoJSON($2), 4326)::geography), 'unverified', false, now(), $3, $4, $5)
-                   RETURNING id, area_sqm, centroid_lat, centroid_lng`,
+                  `INSERT INTO buildings (organization_id, footprint, area_sqm, status, in_protected_area, detected_at, centroid_lat, centroid_lng, metadata,
+                                           estimated_height_m, estimated_floors, height_method, height_confidence)
+                   VALUES ($1, ST_SetSRID(ST_GeomFromGeoJSON($2), 4326), ST_Area(ST_SetSRID(ST_GeomFromGeoJSON($2), 4326)::geography), 'unverified', false, now(), $3, $4, $5, $6, $7, $8, $9)
+                   RETURNING id, area_sqm, centroid_lat, centroid_lng, estimated_height_m, estimated_floors`,
                   [orgId, JSON.stringify(geojson), centroidLat, centroidLng, JSON.stringify({
                     detection_method: 'sentinel2_ndbi_ndvi_bsi',
                     detection_date: new Date().toISOString(),
@@ -757,14 +782,21 @@ exports.detectBuildings = async (req, res, next) => {
                     boundary_source: boundarySource,
                     pixel_count: feat.properties?.count || 0,
                     source: 'earth_engine',
-                  })]
+                    height_estimation: heightData,
+                    nearby_comparison: comparisonData,
+                  }), heightData.height_m, heightData.estimated_floors, heightData.method, heightData.confidence]
                 );
 
+                const saved = insertResult.rows[0];
                 savedBuildings.push({
-                  id: insertResult.rows[0].id,
-                  area_sqm: parseFloat(insertResult.rows[0].area_sqm),
-                  centroid_lat: insertResult.rows[0].centroid_lat,
-                  centroid_lng: insertResult.rows[0].centroid_lng,
+                  id: saved.id,
+                  area_sqm: parseFloat(saved.area_sqm),
+                  centroid_lat: saved.centroid_lat,
+                  centroid_lng: saved.centroid_lng,
+                  estimated_height_m: saved.estimated_height_m ? parseFloat(saved.estimated_height_m) : null,
+                  estimated_floors: saved.estimated_floors || null,
+                  height_method: heightData.method,
+                  nearby_comparison: comparisonData,
                 });
               } catch (e) {
                 // Skip individual building save errors

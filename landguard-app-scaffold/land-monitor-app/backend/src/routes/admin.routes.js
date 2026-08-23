@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { requireAuth, requireRole } = require('../middleware/auth');
+const { requireAuth, requireRole, requireAdminRole } = require('../middleware/auth');
 const ctrl = require('../controllers/admin.controller');
 
 router.use(requireAuth, requireRole('admin'));
@@ -13,8 +13,9 @@ router.get('/recent-activity', ctrl.getRecentActivity);
 router.get('/users', ctrl.listUsers);
 router.patch('/users/owner/:id', ctrl.updateOwner);
 router.delete('/users/owner/:id', ctrl.deleteOwner);
-router.post('/users/admin', ctrl.createAdmin);
-router.delete('/users/admin/:id', ctrl.deleteAdmin);
+// Admin account creation/deletion is restricted to super_admin only
+router.post('/users/admin', requireAdminRole('super_admin'), ctrl.createAdmin);
+router.delete('/users/admin/:id', requireAdminRole('super_admin'), ctrl.deleteAdmin);
 
 // Organization (assembly tenant) management
 router.get('/organizations', ctrl.listOrganizations);

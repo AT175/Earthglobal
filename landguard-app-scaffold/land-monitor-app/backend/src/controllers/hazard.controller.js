@@ -50,6 +50,30 @@ const HAZARD_CONFIG = {
     description: 'Built-up anomaly + bare soil + vegetation stress indicating waste accumulation',
     indices: ['ndbi', 'bsi', 'ndvi', 'ndbi_anomaly'],
   },
+  deforestation: {
+    label: 'Deforestation',
+    color: '#84cc16',
+    description: 'Significant vegetation loss detected via NDVI time-series comparison (Sentinel-2)',
+    indices: ['ndvi_baseline', 'ndvi_current', 'ndvi_change', 'evi'],
+  },
+  air_quality: {
+    label: 'Air Quality (NO2)',
+    color: '#f97316',
+    description: 'High nitrogen dioxide concentrations from Sentinel-5P TROPOMI indicating industrial/traffic emissions',
+    indices: ['no2_column', 'no2_tropospheric'],
+  },
+  urban_heat: {
+    label: 'Urban Heat Island',
+    color: '#dc2626',
+    description: 'Elevated land surface temperature from Landsat 8/9 thermal infrared, indicating heat stress risk',
+    indices: ['lst', 'ndvi', 'temperature_anomaly'],
+  },
+  wetland_loss: {
+    label: 'Wetland Degradation',
+    color: '#0ea5e9',
+    description: 'Loss of water bodies and wetland vegetation detected via MNDWI time-series change',
+    indices: ['mndwi_baseline', 'mndwi_current', 'mndwi_change', 'ndvi'],
+  },
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -151,6 +175,66 @@ exports.detectHazards = async (req, res, next) => {
       const bareSoil = bsi.gt(0.15);
       const vegStress = ndvi.gt(0.1).and(ndvi.lt(0.3));
       detectionMasks.open_dump = builtup.and(bareSoil).and(vegStress).rename('open_dump');
+    }
+
+    if (detectTypes.includes('deforestation')) {
+      // Deforestation: compare baseline NDVI (6-12 months ago) vs current NDVI
+      // Significant vegetation loss = NDVI dropped by > 0.25
+      const baselineDefor = ee.ImageCollection('COPERNICUS/S2_HARMONIZED')
+        .filterDate('2024-01-01', '2024-06-30')
+        .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20))
+        .filterBounds(region)
+        .median();
+      const baselineNdvi = baselineDefor.normalizedDifference(['B8', 'B4']).rename('ndvi_baseline');
+      const currentNdvi = ndvi.rename('ndvi_current');
+      const ndviChange = baselineNdvi.subtract(currentNdvi).rename('ndvi_change');
+      // Deforestation: NDVI dropped by more than 0.25 AND was previously vegetated (baseline NDVI > 0.4)
+      detectionMasks.deforestation = ndviChange.gt(0.25).and(baselineNdvi.gt(0.4)).rename('deforestation');
+    }
+
+    if (detectTypes.includes('air_quality')) {
+      // Air quality: Sentinel-5P TROPOMI NO2 (tropospheric NO2 column)
+      // High NO2 = industrial emissions, traffic pollution, biomass burning
+      const s5p = ee.ImageCollection('COPERNICUS/S5P/N02')
+        .filterDate('2024-01-01', '2025-12-31')
+        .filterBounds(region)
+        .select('troposphic_NO2_column_number_density')
+        .median();
+      // NO2 threshold: > 0.0001 mol/m² (typical polluted area)
+      // Use focal_max to smooth the NO2 data (it's coarse resolution ~7km)
+      const no2Smoothed = s5p.focal_mean(5000, 'circle', 'meters');
+      detectionMasks.air_quality = no2Smoothed.gt(0.0001).rename('air_quality');
+    }
+
+    if (detectTypes.includes('urban_heat')) {
+      // Urban heat island: Landsat 8/9 thermal infrared (LST)
+      // High LST relative to surrounding rural areas = urban heat island
+      const landsat = ee.ImageCollection('LANDSAT/LC09/C02/T1_L2')
+        .filterDate('2024-01-01', '2025-12-31')
+        .filterBounds(region)
+        .median();
+      // Landsat C2 L2 already has surface temperature in ST_B10 band (in Kelvin)
+      // Convert to Celsius: ST_B10 * 0.00341802 + 149.0 - 273.15
+      const lst = landsat.select('ST_B10').multiply(0.00341802).add(149.0).subtract(273.15).rename('lst');
+      // Urban heat: LST > 35°C AND low NDVI (not vegetated, likely urban)
+      // Also compute anomaly: LST - focal mean (50km) to find relative hotspots
+      const lstAnomaly = lst.subtract(lst.focal_mean(50000, 'circle', 'meters')).rename('lst_anomaly');
+      detectionMasks.urban_heat = lst.gt(35).and(ndvi.lt(0.2)).and(lstAnomaly.gt(3)).rename('urban_heat');
+    }
+
+    if (detectTypes.includes('wetland_loss')) {
+      // Wetland degradation: compare baseline MNDWI (6-12 months ago) vs current MNDWI
+      // Significant water loss = MNDWI dropped by > 0.2
+      const baselineWet = ee.ImageCollection('COPERNICUS/S2_HARMONIZED')
+        .filterDate('2024-01-01', '2024-06-30')
+        .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20))
+        .filterBounds(region)
+        .median();
+      const baselineMndwi = baselineWet.normalizedDifference(['B3', 'B11']).rename('mndwi_baseline');
+      const currentMndwi = mndwi.rename('mndwi_current');
+      const mndwiChange = baselineMndwi.subtract(currentMndwi).rename('mndwi_change');
+      // Wetland loss: MNDWI dropped by > 0.2 AND was previously water (baseline MNDWI > 0)
+      detectionMasks.wetland_loss = mndwiChange.gt(0.2).and(baselineMndwi.gt(0)).rename('wetland_loss');
     }
 
     const activeTypes = Object.keys(detectionMasks);
@@ -337,8 +421,8 @@ exports.detectHazards = async (req, res, next) => {
                 bbox,
                 total_hazards: totalHazards,
                 results: detectionResults,
-                method: 'Sentinel-2 multi-spectral analysis via Google Earth Engine (NDWI, MNDWI, NDBI, BSI, NDVI, Iron Oxide, Turbidity)',
-                attribution: 'Hazard detection &copy; Copernicus Sentinel-2 + SRTM via Google Earth Engine',
+                method: 'Sentinel-2 + Sentinel-5P + Landsat 9 multi-spectral analysis via Google Earth Engine (NDWI, MNDWI, NDBI, BSI, NDVI, Iron Oxide, Turbidity, NO2, LST, NDVI change, MNDWI change)',
+                attribution: 'Hazard detection &copy; Copernicus Sentinel-2/5P + Landsat 9 + SRTM via Google Earth Engine',
               });
             }
           });

@@ -37,4 +37,19 @@ function requireAssemblyRole(...assemblyRoles) {
   };
 }
 
-module.exports = { requireAuth, requireRole, requireAssemblyRole };
+// Fine-grained admin sub-role check ('super_admin', 'finance_officer')
+function requireAdminRole(...adminRoles) {
+  return (req, res, next) => {
+    if (!req.user || req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden — admin account required' });
+    }
+    // Admins created before the role column existed default to 'super_admin'
+    const role = req.user.adminRole || 'super_admin';
+    if (!adminRoles.includes(role)) {
+      return res.status(403).json({ error: 'Forbidden — insufficient permissions for this action' });
+    }
+    next();
+  };
+}
+
+module.exports = { requireAuth, requireRole, requireAssemblyRole, requireAdminRole };

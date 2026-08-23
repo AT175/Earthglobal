@@ -55,8 +55,9 @@ const SearchInput = styled.input`
 
 const Grid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: ${({ theme }) => theme.spacing[4]};
+  @media (max-width: 480px) { grid-template-columns: 1fr; }
 `;
 
 const OrgCard = styled.div`

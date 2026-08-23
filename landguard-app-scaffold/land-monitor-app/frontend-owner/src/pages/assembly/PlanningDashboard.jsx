@@ -553,7 +553,15 @@ export default function PlanningDashboard() {
   const [showProtected, setShowProtected] = useState(true);
   const [showDistrict, setShowDistrict] = useState(true);
   const [showHazards, setShowHazards] = useState(true);
+  const [showGoogleBuildings, setShowGoogleBuildings] = useState(false);
+  const [showOSMBuildings, setShowOSMBuildings] = useState(false);
   const [baseLayer, setBaseLayer] = useState('satellite');
+
+  // Reference buildings (Google Open Buildings + OSM)
+  const [googleBuildingsFC, setGoogleBuildingsFC] = useState(null);
+  const [osmBuildingsFC, setOSMBuildingsFC] = useState(null);
+  const [loadingRefBuildings, setLoadingRefBuildings] = useState(false);
+  const [refComparison, setRefComparison] = useState(null);
 
   // Environmental hazards
   const [hazardsFC, setHazardsFC] = useState(null);
@@ -825,6 +833,80 @@ export default function PlanningDashboard() {
     } catch {}
   };
 
+  // ── Load Google Open Buildings for the current map view ──
+  const loadGoogleBuildings = async () => {
+    if (!mapBounds) { showToast('Map not loaded yet', 'error'); return; }
+    setLoadingRefBuildings(true);
+    try {
+      const bbox = `${mapBounds.minLng},${mapBounds.minLat},${mapBounds.maxLng},${mapBounds.maxLat}`;
+      const { data } = await api.get(`/assembly/planning/google-buildings?bbox=${bbox}`);
+      setGoogleBuildingsFC(data);
+      if (data.capped) {
+        showToast(`Loaded ${data.returned} of ${data.total_in_area} Google buildings (capped). Zoom in for more.`);
+      } else {
+        showToast(`Loaded ${data.returned} Google Open Buildings`);
+      }
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Failed to load Google buildings', 'error');
+    } finally {
+      setLoadingRefBuildings(false);
+    }
+  };
+
+  // ── Load OSM buildings for the current map view ──
+  const loadOSMBuildings = async () => {
+    if (!mapBounds) { showToast('Map not loaded yet', 'error'); return; }
+    setLoadingRefBuildings(true);
+    try {
+      const bbox = `${mapBounds.minLng},${mapBounds.minLat},${mapBounds.maxLng},${mapBounds.maxLat}`;
+      const { data } = await api.get(`/assembly/planning/osm-buildings?bbox=${bbox}`);
+      setOSMBuildingsFC(data);
+      showToast(`Loaded ${data.total} OSM buildings`);
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Failed to load OSM buildings', 'error');
+    } finally {
+      setLoadingRefBuildings(false);
+    }
+  };
+
+  // ── Run building source comparison ──
+  const runBuildingComparison = async () => {
+    if (!buildingsFC?.features?.length && !googleBuildingsFC?.features?.length && !osmBuildingsFC?.features?.length) {
+      showToast('Need at least one building dataset loaded', 'error');
+      return;
+    }
+    setLoadingRefBuildings(true);
+    try {
+      const { data } = await api.post('/assembly/planning/buildings-comparison', {
+        detected: buildingsFC || { type: 'FeatureCollection', features: [] },
+        google: googleBuildingsFC || { type: 'FeatureCollection', features: [] },
+        osm: osmBuildingsFC || { type: 'FeatureCollection', features: [] },
+      });
+      setRefComparison(data);
+      showToast(`Comparison: ${data.coverage.detected_matched_to_google_pct}% match with Google, ${data.coverage.detected_matched_to_osm_pct}% with OSM`);
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Comparison failed', 'error');
+    } finally {
+      setLoadingRefBuildings(false);
+    }
+  };
+
+  // ── Toggle Google buildings layer ──
+  const toggleGoogleBuildings = (checked) => {
+    setShowGoogleBuildings(checked);
+    if (checked && !googleBuildingsFC) {
+      loadGoogleBuildings();
+    }
+  };
+
+  // ── Toggle OSM buildings layer ──
+  const toggleOSMBuildings = (checked) => {
+    setShowOSMBuildings(checked);
+    if (checked && !osmBuildingsFC) {
+      loadOSMBuildings();
+    }
+  };
+
   // ── Run environmental hazard detection via EE ──
   const runHazardDetection = async () => {
     if (!mapBounds) { showToast('Map not loaded yet', 'error'); return; }
@@ -1066,6 +1148,10 @@ export default function PlanningDashboard() {
     flood_prone: { color: '#3b82f6', fillColor: '#3b82f6' },
     illegal_mining: { color: '#a855f7', fillColor: '#a855f7' },
     open_dump: { color: '#ef4444', fillColor: '#ef4444' },
+    deforestation: { color: '#84cc16', fillColor: '#84cc16' },
+    air_quality: { color: '#f97316', fillColor: '#f97316' },
+    urban_heat: { color: '#dc2626', fillColor: '#dc2626' },
+    wetland_loss: { color: '#0ea5e9', fillColor: '#0ea5e9' },
   };
   const severityOpacity = { low: 0.2, moderate: 0.35, high: 0.5, critical: 0.6 };
   const hazardStyle = (feature) => {
@@ -1175,6 +1261,15 @@ export default function PlanningDashboard() {
               <Checkbox type="checkbox" checked={showHazards} onChange={(e) => setShowHazards(e.target.checked)} />
               <AlertTriangle size={14} color="#ef4444" /> Env. Hazards ({hazardsFC?.features?.length || 0})
             </LayerToggle>
+            <LayerToggle>
+              <Checkbox type="checkbox" checked={showGoogleBuildings} onChange={(e) => toggleGoogleBuildings(e.target.checked)} disabled={loadingRefBuildings} />
+              <Building2 size={14} color="#22d3ee" /> Google Buildings ({googleBuildingsFC?.features?.length || 0})
+              {loadingRefBuildings && <Loader size={10} className="animate-spin" style={{ marginLeft: 4 }} />}
+            </LayerToggle>
+            <LayerToggle>
+              <Checkbox type="checkbox" checked={showOSMBuildings} onChange={(e) => toggleOSMBuildings(e.target.checked)} disabled={loadingRefBuildings} />
+              <Building2 size={14} color="#a3e635" /> OSM Buildings ({osmBuildingsFC?.features?.length || 0})
+            </LayerToggle>
           </SidebarSection>
 
           {/* ── Environmental Hazard Stats ── */}
@@ -1228,6 +1323,20 @@ export default function PlanningDashboard() {
                 <StatLabel>Investigating</StatLabel>
               </StatCard>
             </StatsGrid>
+            {/* Height + comparison summary */}
+            {buildingList.some(b => b.properties.estimated_height_m != null) && (
+              <div style={{ fontSize: '0.7rem', color: '#5ce1ff', marginTop: 8, padding: '6px 8px', background: 'rgba(92,225,255,0.08)', borderRadius: 6 }}>
+                {buildingList.filter(b => b.properties.estimated_height_m != null).length} buildings with height data |
+                Tallest: {Math.max(...buildingList.filter(b => b.properties.estimated_height_m != null).map(b => b.properties.estimated_height_m))}m |
+                Avg floors: {(buildingList.filter(b => b.properties.estimated_floors != null).reduce((s, b) => s + b.properties.estimated_floors, 0) / Math.max(1, buildingList.filter(b => b.properties.estimated_floors != null).length)).toFixed(1)}
+              </div>
+            )}
+            {buildingList.some(b => b.properties.metadata?.nearby_comparison?.size_category && b.properties.metadata.nearby_comparison.size_category !== 'typical' && b.properties.metadata.nearby_comparison.size_category !== 'unknown') && (
+              <div style={{ fontSize: '0.7rem', color: '#84cc16', marginTop: 4, padding: '6px 8px', background: 'rgba(132,204,22,0.08)', borderRadius: 6 }}>
+                {buildingList.filter(b => b.properties.metadata?.nearby_comparison?.size_category === 'unusually_large').length} unusually large |
+                {buildingList.filter(b => b.properties.metadata?.nearby_comparison?.size_category === 'unusually_small').length} unusually small
+              </div>
+            )}
           </SidebarSection>
 
           <SidebarSection>
@@ -1262,12 +1371,18 @@ export default function PlanningDashboard() {
                   </BuildingName>
                   <BuildingMeta>
                     <span><Ruler size={11} /> {Math.round(props.area_sqm)}m²</span>
+                    {props.estimated_height_m != null && (
+                      <span style={{ color: '#5ce1ff' }}>H: {props.estimated_height_m}m{props.estimated_floors ? ` (~${props.estimated_floors}f)` : ''}</span>
+                    )}
                     {props.parcel_name && <span>{props.parcel_name}</span>}
                   </BuildingMeta>
                   <div style={{ marginTop: 4, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                     <StatusBadge $bg={badge.bg} $color={badge.color}>{props.status?.replace(/_/g, ' ')}</StatusBadge>
                     {props.in_protected_area && (
                       <StatusBadge $bg="rgba(239,68,68,0.15)" $color="#f87171"><AlertTriangle size={9} /> Protected</StatusBadge>
+                    )}
+                    {props.metadata?.nearby_comparison && props.metadata.nearby_comparison.size_category && props.metadata.nearby_comparison.size_category !== 'typical' && props.metadata.nearby_comparison.size_category !== 'unknown' && (
+                      <StatusBadge $bg="rgba(132,204,22,0.15)" $color="#84cc16">{props.metadata.nearby_comparison.size_category.replace(/_/g, ' ')}</StatusBadge>
                     )}
                     {props.metadata && Object.keys(props.metadata).length > 0 && (
                       <StatusBadge $bg="rgba(92,225,255,0.15)" $color="#5ce1ff">{Object.keys(props.metadata).length} meta</StatusBadge>
@@ -1346,18 +1461,56 @@ export default function PlanningDashboard() {
                 />
               )}
 
-              {/* Buildings */}
+              {/* Buildings (detected via Sentinel-2) */}
               {showBuildings && buildingsFC && (
                 <GeoJSON data={buildingsFC} style={buildingStyle}
                   onEachFeature={(feature, layer) => {
                     if (feature.properties) {
                       const p = feature.properties;
-                      layer.bindPopup(`<b>Building</b><br/>Status: ${p.status?.replace(/_/g, ' ')}<br/>Area: ${Math.round(p.area_sqm)} m²<br/>
+                      layer.bindPopup(`<b>Detected Building</b><br/>Status: ${p.status?.replace(/_/g, ' ')}<br/>Area: ${Math.round(p.area_sqm)} m²<br/>
+                        ${p.estimated_height_m ? 'Height: ~' + p.estimated_height_m + 'm (' + (p.estimated_floors || '?') + ' floors)<br/>' : ''}
                         ${p.centroid_lat ? 'Centroid: ' + p.centroid_lat.toFixed(4) + ', ' + p.centroid_lng.toFixed(4) + '<br/>' : ''}
                         ${p.parcel_name ? 'Parcel: ' + p.parcel_name + '<br/>' : ''}
                         ${p.in_protected_area ? '<b style="color:red">In protected area!</b><br/>' : ''}
-                        ${p.metadata && Object.keys(p.metadata).length > 0 ? '<b>Metadata:</b><br/>' + Object.entries(p.metadata).map(([k,v]) => k + ': ' + v).join('<br/>') : ''}`);
+                        ${p.metadata && Object.keys(p.metadata).length > 0 ? '<b>Metadata:</b><br/>' + Object.entries(p.metadata).map(([k,v]) => k + ': ' + (typeof v === 'object' ? JSON.stringify(v).substring(0, 80) : v)).join('<br/>') : ''}`);
                       layer.on('click', () => onBuildingClick(feature));
+                    }
+                  }}
+                />
+              )}
+
+              {/* Google Open Buildings (reference layer) */}
+              {showGoogleBuildings && googleBuildingsFC && googleBuildingsFC.features && (
+                <GeoJSON data={googleBuildingsFC}
+                  style={{ color: '#22d3ee', fillColor: '#22d3ee', fillOpacity: 0.15, weight: 1.5 }}
+                  onEachFeature={(feature, layer) => {
+                    if (feature.properties) {
+                      const p = feature.properties;
+                      layer.bindPopup(`<b style="color:#22d3ee">Google Open Building</b><br/>
+                        Area: ${p.area_sqm ? Math.round(p.area_sqm) + ' m²' : '—'}<br/>
+                        Confidence: ${p.confidence ? (p.confidence * 100).toFixed(0) + '%' : '—'}<br/>
+                        ${p.centroid_lat ? 'Centroid: ' + p.centroid_lat.toFixed(4) + ', ' + p.centroid_lng.toFixed(4) : ''}<br/>
+                        <small style="color:#888">Source: Google Research Open Buildings</small>`);
+                    }
+                  }}
+                />
+              )}
+
+              {/* OSM Buildings (reference layer) */}
+              {showOSMBuildings && osmBuildingsFC && osmBuildingsFC.features && (
+                <GeoJSON data={osmBuildingsFC}
+                  style={{ color: '#a3e635', fillColor: '#a3e635', fillOpacity: 0.15, weight: 1.5 }}
+                  onEachFeature={(feature, layer) => {
+                    if (feature.properties) {
+                      const p = feature.properties;
+                      layer.bindPopup(`<b style="color:#a3e635">OSM Building</b><br/>
+                        ${p.name ? 'Name: ' + p.name + '<br/>' : ''}
+                        Type: ${p.building || 'yes'}<br/>
+                        ${p.building_levels ? 'Floors: ' + p.building_levels + '<br/>' : ''}
+                        ${p.building_height ? 'Height: ' + p.building_height + '<br/>' : ''}
+                        Area: ${p.area_sqm ? Math.round(p.area_sqm) + ' m²' : '—'}<br/>
+                        ${p.centroid_lat ? 'Centroid: ' + p.centroid_lat.toFixed(4) + ', ' + p.centroid_lng.toFixed(4) : ''}<br/>
+                        <small style="color:#888">Source: OpenStreetMap contributors</small>`);
                     }
                   }}
                 />
@@ -1369,7 +1522,7 @@ export default function PlanningDashboard() {
                   onEachFeature={(feature, layer) => {
                     if (feature.properties) {
                       const p = feature.properties;
-                      const typeLabels = { water_pollution: 'Water Pollution', flood_prone: 'Flood-Prone Area', illegal_mining: 'Illegal Mining', open_dump: 'Open Dump' };
+                      const typeLabels = { water_pollution: 'Water Pollution', flood_prone: 'Flood-Prone Area', illegal_mining: 'Illegal Mining', open_dump: 'Open Dump', deforestation: 'Deforestation', air_quality: 'Air Quality (NO2)', urban_heat: 'Urban Heat Island', wetland_loss: 'Wetland Degradation' };
                       const sevColors = { low: '#fbbf24', moderate: '#f97316', high: '#ef4444', critical: '#991b1b' };
                       const label = typeLabels[p.hazard_type] || p.hazard_type;
                       const sevColor = sevColors[p.severity] || '#fbbf24';
@@ -1433,6 +1586,11 @@ export default function PlanningDashboard() {
               <MapButton onClick={() => setShowHazardPanel(!showHazardPanel)}
                 style={{ borderColor: 'rgba(168,85,247,0.3)', color: '#c084fc' }}>
                 <Search size={16} /> Hazard Query
+              </MapButton>
+              <MapButton onClick={runBuildingComparison} disabled={loadingRefBuildings}
+                style={{ borderColor: 'rgba(34,211,238,0.4)', color: '#22d3ee' }}>
+                {loadingRefBuildings ? <Loader size={16} className="animate-spin" /> : <Layers size={16} />}
+                {loadingRefBuildings ? 'Comparing...' : 'Compare Sources'}
               </MapButton>
               <MapButton onClick={loadAll}><RefreshCw size={16} /> Refresh Data</MapButton>
               <MapButton onClick={exportKML}><Download size={16} /> Export KML</MapButton>
@@ -1640,6 +1798,119 @@ export default function PlanningDashboard() {
             </FloatingPanel>
 
             {/* ── Environmental Hazard Panel ── */}
+            {/* ── Building Source Comparison Panel ── */}
+            <FloatingPanel $show={!!refComparison}>
+              <PanelTitle>
+                <Layers size={18} color="#22d3ee" /> Building Source Comparison
+                <button onClick={() => setRefComparison(null)}
+                  style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#aab7d4', cursor: 'pointer' }}>
+                  <X size={16} />
+                </button>
+              </PanelTitle>
+
+              {refComparison && (
+                <>
+                  {/* Summary counts */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
+                    <div style={{ padding: 10, background: 'rgba(251,191,36,0.1)', borderRadius: 8, textAlign: 'center' }}>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#fbbf24' }}>{refComparison.summary.detected.count}</div>
+                      <div style={{ fontSize: '0.7rem', color: '#aab7d4' }}>Detected (S2)</div>
+                    </div>
+                    <div style={{ padding: 10, background: 'rgba(34,211,238,0.1)', borderRadius: 8, textAlign: 'center' }}>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#22d3ee' }}>{refComparison.summary.google.count}</div>
+                      <div style={{ fontSize: '0.7rem', color: '#aab7d4' }}>Google</div>
+                    </div>
+                    <div style={{ padding: 10, background: 'rgba(163,230,53,0.1)', borderRadius: 8, textAlign: 'center' }}>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#a3e635' }}>{refComparison.summary.osm.count}</div>
+                      <div style={{ fontSize: '0.7rem', color: '#aab7d4' }}>OSM</div>
+                    </div>
+                  </div>
+
+                  {/* Coverage analysis */}
+                  <div style={{ padding: 12, background: 'rgba(8,15,36,0.4)', borderRadius: 8, marginBottom: 12 }}>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: 8, color: '#5ce1ff' }}>Coverage Analysis</div>
+                    <div style={{ fontSize: '0.75rem', color: '#aab7d4', lineHeight: 1.8 }}>
+                      <div>Detected → Google match: <strong style={{ color: refComparison.coverage.detected_matched_to_google_pct > 70 ? '#4ade80' : refComparison.coverage.detected_matched_to_google_pct > 40 ? '#fbbf24' : '#f87171' }}>{refComparison.coverage.detected_matched_to_google_pct}%</strong> ({refComparison.coverage.detected_matched_to_google} buildings within 15m)</div>
+                      <div>Detected → OSM match: <strong style={{ color: refComparison.coverage.detected_matched_to_osm_pct > 70 ? '#4ade80' : refComparison.coverage.detected_matched_to_osm_pct > 40 ? '#fbbf24' : '#f87171' }}>{refComparison.coverage.detected_matched_to_osm_pct}%</strong> ({refComparison.coverage.detected_matched_to_osm} buildings within 15m)</div>
+                      <div>Google only (missed by detection): <strong style={{ color: '#fbbf24' }}>{refComparison.coverage.google_only}</strong></div>
+                      <div>OSM only (missed by detection): <strong style={{ color: '#fbbf24' }}>{refComparison.coverage.osm_only}</strong></div>
+                      <div>Detected only (not in Google/OSM): <strong style={{ color: '#22d3ee' }}>{refComparison.coverage.detected_only}</strong></div>
+                    </div>
+                  </div>
+
+                  {/* Accuracy assessment */}
+                  {refComparison.accuracy_assessment.detection_precision != null && (
+                    <div style={{ padding: 12, borderRadius: 8, marginBottom: 12,
+                      background: refComparison.accuracy_assessment.detection_precision > 70 ? 'rgba(74,222,128,0.1)' :
+                                 refComparison.accuracy_assessment.detection_precision > 40 ? 'rgba(251,191,36,0.1)' : 'rgba(239,68,68,0.1)',
+                      border: `1px solid ${refComparison.accuracy_assessment.detection_precision > 70 ? 'rgba(74,222,128,0.3)' :
+                                 refComparison.accuracy_assessment.detection_precision > 40 ? 'rgba(251,191,36,0.3)' : 'rgba(239,68,68,0.3)'}` }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: 4,
+                        color: refComparison.accuracy_assessment.detection_precision > 70 ? '#4ade80' :
+                               refComparison.accuracy_assessment.detection_precision > 40 ? '#fbbf24' : '#f87171' }}>
+                        Detection Precision: {refComparison.accuracy_assessment.detection_precision}%
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: '#aab7d4' }}>{refComparison.accuracy_assessment.note}</div>
+                    </div>
+                  )}
+
+                  {/* Area statistics */}
+                  <div style={{ fontSize: '0.75rem', color: '#aab7d4' }}>
+                    <div style={{ fontWeight: 600, marginBottom: 6 }}>Area Statistics (m²)</div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.7rem' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                          <th style={{ textAlign: 'left', padding: '4px 0' }}>Source</th>
+                          <th style={{ textAlign: 'right' }}>Mean</th>
+                          <th style={{ textAlign: 'right' }}>Median</th>
+                          <th style={{ textAlign: 'right' }}>Min</th>
+                          <th style={{ textAlign: 'right' }}>Max</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr><td style={{ color: '#fbbf24' }}>Detected</td><td style={{ textAlign: 'right' }}>{refComparison.summary.detected.mean}</td><td style={{ textAlign: 'right' }}>{refComparison.summary.detected.median}</td><td style={{ textAlign: 'right' }}>{refComparison.summary.detected.min}</td><td style={{ textAlign: 'right' }}>{refComparison.summary.detected.max}</td></tr>
+                        <tr><td style={{ color: '#22d3ee' }}>Google</td><td style={{ textAlign: 'right' }}>{refComparison.summary.google.mean}</td><td style={{ textAlign: 'right' }}>{refComparison.summary.google.median}</td><td style={{ textAlign: 'right' }}>{refComparison.summary.google.min}</td><td style={{ textAlign: 'right' }}>{refComparison.summary.google.max}</td></tr>
+                        <tr><td style={{ color: '#a3e635' }}>OSM</td><td style={{ textAlign: 'right' }}>{refComparison.summary.osm.mean}</td><td style={{ textAlign: 'right' }}>{refComparison.summary.osm.median}</td><td style={{ textAlign: 'right' }}>{refComparison.summary.osm.min}</td><td style={{ textAlign: 'right' }}>{refComparison.summary.osm.max}</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Sample matches */}
+                  {refComparison.matches && refComparison.matches.length > 0 && (
+                    <div style={{ marginTop: 12, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 12 }}>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: 8 }}>Sample Matches (top {Math.min(20, refComparison.matches.length)})</div>
+                      <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+                        {refComparison.matches.slice(0, 20).map((m, i) => (
+                          <div key={i} style={{ padding: 6, marginBottom: 4, background: 'rgba(8,15,36,0.4)', borderRadius: 6, fontSize: '0.7rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ color: '#fbbf24' }}>Detected: {Math.round(m.detected_area)}m²</span>
+                              {m.google_match && (
+                                <span style={{ color: m.google_match.distance_m < 15 ? '#4ade80' : '#aab7d4' }}>
+                                  Google: {m.google_match.distance_m}m {m.google_match.distance_m < 15 ? '✓' : '✗'}
+                                </span>
+                              )}
+                              {m.osm_match && (
+                                <span style={{ color: m.osm_match.distance_m < 15 ? '#4ade80' : '#aab7d4' }}>
+                                  OSM: {m.osm_match.distance_m}m {m.osm_match.distance_m < 15 ? '✓' : '✗'}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ marginTop: 12 }}>
+                    <ActionBtn onClick={() => { if (!googleBuildingsFC) loadGoogleBuildings(); if (!osmBuildingsFC) loadOSMBuildings(); }}>
+                      <Building2 size={12} /> Load Both Reference Layers
+                    </ActionBtn>
+                  </div>
+                </>
+              )}
+            </FloatingPanel>
+
+            {/* ── Hazard Panel ── */}
             <FloatingPanel $show={showHazardPanel}>
               <PanelTitle>
                 <AlertTriangle size={18} color="#c084fc" /> Environmental Hazards
@@ -1654,8 +1925,8 @@ export default function PlanningDashboard() {
                 <div style={{ textAlign: 'center', padding: 20 }}>
                   <Loader size={28} className="animate-spin" style={{ margin: '0 auto 12px' }} />
                   <div style={{ fontSize: '0.85rem', color: '#aab7d4' }}>
-                    Running Earth Engine spectral analysis...
-                    <div style={{ fontSize: '0.75rem', marginTop: 4 }}>NDWI, MNDWI, NDBI, BSI, NDVI, Iron Oxide, Turbidity</div>
+                    Running Earth Engine multi-satellite analysis...
+                    <div style={{ fontSize: '0.75rem', marginTop: 4 }}>Sentinel-2: NDWI, MNDWI, NDBI, BSI, NDVI | Sentinel-5P: NO2 | Landsat 9: LST</div>
                   </div>
                 </div>
               )}
@@ -1711,6 +1982,10 @@ export default function PlanningDashboard() {
                       <option value="flood_prone">Flood-Prone Area</option>
                       <option value="illegal_mining">Illegal Mining</option>
                       <option value="open_dump">Open Dump</option>
+                      <option value="deforestation">Deforestation</option>
+                      <option value="air_quality">Air Quality (NO2)</option>
+                      <option value="urban_heat">Urban Heat Island</option>
+                      <option value="wetland_loss">Wetland Degradation</option>
                     </Select>
                   </FormGroup>
                   <FormGroup>
@@ -1774,7 +2049,7 @@ export default function PlanningDashboard() {
                   <div style={{ maxHeight: 200, overflowY: 'auto' }}>
                     {hazardsFC.features.map((f, i) => {
                       const p = f.properties;
-                      const typeLabels = { water_pollution: 'Water Pollution', flood_prone: 'Flood', illegal_mining: 'Mining', open_dump: 'Dump' };
+                      const typeLabels = { water_pollution: 'Water Pollution', flood_prone: 'Flood', illegal_mining: 'Mining', open_dump: 'Dump', deforestation: 'Deforestation', air_quality: 'Air Quality', urban_heat: 'Heat Island', wetland_loss: 'Wetland Loss' };
                       const sevColors = { low: '#fbbf24', moderate: '#f97316', high: '#ef4444', critical: '#991b1b' };
                       return (
                         <div key={i} style={{ padding: 8, marginBottom: 4, background: 'rgba(8,15,36,0.4)', borderRadius: 6, fontSize: '0.8rem' }}>
@@ -1799,7 +2074,7 @@ export default function PlanningDashboard() {
                   <AlertTriangle size={32} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
                   Click "Detect Hazards (EE)" to scan for environmental hazards, or use the manual query form below to search the database.
                   <div style={{ fontSize: '0.75rem', marginTop: 8, color: '#6b7280' }}>
-                    Detects: water pollution, flood-prone areas, illegal mining, open dumps via Sentinel-2 spectral analysis.
+                    Detects: water pollution, flood-prone areas, illegal mining, open dumps, deforestation, air quality (NO2), urban heat islands, and wetland degradation via Sentinel-2/5P + Landsat 9 spectral analysis.
                   </div>
                 </div>
               )}
@@ -1818,6 +2093,9 @@ export default function PlanningDashboard() {
               {buildingsFC?.features?.find(f => f.properties.id === selectedBuilding) && (() => {
                 const b = buildingsFC.features.find(f => f.properties.id === selectedBuilding);
                 const p = b.properties;
+                const meta = p.metadata || {};
+                const comparison = meta.nearby_comparison || null;
+                const heightInfo = meta.height_estimation || {};
                 return (
                   <>
                     <div style={{ fontSize: '0.8rem', color: '#aab7d4', marginBottom: 12 }}>
@@ -1825,6 +2103,66 @@ export default function PlanningDashboard() {
                       {p.centroid_lat && ` | Centroid: ${p.centroid_lat.toFixed(4)}, ${p.centroid_lng.toFixed(4)}`}
                       {p.parcel_name && ` | Parcel: ${p.parcel_name}`}
                     </div>
+
+                    {/* ── Building Height Estimation ── */}
+                    {(p.estimated_height_m != null || heightInfo.height_m != null) && (
+                      <div style={{ padding: 10, background: 'rgba(92,225,255,0.08)', borderRadius: 8, marginBottom: 12, border: '1px solid rgba(92,225,255,0.2)' }}>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#5ce1ff', marginBottom: 6 }}>
+                          Height Estimation
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#aab7d4', display: 'flex', flexWrap: 'wrap', gap: '4px 12px' }}>
+                          <span>Height: <strong style={{ color: '#fff' }}>{p.estimated_height_m || heightInfo.height_m}m</strong></span>
+                          {(p.estimated_floors || heightInfo.estimated_floors) && (
+                            <span>Floors: <strong style={{ color: '#fff' }}>~{p.estimated_floors || heightInfo.estimated_floors}</strong></span>
+                          )}
+                          <span>Method: <strong style={{ color: '#fff' }}>{(p.height_method || heightInfo.method || '').replace(/_/g, ' ')}</strong></span>
+                          {(p.height_confidence || heightInfo.confidence) != null && (
+                            <span>Confidence: <strong style={{ color: (p.height_confidence || heightInfo.confidence) > 0.5 ? '#4ade80' : '#fbbf24' }}>{Math.round((p.height_confidence || heightInfo.confidence) * 100)}%</strong></span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ── Size Comparison to Nearby Buildings ── */}
+                    {comparison && comparison.nearby_count > 0 && (
+                      <div style={{ padding: 10, background: 'rgba(132,204,22,0.08)', borderRadius: 8, marginBottom: 12, border: '1px solid rgba(132,204,22,0.2)' }}>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#84cc16', marginBottom: 6 }}>
+                          Size Comparison ({comparison.nearby_count} nearby)
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#aab7d4', display: 'flex', flexWrap: 'wrap', gap: '4px 12px' }}>
+                          {comparison.median_area != null && <span>Median nearby: <strong style={{ color: '#fff' }}>{comparison.median_area} m²</strong></span>}
+                          {comparison.mean_area != null && <span>Mean: <strong style={{ color: '#fff' }}>{comparison.mean_area} m²</strong></span>}
+                          {comparison.percentile_rank != null && <span>Percentile: <strong style={{ color: '#fff' }}>{comparison.percentile_rank}%</strong></span>}
+                        </div>
+                        <div style={{ marginTop: 6 }}>
+                          <span style={{
+                            fontSize: '0.7rem', padding: '2px 8px', borderRadius: 4,
+                            background: comparison.size_category === 'unusually_large' ? 'rgba(239,68,68,0.2)' :
+                                        comparison.size_category === 'larger_than_average' ? 'rgba(251,191,36,0.2)' :
+                                        comparison.size_category === 'unusually_small' ? 'rgba(59,130,246,0.2)' :
+                                        comparison.size_category === 'smaller_than_average' ? 'rgba(6,182,212,0.2)' :
+                                        'rgba(74,222,128,0.2)',
+                            color: comparison.size_category === 'unusually_large' ? '#f87171' :
+                                   comparison.size_category === 'larger_than_average' ? '#fbbf24' :
+                                   comparison.size_category === 'unusually_small' ? '#60a5fa' :
+                                   comparison.size_category === 'smaller_than_average' ? '#22d3ee' : '#4ade80',
+                            textTransform: 'capitalize',
+                          }}>
+                            {comparison.size_category.replace(/_/g, ' ')}
+                          </span>
+                        </div>
+                        {comparison.height_comparison && (
+                          <div style={{ fontSize: '0.7rem', color: '#6b7280', marginTop: 4 }}>
+                            Nearby median height: {comparison.height_comparison.median_height_m}m ({comparison.height_comparison.nearby_with_height_data} buildings with height data)
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {comparison && comparison.nearby_count === 0 && (
+                      <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 12, padding: 8, background: 'rgba(255,255,255,0.03)', borderRadius: 6 }}>
+                        First building in this area — no nearby buildings for comparison.
+                      </div>
+                    )}
 
                     <FormGroup>
                       <Label>Status</Label>

@@ -100,6 +100,8 @@ export default defineConfig({
     port: 5173,
   },
   build: {
+    target: 'esnext',
+    minify: false,
     rollupOptions: {
       output: {
         manualChunks(id) {

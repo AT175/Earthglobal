@@ -74,6 +74,8 @@ export const commonResources = {
         parcels: 'Parcels',
         validation: 'Validation',
         sell: 'Sell Land',
+        pricing: 'Subscribe',
+        logout: 'Logout',
       },
       tagline: 'See it. Check it. Secure it.',
       realtime: {
@@ -110,6 +112,8 @@ export const commonResources = {
         parcels: 'Parcelas',
         validation: 'Validación',
         sell: 'Vender terreno',
+        pricing: 'Suscribirse',
+        logout: 'Cerrar sesión',
       },
       tagline: 'Obsérvalo. Compruébalo. Protégelo.',
       realtime: {

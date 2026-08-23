@@ -6,7 +6,7 @@ import {
   Building2, FileCheck, FileX, AlertTriangle, DollarSign, Shield,
   Trees, MapPin, LogOut, RefreshCw, TrendingUp, Home, Landmark,
   CheckCircle2, XCircle, Clock, ArrowRight, Search,
-  Users, Plus, Trash2, X, Save, Mail, Phone as PhoneIcon, UserCog, Map, FileText,
+  Users, Plus, Trash2, X, Save, Mail, Phone as PhoneIcon, UserCog, Map, FileText, User,
 } from 'lucide-react';
 import api from '../../services/api';
 
@@ -31,6 +31,8 @@ const TopBar = styled.header`
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: ${({ theme }) => theme.spacing[3]};
+  @media (max-width: 768px) { padding: 12px 16px; flex-wrap: wrap; }
 `;
 
 const Logo = styled.div`
@@ -56,6 +58,10 @@ const UserInfo = styled.div`
   display: flex;
   align-items: center;
   gap: ${({ theme }) => theme.spacing[4]};
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  @media (max-width: 768px) { gap: 6px; }
+  @media (max-width: 640px) { width: 100%; justify-content: flex-start; }
 `;
 
 const UserBadge = styled.div`
@@ -66,6 +72,7 @@ const UserBadge = styled.div`
 
   span:first-child { font-weight: 600; }
   span:last-child { color: ${({ theme }) => theme.colors.textMuted}; font-size: 0.75rem; }
+  @media (max-width: 640px) { display: none; }
 `;
 
 const LogoutBtn = styled.button`
@@ -80,14 +87,20 @@ const LogoutBtn = styled.button`
   cursor: pointer;
   font-size: ${({ theme }) => theme.fontSizes.sm};
   transition: all 0.2s;
+  white-space: nowrap;
 
   &:hover { color: ${({ theme }) => theme.colors.error}; border-color: ${({ theme }) => theme.colors.error}40; }
+  @media (max-width: 640px) {
+    padding: 8px; font-size: 0;
+    svg { width: 16px; height: 16px; }
+  }
 `;
 
 const Container = styled.div`
   max-width: 1400px;
   margin: 0 auto;
   padding: ${({ theme }) => theme.spacing[6]};
+  @media (max-width: 768px) { padding: ${({ theme }) => theme.spacing[4]}; }
 `;
 
 const Tabs = styled.div`
@@ -96,6 +109,10 @@ const Tabs = styled.div`
   margin-bottom: ${({ theme }) => theme.spacing[6]};
   border-bottom: 1px solid ${({ theme }) => theme.colors.borderDark};
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  &::-webkit-scrollbar { height: 4px; }
+  &::-webkit-scrollbar-thumb { background: rgba(92,225,255,0.3); border-radius: 4px; }
 `;
 
 const Tab = styled.button`
@@ -185,6 +202,7 @@ const Panel = styled.div`
   border: 1px solid ${({ theme }) => theme.colors.borderDark};
   border-radius: ${({ theme }) => theme.radii.xl};
   overflow: hidden;
+  & > table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 `;
 
 const PanelHeader = styled.div`
@@ -193,6 +211,7 @@ const PanelHeader = styled.div`
   justify-content: space-between;
   padding: ${({ theme }) => `${theme.spacing[4]} ${theme.spacing[5]}`};
   border-bottom: 1px solid ${({ theme }) => theme.colors.borderDark};
+  @media (max-width: 640px) { flex-direction: column; align-items: flex-start; gap: 8px; }
 `;
 
 const PanelTitle = styled.h3`
@@ -206,6 +225,7 @@ const PanelTitle = styled.h3`
 const FilterBar = styled.div`
   display: flex;
   gap: ${({ theme }) => theme.spacing[2]};
+  flex-wrap: wrap;
 `;
 
 const FilterBtn = styled.button`
@@ -242,6 +262,7 @@ const AddBtn = styled.button`
 const Table = styled.table`
   width: 100%;
   border-collapse: collapse;
+  min-width: 600px;
 
   th {
     text-align: left;
@@ -497,6 +518,9 @@ export default function AssemblyDashboard() {
               <Landmark size={16} /> Land Sale Approvals
             </LogoutBtn>
           )}
+          <LogoutBtn onClick={() => navigate('/assembly/profile')} style={{ borderColor: 'rgba(22,119,255,0.3)', color: '#3ba7ff' }}>
+            <User size={16} /> My Profile
+          </LogoutBtn>
           <LogoutBtn onClick={handleLogout}>
             <LogOut size={16} /> Logout
           </LogoutBtn>
@@ -841,7 +865,7 @@ export default function AssemblyDashboard() {
 
             {showUserForm && (
               <div style={{ padding: 24, background: 'rgba(13,23,51,0.5)', borderBottom: '1px solid rgba(92,225,255,0.1)' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 16 }}>
                   <div>
                     <label style={{ fontSize: '0.85rem', color: '#aab7d4', display: 'block', marginBottom: 6 }}>Full Name *</label>
                     <input
@@ -920,7 +944,7 @@ export default function AssemblyDashboard() {
             ) : (
               <div style={{ padding: 16 }}>
                 {orgUsers.map((u) => (
-                  <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 16, borderRadius: 12, background: 'rgba(13,23,51,0.5)', marginBottom: 8, border: '1px solid rgba(92,225,255,0.08)' }}>
+                  <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 16, borderRadius: 12, background: 'rgba(13,23,51,0.5)', marginBottom: 8, border: '1px solid rgba(92,225,255,0.08)', flexWrap: 'wrap' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: '50%', background: 'rgba(168,85,247,0.15)', color: '#c084fc', fontWeight: 600, fontSize: '0.8rem', flexShrink: 0 }}>
                       {initials(u.name)}
                     </div>
@@ -929,7 +953,7 @@ export default function AssemblyDashboard() {
                         {u.name}
                         {u.id === user?.id && <span style={{ color: '#5ce1ff', fontSize: '0.75rem', marginLeft: 8 }}>(You)</span>}
                       </div>
-                      <div style={{ fontSize: '0.8rem', color: '#aab7d4', display: 'flex', gap: 12, marginTop: 2 }}>
+                      <div style={{ fontSize: '0.8rem', color: '#aab7d4', display: 'flex', gap: 12, marginTop: 2, flexWrap: 'wrap' }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Mail size={11} /> {u.email}</span>
                         {u.phone && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><PhoneIcon size={11} /> {u.phone}</span>}
                       </div>

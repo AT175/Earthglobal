@@ -71,6 +71,13 @@ CREATE TABLE IF NOT EXISTS admins (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Admin sub-role: 'super_admin' (full platform access) or 'finance_officer'
+-- (manages subscriptions, fees, payments and tenant billing configuration).
+-- Mirrors the assembly_users.role sub-role pattern.
+DO $$ BEGIN
+    ALTER TABLE admins ADD COLUMN IF NOT EXISTS role VARCHAR(30) NOT NULL DEFAULT 'super_admin';
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
 -- =========================================================
 -- PARCELS
 -- =========================================================
@@ -116,7 +123,20 @@ CREATE INDEX IF NOT EXISTS idx_survey_sessions_parcel ON survey_sessions (parcel
 -- PLANS & SUBSCRIPTIONS
 -- =========================================================
 DO $$ BEGIN
-    CREATE TYPE plan_period AS ENUM ('week', 'month', 'quarter');
+    CREATE TYPE plan_period AS ENUM ('week', 'month', 'quarter', 'one_time');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN ALTER TYPE plan_period ADD VALUE IF NOT EXISTS 'one_time'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- plan_category: 'search' = one-off land search batches (quick/validated/taboo)
+--                'monitoring' = recurring land monitoring subscriptions
+DO $$ BEGIN
+    CREATE TYPE plan_category AS ENUM ('search', 'monitoring');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- billing_cycle: for monitoring plans — monthly, quarterly, or yearly
+DO $$ BEGIN
+    CREATE TYPE billing_cycle AS ENUM ('monthly', 'quarterly', 'yearly');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 CREATE TABLE IF NOT EXISTS plans (
@@ -125,11 +145,39 @@ CREATE TABLE IF NOT EXISTS plans (
     included_visits_per_period INT NOT NULL DEFAULT 0,
     period plan_period NOT NULL,
     price NUMERIC(10, 2) NOT NULL,
-    live_video_included BOOLEAN NOT NULL DEFAULT false
+    live_video_included BOOLEAN NOT NULL DEFAULT false,
+    -- ── Extended plan metadata ──
+    category plan_category NOT NULL DEFAULT 'monitoring',
+    tier VARCHAR(50) NOT NULL DEFAULT 'regular',        -- quick_search | validated_search | taboo_search | regular | executive_suite | golden_member
+    max_parcels INT NOT NULL DEFAULT 5,                  -- max parcels per subscription (5 for all tiers)
+    includes_quick_search BOOLEAN NOT NULL DEFAULT false,
+    includes_validated_search BOOLEAN NOT NULL DEFAULT false,
+    includes_field_verification BOOLEAN NOT NULL DEFAULT false,
+    -- Search-plan delivery pricing (NULL for monitoring plans)
+    min_delivery_days INT,                               -- minimum delivery days (1)
+    max_delivery_days INT,                               -- maximum delivery days (5)
+    base_price NUMERIC(12, 2),                           -- price at max delivery days
+    rush_fee_per_day NUMERIC(12, 2) DEFAULT 0,           -- extra fee per day fewer than max
+    -- Monitoring billing discounts (fractional, e.g. 0.9 = 10% off for quarterly)
+    quarterly_discount NUMERIC(3, 2) DEFAULT 0.00,
+    yearly_discount NUMERIC(3, 2) DEFAULT 0.00,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    sort_order INT NOT NULL DEFAULT 0,
+    description TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE INDEX IF NOT EXISTS idx_plans_category ON plans(category);
+CREATE INDEX IF NOT EXISTS idx_plans_tier ON plans(tier);
+CREATE INDEX IF NOT EXISTS idx_plans_active ON plans(is_active);
+
+-- Ensure one plan per category+tier (prevents duplicate seeds)
 DO $$ BEGIN
-    CREATE TYPE subscription_status AS ENUM ('active', 'past_due', 'cancelled');
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_plans_category_tier_unique ON plans(category, tier);
+EXCEPTION WHEN duplicate_table THEN NULL; END $$;
+
+DO $$ BEGIN
+    CREATE TYPE subscription_status AS ENUM ('active', 'past_due', 'cancelled', 'expired', 'trial');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 CREATE TABLE IF NOT EXISTS subscriptions (
@@ -139,10 +187,93 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     credits_remaining INT NOT NULL DEFAULT 0,
     renews_at TIMESTAMPTZ,
     status subscription_status NOT NULL DEFAULT 'active',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- ── Extended subscription metadata ──
+    billing_cycle billing_cycle,                         -- monthly | quarterly | yearly (monitoring plans)
+    delivery_days INT,                                   -- chosen delivery days (search plans)
+    price_paid NUMERIC(12, 2) DEFAULT 0,                 -- actual amount paid
+    currency VARCHAR(10) NOT NULL DEFAULT 'GHS',
+    parcels_used INT NOT NULL DEFAULT 0,                 -- how many of max_parcels are used
+    searches_used INT NOT NULL DEFAULT 0,                -- how many searches done (search plans)
+    expires_at TIMESTAMPTZ                               -- when the subscription expires
 );
 
 CREATE INDEX IF NOT EXISTS idx_subscriptions_owner ON subscriptions (owner_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions (status);
+
+-- Top-ups: additional services purchased when a subscription is exhausted
+DO $$ BEGIN
+    CREATE TYPE top_up_type AS ENUM ('extra_parcel', 'extra_search', 'field_visit', 'rush_delivery');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+    CREATE TYPE top_up_status AS ENUM ('pending', 'fulfilled', 'cancelled');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS top_ups (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    subscription_id UUID NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
+    owner_id UUID NOT NULL REFERENCES owners(id) ON DELETE CASCADE,
+    type top_up_type NOT NULL,
+    quantity INT NOT NULL DEFAULT 1,
+    amount NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    currency VARCHAR(10) NOT NULL DEFAULT 'GHS',
+    status top_up_status NOT NULL DEFAULT 'pending',
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    fulfilled_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_top_ups_subscription ON top_ups(subscription_id);
+CREATE INDEX IF NOT EXISTS idx_top_ups_owner ON top_ups(owner_id);
+CREATE INDEX IF NOT EXISTS idx_top_ups_status ON top_ups(status);
+
+-- Extend payment_purpose for top-ups and search subscriptions
+DO $$ BEGIN
+    ALTER TYPE payment_purpose ADD VALUE IF NOT EXISTS 'top_up';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+    ALTER TYPE payment_purpose ADD VALUE IF NOT EXISTS 'search';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- ── Seed default plans (idempotent — uses ON CONFLICT) ──
+-- Search plans (one-off, max 5 parcels each, delivery-day pricing)
+INSERT INTO plans (name, category, tier, period, price, included_visits_per_period, max_parcels,
+    includes_quick_search, includes_validated_search, includes_field_verification,
+    min_delivery_days, max_delivery_days, base_price, rush_fee_per_day, is_active, sort_order, description)
+VALUES
+    ('Quick Search', 'search', 'quick_search', 'week', 50.00, 0, 5,
+     true, false, false,
+     NULL, NULL, 50.00, 0, true, 1,
+     'Basic parcel detail search. Covers up to 5 parcels. Once exhausted, a new subscription is needed.'),
+    ('Validated Search', 'search', 'validated_search', 'week', 150.00, 0, 5,
+     true, true, false,
+     1, 5, 150.00, 40.00, true, 2,
+     'Quick Search + validated search from the assembly planner. Delivered in 1-5 working days. Pay more for faster delivery.'),
+    ('Taboo Search', 'search', 'taboo_search', 'week', 300.00, 0, 5,
+     true, true, true,
+     1, 5, 300.00, 80.00, true, 3,
+     'Quick Search + Validated Search + field verification. Delivered in 1-5 days. Price based on delivery speed.')
+ON CONFLICT (category, tier) DO NOTHING;
+
+-- Monitoring plans (recurring, max 5 parcels, billing cycle discounts)
+INSERT INTO plans (name, category, tier, period, price, included_visits_per_period, max_parcels,
+    includes_quick_search, includes_validated_search, includes_field_verification,
+    quarterly_discount, yearly_discount, is_active, sort_order, description)
+VALUES
+    ('Regular Monitoring', 'monitoring', 'regular', 'month', 100.00, 4, 5,
+     true, false, false,
+     0.10, 0.20, true, 4,
+     'Monitor up to 5 parcels with satellite + alert detection. Excludes field verification.'),
+    ('Executive Suite', 'monitoring', 'executive_suite', 'month', 250.00, 8, 5,
+     true, true, true,
+     0.10, 0.20, true, 5,
+     'Monitor up to 5 plots with one scheduled field visit per billing cycle. Includes validated search.'),
+    ('Golden Member', 'monitoring', 'golden_member', 'month', 500.00, 12, 5,
+     true, true, true,
+     0.15, 0.25, true, 6,
+     'Premium monitoring for up to 5 plots with regular field visits upon request. Full feature access.')
+ON CONFLICT (category, tier) DO NOTHING;
 
 -- =========================================================
 -- VISIT REQUESTS
@@ -194,8 +325,16 @@ CREATE INDEX IF NOT EXISTS idx_media_visit_request ON media (visit_request_id);
 -- ALERTS (satellite change detection)
 -- =========================================================
 DO $$ BEGIN
-    CREATE TYPE alert_type AS ENUM ('clearing', 'possible_structure', 'other');
+    CREATE TYPE alert_type AS ENUM ('clearing', 'possible_structure', 'other', 'new_building', 'building_change', 'deforestation', 'air_quality', 'urban_heat', 'wetland_loss');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Add building change detection values if the type already exists
+DO $$ BEGIN ALTER TYPE alert_type ADD VALUE IF NOT EXISTS 'new_building'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER TYPE alert_type ADD VALUE IF NOT EXISTS 'building_change'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER TYPE alert_type ADD VALUE IF NOT EXISTS 'deforestation'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER TYPE alert_type ADD VALUE IF NOT EXISTS 'air_quality'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER TYPE alert_type ADD VALUE IF NOT EXISTS 'urban_heat'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER TYPE alert_type ADD VALUE IF NOT EXISTS 'wetland_loss'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 CREATE TABLE IF NOT EXISTS alerts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -211,6 +350,11 @@ CREATE TABLE IF NOT EXISTS alerts (
 );
 
 CREATE INDEX IF NOT EXISTS idx_alerts_parcel ON alerts (parcel_id);
+
+-- Building change detection columns on alerts (FK added after building_change_detections table is created)
+DO $$ BEGIN ALTER TABLE alerts ADD COLUMN IF NOT EXISTS change_detection_id UUID; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE alerts ADD COLUMN IF NOT EXISTS building_count INTEGER; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE alerts ADD COLUMN IF NOT EXISTS builtup_area_sqm DOUBLE PRECISION; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 
 -- =========================================================
 -- PARCEL IMAGES (satellite snapshots)
@@ -232,6 +376,15 @@ CREATE INDEX IF NOT EXISTS idx_parcel_images_date ON parcel_images (captured_at 
 -- =========================================================
 DO $$ BEGIN
     CREATE TYPE payment_purpose AS ENUM ('subscription', 'one_off_visit');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Extend payment_purpose for land-sale commission payments and tenant
+-- (assembly) subscription billing, both managed by the finance officer.
+DO $$ BEGIN
+    ALTER TYPE payment_purpose ADD VALUE IF NOT EXISTS 'land_sale';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+    ALTER TYPE payment_purpose ADD VALUE IF NOT EXISTS 'tenant_billing';
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
@@ -370,6 +523,37 @@ DO $$ BEGIN
     CREATE TYPE building_status AS ENUM ('unverified', 'verified_permitted', 'verified_unpermitted', 'under_investigation', 'demolished');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+-- Building change detection runs — tracks each ML-based comparison
+CREATE TABLE IF NOT EXISTS building_change_detections (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    status VARCHAR(50) NOT NULL DEFAULT 'running',
+    period_start DATE NOT NULL,
+    period_end DATE NOT NULL,
+    baseline_start DATE NOT NULL,
+    baseline_end DATE NOT NULL,
+    bbox JSONB,
+    new_buildings_count INTEGER DEFAULT 0,
+    new_builtup_area_sqm DOUBLE PRECISION DEFAULT 0,
+    method TEXT,
+    before_tile_url TEXT,
+    after_tile_url TEXT,
+    change_tile_url TEXT,
+    error_message TEXT,
+    started_by UUID REFERENCES assembly_users(id),
+    started_at TIMESTAMPTZ DEFAULT now(),
+    completed_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_bcd_org ON building_change_detections(organization_id);
+CREATE INDEX IF NOT EXISTS idx_bcd_status ON building_change_detections(status);
+
+-- Add FK from alerts.change_detection_id to building_change_detections (now that the table exists)
+DO $$ BEGIN
+  ALTER TABLE alerts ADD CONSTRAINT fk_alerts_change_detection
+    FOREIGN KEY (change_detection_id) REFERENCES building_change_detections(id) ON DELETE SET NULL;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 CREATE TABLE IF NOT EXISTS buildings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
@@ -385,6 +569,17 @@ CREATE TABLE IF NOT EXISTS buildings (
     verified_by UUID REFERENCES assembly_users(id),
     verified_at TIMESTAMPTZ,
     notes TEXT,
+    -- Geospatial metadata (added by migrate-geospatial.js)
+    metadata JSONB DEFAULT '{}'::jsonb,
+    centroid_lat DOUBLE PRECISION,
+    centroid_lng DOUBLE PRECISION,
+    -- Change detection linkage (added by migrate-building-change-detection.js)
+    change_detection_id UUID REFERENCES building_change_detections(id) ON DELETE SET NULL,
+    -- Building height estimation (added by migrate-building-height.js)
+    estimated_height_m DOUBLE PRECISION,
+    estimated_floors INTEGER,
+    height_method VARCHAR(20),
+    height_confidence DOUBLE PRECISION,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -393,6 +588,8 @@ CREATE INDEX IF NOT EXISTS idx_buildings_parcel ON buildings (parcel_id);
 CREATE INDEX IF NOT EXISTS idx_buildings_status ON buildings (status);
 CREATE INDEX IF NOT EXISTS idx_buildings_footprint ON buildings USING GIST (footprint);
 CREATE INDEX IF NOT EXISTS idx_buildings_protected ON buildings (in_protected_area);
+CREATE INDEX IF NOT EXISTS idx_buildings_centroid ON buildings (centroid_lat, centroid_lng);
+CREATE INDEX IF NOT EXISTS idx_buildings_cd ON buildings (change_detection_id);
 
 -- =========================================================
 -- PROTECTED AREAS (zones where construction is prohibited)
@@ -743,6 +940,223 @@ CREATE TABLE IF NOT EXISTS scheme_parcels (
 CREATE INDEX IF NOT EXISTS idx_sp_scheme ON scheme_parcels(scheme_id);
 CREATE INDEX IF NOT EXISTS idx_sp_org ON scheme_parcels(organization_id);
 CREATE INDEX IF NOT EXISTS idx_sp_boundary ON scheme_parcels USING GIST (boundary);
+
+-- =========================================================
+-- FINANCE — platform fee settings, tenant billing & invoices
+-- Managed by the finance_officer admin sub-role. Covers everything
+-- money-related: land-sale commission %, per-tenant (assembly)
+-- subscription billing configuration, and invoices.
+-- =========================================================
+
+-- Singleton row holding platform-wide fee/commission defaults.
+CREATE TABLE IF NOT EXISTS platform_fee_settings (
+    id VARCHAR(20) PRIMARY KEY DEFAULT 'default',
+    land_sale_commission_percent NUMERIC(5, 2) NOT NULL DEFAULT 10.00,
+    default_currency VARCHAR(10) NOT NULL DEFAULT 'GHS',
+    late_payment_penalty_percent NUMERIC(5, 2) NOT NULL DEFAULT 0,
+    updated_by UUID REFERENCES admins(id) ON DELETE SET NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+INSERT INTO platform_fee_settings (id) VALUES ('default') ON CONFLICT (id) DO NOTHING;
+
+-- Per-tenant (organization) billing configuration — one row per assembly.
+CREATE TABLE IF NOT EXISTS tenant_billing (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL UNIQUE REFERENCES organizations(id) ON DELETE CASCADE,
+    billing_plan VARCHAR(50) NOT NULL DEFAULT 'standard',
+    monthly_fee NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    currency VARCHAR(10) NOT NULL DEFAULT 'GHS',
+    -- NULL = use platform_fee_settings.land_sale_commission_percent
+    commission_override_percent NUMERIC(5, 2),
+    billing_cycle VARCHAR(20) NOT NULL DEFAULT 'monthly', -- monthly | quarterly | yearly
+    status VARCHAR(20) NOT NULL DEFAULT 'active',         -- active | trial | suspended | cancelled
+    trial_ends_at TIMESTAMPTZ,
+    next_invoice_date DATE,
+    notes TEXT,
+    updated_by UUID REFERENCES admins(id) ON DELETE SET NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_tenant_billing_org ON tenant_billing(organization_id);
+CREATE INDEX IF NOT EXISTS idx_tenant_billing_status ON tenant_billing(status);
+
+-- Invoices issued to tenant organizations for their subscription billing.
+CREATE TABLE IF NOT EXISTS tenant_invoices (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    invoice_number VARCHAR(50) NOT NULL UNIQUE,
+    amount NUMERIC(12, 2) NOT NULL,
+    currency VARCHAR(10) NOT NULL DEFAULT 'GHS',
+    period_start DATE,
+    period_end DATE,
+    due_date DATE,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending', -- pending | paid | overdue | cancelled
+    paid_at TIMESTAMPTZ,
+    payment_method VARCHAR(50),
+    payment_reference VARCHAR(255),
+    notes TEXT,
+    created_by UUID REFERENCES admins(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_tenant_invoices_org ON tenant_invoices(organization_id);
+CREATE INDEX IF NOT EXISTS idx_tenant_invoices_status ON tenant_invoices(status);
+
+-- =========================================================
+-- HIERARCHICAL PAYMENT SYSTEM
+-- Payments are split between the platform (system finance)
+-- and the tenant (assembly organization). The system receives
+-- all subscription, upgrade, and fee revenue. Tenants receive
+-- their own revenue (e.g. validated search fees, field visit
+-- charges, land-sale commission share) into their wallet.
+-- =========================================================
+
+-- Payment methods supported by the platform
+DO $$ BEGIN
+    CREATE TYPE payment_method AS ENUM ('cash', 'momo', 'card');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Settlement destination — who receives the money
+DO $$ BEGIN
+    CREATE TYPE settlement_destination AS ENUM ('system', 'tenant');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Settlement status
+DO $$ BEGIN
+    CREATE TYPE settlement_status AS ENUM ('pending', 'settled', 'failed', 'reversed');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Add payment method + organization_id to payments table
+DO $$ BEGIN ALTER TABLE payments ADD COLUMN IF NOT EXISTS method payment_method; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE payments ADD COLUMN IF NOT EXISTS organization_id UUID REFERENCES organizations(id) ON DELETE SET NULL; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE payments ADD COLUMN IF NOT EXISTS method_reference VARCHAR(255); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+-- momo_number, card_last4 for receipt tracking
+DO $$ BEGIN ALTER TABLE payments ADD COLUMN IF NOT EXISTS momo_number VARCHAR(20); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE payments ADD COLUMN IF NOT EXISTS card_last4 VARCHAR(4); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE payments ADD COLUMN IF NOT EXISTS settled_at TIMESTAMPTZ; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+CREATE INDEX IF NOT EXISTS idx_payments_method ON payments(method);
+CREATE INDEX IF NOT EXISTS idx_payments_org ON payments(organization_id);
+CREATE INDEX IF NOT EXISTS idx_payments_purpose ON payments(purpose);
+
+-- Tenant wallets — each organization has a wallet balance
+-- that accumulates their share of payments until paid out.
+CREATE TABLE IF NOT EXISTS tenant_wallets (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL UNIQUE REFERENCES organizations(id) ON DELETE CASCADE,
+    balance NUMERIC(14, 2) NOT NULL DEFAULT 0,
+    total_earned NUMERIC(14, 2) NOT NULL DEFAULT 0,
+    total_paid_out NUMERIC(14, 2) NOT NULL DEFAULT 0,
+    currency VARCHAR(10) NOT NULL DEFAULT 'GHS',
+    -- Payout account details
+    payout_momo_number VARCHAR(20),
+    payout_bank_name VARCHAR(100),
+    payout_bank_account VARCHAR(50),
+    payout_account_name VARCHAR(255),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_tenant_wallets_org ON tenant_wallets(organization_id);
+
+-- Payment settlements — each payment is split into one or more
+-- settlement lines. 'system' lines go to platform finance,
+-- 'tenant' lines credit the organization's wallet.
+CREATE TABLE IF NOT EXISTS payment_settlements (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    payment_id UUID NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
+    organization_id UUID REFERENCES organizations(id) ON DELETE SET NULL,
+    destination settlement_destination NOT NULL,
+    amount NUMERIC(14, 2) NOT NULL,
+    currency VARCHAR(10) NOT NULL DEFAULT 'GHS',
+    description VARCHAR(255),
+    status settlement_status NOT NULL DEFAULT 'pending',
+    settled_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_settlements_payment ON payment_settlements(payment_id);
+CREATE INDEX IF NOT EXISTS idx_settlements_org ON payment_settlements(organization_id);
+CREATE INDEX IF NOT EXISTS idx_settlements_destination ON payment_settlements(destination);
+CREATE INDEX IF NOT EXISTS idx_settlements_status ON payment_settlements(status);
+
+-- Tenant payouts — withdrawals from the tenant wallet to their
+-- momo or bank account. Initiated by the finance officer.
+DO $$ BEGIN
+    CREATE TYPE payout_status AS ENUM ('pending', 'approved', 'rejected', 'paid', 'failed');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+    CREATE TYPE payout_method AS ENUM ('momo', 'bank', 'cash');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS tenant_payouts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    amount NUMERIC(14, 2) NOT NULL,
+    currency VARCHAR(10) NOT NULL DEFAULT 'GHS',
+    method payout_method NOT NULL DEFAULT 'momo',
+    -- Destination details (snapshot at time of payout)
+    destination_account VARCHAR(255),
+    destination_name VARCHAR(255),
+    reference VARCHAR(255),
+    notes TEXT,
+    status payout_status NOT NULL DEFAULT 'pending',
+    requested_by UUID REFERENCES admins(id) ON DELETE SET NULL,
+    approved_by UUID REFERENCES admins(id) ON DELETE SET NULL,
+    requested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    approved_at TIMESTAMPTZ,
+    paid_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_payouts_org ON tenant_payouts(organization_id);
+CREATE INDEX IF NOT EXISTS idx_payouts_status ON tenant_payouts(status);
+
+-- Extend payment_purpose for tenant-collected fees
+DO $$ BEGIN
+    ALTER TYPE payment_purpose ADD VALUE IF NOT EXISTS 'validated_search';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+    ALTER TYPE payment_purpose ADD VALUE IF NOT EXISTS 'field_visit_fee';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+    ALTER TYPE payment_purpose ADD VALUE IF NOT EXISTS 'upgrade';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- =========================================================
+-- USER PROFILE COLUMNS — extended metadata for all roles
+-- =========================================================
+-- Owners
+DO $$ BEGIN ALTER TABLE owners ADD COLUMN IF NOT EXISTS avatar_url TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE owners ADD COLUMN IF NOT EXISTS bio TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE owners ADD COLUMN IF NOT EXISTS address TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE owners ADD COLUMN IF NOT EXISTS region VARCHAR(255); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE owners ADD COLUMN IF NOT EXISTS notification_email BOOLEAN NOT NULL DEFAULT true; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE owners ADD COLUMN IF NOT EXISTS notification_sms BOOLEAN NOT NULL DEFAULT false; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE owners ADD COLUMN IF NOT EXISTS notification_push BOOLEAN NOT NULL DEFAULT true; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+-- Agents
+DO $$ BEGIN ALTER TABLE agents ADD COLUMN IF NOT EXISTS avatar_url TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE agents ADD COLUMN IF NOT EXISTS bio TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE agents ADD COLUMN IF NOT EXISTS address TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE agents ADD COLUMN IF NOT EXISTS notification_email BOOLEAN NOT NULL DEFAULT true; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE agents ADD COLUMN IF NOT EXISTS notification_push BOOLEAN NOT NULL DEFAULT true; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+-- Admins
+DO $$ BEGIN ALTER TABLE admins ADD COLUMN IF NOT EXISTS avatar_url TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE admins ADD COLUMN IF NOT EXISTS bio TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE admins ADD COLUMN IF NOT EXISTS phone VARCHAR(50); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE admins ADD COLUMN IF NOT EXISTS notification_email BOOLEAN NOT NULL DEFAULT true; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+-- Assembly users
+DO $$ BEGIN ALTER TABLE assembly_users ADD COLUMN IF NOT EXISTS avatar_url TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE assembly_users ADD COLUMN IF NOT EXISTS bio TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE assembly_users ADD COLUMN IF NOT EXISTS address TEXT; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE assembly_users ADD COLUMN IF NOT EXISTS notification_email BOOLEAN NOT NULL DEFAULT true; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE assembly_users ADD COLUMN IF NOT EXISTS notification_push BOOLEAN NOT NULL DEFAULT true; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 
 -- Reset search_path to the app default (pooled connections reuse this session)
 SET search_path TO earthglobal, public, extensions;
