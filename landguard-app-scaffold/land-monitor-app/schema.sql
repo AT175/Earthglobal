@@ -423,6 +423,23 @@ CREATE INDEX IF NOT EXISTS idx_notifications_owner ON notifications (owner_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_agent ON notifications (agent_id);
 
 -- =========================================================
+-- AUDIT LOGS — immutable record of sensitive actions
+-- =========================================================
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID,  -- no FK — user may be deleted but audit record stays
+    user_role VARCHAR(50),
+    action VARCHAR(100) NOT NULL,
+    details JSONB,
+    ip_address VARCHAR(45),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs (user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs (action);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs (created_at DESC);
+
+-- =========================================================
 -- Reset search_path to default after schema setup
 -- =========================================================
 -- Reset search_path to the app default (pooled connections reuse this session)

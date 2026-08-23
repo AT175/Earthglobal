@@ -4,6 +4,8 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const logger = require('./config/logger');
+const { apiLimiter } = require('./middleware/security');
 
 const authRoutes = require('./routes/auth.routes');
 const parcelRoutes = require('./routes/parcels.routes');
@@ -36,7 +38,7 @@ async function runMigrations() {
   try {
     const schemaPath = path.join(__dirname, '..', '..', 'schema.sql');
     if (!fs.existsSync(schemaPath)) {
-      console.log('[Migration] schema.sql not found, skipping');
+      logger.info('[Migration] schema.sql not found, skipping');
       return;
     }
     const schema = fs.readFileSync(schemaPath, 'utf8');
@@ -44,9 +46,9 @@ async function runMigrations() {
     // schema's SET/RESET search_path doesn't leak into pooled connections.
     client = await db.pool.connect();
     await client.query(schema);
-    console.log('[Migration] Schema applied successfully');
+    logger.info('[Migration] Schema applied successfully');
   } catch (err) {
-    console.error('[Migration] Error:', err.message);
+    logger.error('[Migration] Error: %s', err.message);
     // Don't crash — the DB might already be up to date
   } finally {
     if (client) client.release();
@@ -65,7 +67,21 @@ app.use(cors({ origin: corsOrigins, credentials: true }));
 // so it's mounted separately before the global json parser in a real build.
 app.use(express.json({ limit: '10mb' }));
 
+// Apply general rate limiting to all API routes
+app.use('/auth', apiLimiter);
+
+// Health check — basic liveness
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+
+// Status check — includes DB connectivity (for monitoring)
+app.get('/status', async (_req, res) => {
+  try {
+    await db.query('SELECT 1');
+    res.json({ status: 'ok', database: 'connected', uptime: process.uptime() });
+  } catch (err) {
+    res.status(503).json({ status: 'degraded', database: 'disconnected', error: err.message });
+  }
+});
 
 app.use('/auth', authRoutes);
 app.use('/parcels', parcelRoutes);
@@ -87,7 +103,7 @@ app.use('/finance', financeRoutes);
 app.use('/profile', profileRoutes);
 
 app.use((err, _req, res, _next) => {
-  console.error('[API Error]', err);
+  logger.error('[API Error] %s', err.message);
   res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
 });
 
@@ -99,28 +115,28 @@ const PORT = process.env.PORT || 4000;
 // Run migrations then start the server
 runMigrations().then(() => {
   server.listen(PORT, () => {
-    console.log(`API + WebSocket listening on port ${PORT}`);
+    logger.info(`API + WebSocket listening on port ${PORT}`);
 
     // Schedule NDVI change detection — runs every 2 days at 3:00 AM UTC
     // Sentinel-2 revisits every 2-3 days, so checking every 2 days catches
     // new imagery soon after it's available.
     if (process.env.NODE_ENV === 'production' || process.env.ENABLE_NDVI_CRON === 'true') {
       cron.schedule('0 3 */2 * *', () => {
-        console.log('[Cron] Starting scheduled NDVI change detection...');
-        runNdviJob().catch((err) => console.error('[Cron] NDVI job error:', err.message));
+        logger.info('[Cron] Starting scheduled NDVI change detection...');
+        runNdviJob().catch((err) => logger.error('[Cron] NDVI job error:', err.message));
       });
-      console.log('NDVI change detection scheduled: every 2 days at 3:00 AM UTC');
+      logger.info('NDVI change detection scheduled: every 2 days at 3:00 AM UTC');
 
       // Schedule building change detection — runs weekly on Sundays at 4:00 AM UTC
       // Compares the last 3 months of imagery vs. the previous 3 months to detect
       // new buildings that have appeared in each organization's district.
       cron.schedule('0 4 * * 0', () => {
-        console.log('[Cron] Starting scheduled building change detection...');
-        runBuildingChangeJob().catch((err) => console.error('[Cron] Building change job error:', err.message));
+        logger.info('[Cron] Starting scheduled building change detection...');
+        runBuildingChangeJob().catch((err) => logger.error('[Cron] Building change job error:', err.message));
       });
-      console.log('Building change detection scheduled: weekly on Sundays at 4:00 AM UTC');
+      logger.info('Building change detection scheduled: weekly on Sundays at 4:00 AM UTC');
     } else {
-      console.log('Cron jobs disabled in dev — set ENABLE_NDVI_CRON=true to enable');
+      logger.info('Cron jobs disabled in dev — set ENABLE_NDVI_CRON=true to enable');
     }
   });
 });

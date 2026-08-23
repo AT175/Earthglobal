@@ -16,6 +16,7 @@
  */
 const db = require('../config/db');
 const bus = require('../realtime/eventBus');
+const { notifyPurchaseRequest, notifyPaymentConfirmed, notifyOwnershipTransferred } = require('../services/notification.service');
 const PDFDocument = require('pdfkit');
 
 function getOrgId(req) {
@@ -501,6 +502,15 @@ exports.initiatePurchase = async (req, res, next) => {
       buyerPhone,
     });
 
+    // Send email/SMS notification to seller
+    notifyPurchaseRequest({
+      sellerEmail: listing.seller_email,
+      sellerPhone: listing.seller_phone,
+      listingTitle: listing.title,
+      buyerName,
+      price: listing.price,
+    }).catch(() => {}); // fire-and-forget
+
     res.status(201).json({
       ...result.rows[0],
       message: 'Purchase initiated. The seller has been notified and will respond shortly.',
@@ -594,7 +604,25 @@ exports.confirmPayment = async (req, res, next) => {
     );
     if (!result.rows[0]) return res.status(404).json({ error: 'Purchase not found or not in accepted state' });
 
-    // Record payment method in receipt later
+    // Notify buyer that payment is confirmed
+    const purchaseInfo = await db.query(
+      `SELECT p.buyer_id, p.listing_id, l.title, l.price, o.email as buyer_email, o.phone as buyer_phone
+       FROM land_purchases p
+       JOIN land_listings l ON p.listing_id = l.id
+       JOIN owners o ON p.buyer_id = o.id
+       WHERE p.id = $1`,
+      [req.params.id]
+    );
+    if (purchaseInfo.rows[0]) {
+      const pi = purchaseInfo.rows[0];
+      notifyPaymentConfirmed({
+        buyerEmail: pi.buyer_email,
+        buyerPhone: pi.buyer_phone,
+        listingTitle: pi.title,
+        amount: pi.price,
+      }).catch(() => {});
+    }
+
     res.json({ success: true, message: 'Payment confirmed. You can now generate the receipt.' });
   } catch (err) { next(err); }
 };
@@ -799,6 +827,19 @@ exports.transferOwnership = async (req, res, next) => {
        WHERE id = $1`,
       [purchase.id]
     );
+
+    // Notify buyer that ownership has been transferred
+    const buyerInfo = await db.query(
+      'SELECT email, phone FROM owners WHERE id = $1',
+      [purchase.buyer_id]
+    );
+    if (buyerInfo.rows[0]) {
+      notifyOwnershipTransferred({
+        buyerEmail: buyerInfo.rows[0].email,
+        buyerPhone: buyerInfo.rows[0].phone,
+        listingTitle: purchase.title,
+      }).catch(() => {});
+    }
 
     res.json({ success: true, message: 'Ownership transferred successfully.' });
   } catch (err) { next(err); }

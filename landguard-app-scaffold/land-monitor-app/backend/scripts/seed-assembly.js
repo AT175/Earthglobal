@@ -1,17 +1,16 @@
 const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
+require('dotenv').config();
 
 const pool = new Pool({
-  host: 'aws-0-eu-west-2.pooler.supabase.com',
-  port: 5432,
-  user: 'postgres.plvtvsavhqaayjspxmst',
-  password: 'Echendaa@2024',
-  database: 'postgres',
-  ssl: { rejectUnauthorized: false },
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
 });
 
+const SEED_PASSWORD = process.env.SEED_PASSWORD || '$SEED_PASSWORD';
+
 (async () => {
-  const hash = await bcrypt.hash('password123', 10);
+  const hash = await bcrypt.hash('$SEED_PASSWORD', 10);
 
   // Create test organization (District Assembly)
   let orgId;
@@ -50,7 +49,7 @@ const pool = new Pool({
          VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (email) DO NOTHING`,
         [orgId, u.name, u.email, '+233240000000', hash, u.role]
       );
-      console.log(`Assembly user seeded: ${u.email} / password123 (${u.role})`);
+      console.log(`Assembly user seeded: ${u.email} / $SEED_PASSWORD (${u.role})`);
     } catch (e) { console.error(`User ${u.email}:`, e.message); }
   }
 

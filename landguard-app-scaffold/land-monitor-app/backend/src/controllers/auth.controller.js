@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const db = require('../config/db');
+const { validatePassword, checkLockout, recordFailedLogin, recordSuccessfulLogin } = require('../middleware/security');
+const { sendSMS, sendEmail } = require('../services/notification.service');
 
 // In-memory OTP store for scaffolding purposes only — replace with Redis or a DB table in production.
 const otpStore = new Map();
@@ -30,6 +32,10 @@ exports.signup = async (req, res, next) => {
   try {
     const { name, email, phone, password, account_type } = req.body;
     if (!name || !email || !password) return res.status(400).json({ error: 'Name, email, and password are required' });
+
+    // Password complexity check
+    const pwError = validatePassword(password);
+    if (pwError) return res.status(400).json({ error: pwError });
 
     const passwordHash = await bcrypt.hash(password, 10);
 
@@ -62,10 +68,11 @@ exports.signup = async (req, res, next) => {
 exports.requestOtp = async (req, res, next) => {
   try {
     const { phone } = req.body;
+    if (!phone) return res.status(400).json({ error: 'Phone number is required' });
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     otpStore.set(phone, { code, expiresAt: Date.now() + 5 * 60 * 1000 });
-    // TODO: send via SMS provider (Twilio / Africa's Talking) instead of logging
-    console.log(`OTP for ${phone}: ${code}`);
+    // Send via Twilio (gracefully degrades to console.log if not configured)
+    await sendSMS({ to: phone, body: `Your EarthGlobal verification code is: ${code}. It expires in 5 minutes.` });
     res.json({ sent: true });
   } catch (err) {
     next(err);
@@ -97,9 +104,18 @@ exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
+    // Check account lockout
+    const lockout = checkLockout(email);
+    if (lockout.locked) {
+      return res.status(429).json({
+        error: `Account temporarily locked. Try again in ${lockout.retryAfter} seconds.`,
+      });
+    }
+
     // Find user across all role tables
     const user = await findUserByEmail(email);
     if (!user || !user.password_hash) {
+      recordFailedLogin(email);
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
@@ -119,7 +135,13 @@ exports.login = async (req, res, next) => {
     }
 
     const valid = await bcrypt.compare(password, user.password_hash);
-    if (!valid) return res.status(401).json({ error: 'Invalid email or password' });
+    if (!valid) {
+      recordFailedLogin(email);
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    // Clear failed attempts on successful login
+    recordSuccessfulLogin(email);
 
     const token = jwt.sign(
       { id: user.id, role: user.role, organizationId: user.organization_id, assemblyRole: user.assembly_role, adminRole: user.admin_role },
