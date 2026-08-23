@@ -5,9 +5,9 @@ import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import {
   Camera, Video, Radio, MapPin, Phone, Calendar, User, ArrowLeft,
-  CheckCircle2, Clock, Film, AlertCircle, ExternalLink,
+  CheckCircle2, Clock, Film, AlertCircle, ExternalLink, FileText, Crosshair,
 } from 'lucide-react';
-import { Card, Badge, Button, Skeleton } from '@earthglobal/design-system';
+import { Card, Badge, Button, Skeleton, ParcelMap } from '@earthglobal/design-system';
 import api from '../../services/api';
 import OwnerLayout from '../../components/OwnerLayout';
 
@@ -291,6 +291,38 @@ export default function VisitDetailOwner() {
           </InfoCard>
         )}
       </InfoGrid>
+
+      {/* Parcel boundary map */}
+      {visit.boundary?.coordinates?.[0] && (
+        <>
+          <SectionTitle><MapPin size={20} /> Parcel Boundary</SectionTitle>
+          <div style={{ marginBottom: 24 }}>
+            <ParcelMap
+              path={visit.boundary.coordinates[0].map(([lng, lat]) => ({ lat, lng }))}
+              status={visit.status === 'completed' ? 'active' : 'alert'}
+              googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}
+              height="350px"
+            />
+          </div>
+        </>
+      )}
+
+      {/* Agent field notes */}
+      {visit.agent_notes && (
+        <>
+          <SectionTitle><FileText size={20} /> Agent Field Notes</SectionTitle>
+          <Card style={{ padding: 16, marginBottom: 24, whiteSpace: 'pre-wrap', fontSize: '0.9rem', lineHeight: 1.6 }}>
+            {visit.agent_notes}
+          </Card>
+        </>
+      )}
+
+      {/* Survey status */}
+      {visit.survey_session_id && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 10, color: '#4ade80', fontSize: '0.85rem', marginBottom: 24 }}>
+          <Crosshair size={16} /> Agent completed a GPS boundary survey during this visit
+        </div>
+      )}
 
       {/* Media gallery */}
       <SectionTitle>

@@ -371,15 +371,17 @@ exports.create = async (req, res, next) => {
   }
 };
 
-// PATCH /visit-requests/:id — agent/admin updates status or assigns agent
+// PATCH /visit-requests/:id — agent/admin updates status, assigns agent, or saves notes
 exports.updateStatus = async (req, res, next) => {
   try {
-    const { status, agent_id } = req.body;
+    const { status, agent_id, agent_notes, survey_session_id } = req.body;
     const fields = [];
     const values = [];
     let i = 1;
     if (status) { fields.push(`status = $${i++}`); values.push(status); }
     if (agent_id) { fields.push(`agent_id = $${i++}`); values.push(agent_id); }
+    if (agent_notes !== undefined) { fields.push(`agent_notes = $${i++}`); values.push(agent_notes); }
+    if (survey_session_id !== undefined) { fields.push(`survey_session_id = $${i++}`); values.push(survey_session_id); }
     if (status === 'completed') { fields.push(`completed_at = now()`); }
     if (status === 'assigned' && agent_id) {
       // Admin manually assigning — create notification for the agent
@@ -462,6 +464,7 @@ exports.getDetail = async (req, res, next) => {
   try {
     const visitResult = await db.query(
       `SELECT v.*, p.name as parcel_name, p.region, p.area_sqm,
+              ST_AsGeoJSON(p.boundary) as boundary_geojson,
               o.name as owner_name, o.phone as owner_phone,
               a.name as agent_name, a.phone as agent_phone, a.region as agent_region
        FROM visit_requests v
@@ -492,6 +495,11 @@ exports.getDetail = async (req, res, next) => {
 
     visit.media = mediaResult.rows;
     visit.media_count = mediaResult.rows.length;
+    // Parse boundary GeoJSON for the map
+    if (visit.boundary_geojson) {
+      visit.boundary = JSON.parse(visit.boundary_geojson);
+      visit.boundary_geojson = undefined;
+    }
 
     res.json(visit);
   } catch (err) {

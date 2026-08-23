@@ -297,7 +297,9 @@ CREATE TABLE IF NOT EXISTS visit_requests (
     scheduled_at TIMESTAMPTZ,
     completed_at TIMESTAMPTZ,
     price_charged NUMERIC(10, 2),
-    plan_credit_used BOOLEAN NOT NULL DEFAULT false
+    plan_credit_used BOOLEAN NOT NULL DEFAULT false,
+    agent_notes TEXT,
+    survey_session_id UUID REFERENCES survey_sessions(id) ON DELETE SET NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_visit_requests_owner ON visit_requests (owner_id);
