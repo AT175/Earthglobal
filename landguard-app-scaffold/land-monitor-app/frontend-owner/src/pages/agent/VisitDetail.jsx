@@ -166,7 +166,6 @@ export default function VisitDetail() {
   const [request, setRequest] = useState(null);
   const [parcelInfo, setParcelInfo] = useState(null);
   const [ownerInfo, setOwnerInfo] = useState(null);
-  const [media, setMedia] = useState([]);
 
   const statusOptions = [
     { value: 'in_progress', label: tCommon('status.in_progress') },
@@ -175,20 +174,25 @@ export default function VisitDetail() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploaded, setUploaded] = useState([]);
+  const [existingMedia, setExistingMedia] = useState([]);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
+    // Use the detail endpoint which includes parcel, owner, agent, and media
     api
-      .get(`/visit-requests/${id}`)
+      .get(`/visit-requests/${id}/detail`)
       .then((res) => {
         setRequest(res.data);
-        // Fetch parcel + owner info if available
-        if (res.data.parcel_id) {
-          api.get(`/parcels/${res.data.parcel_id}`).then((r) => setParcelInfo(r.data)).catch(() => {});
+        setExistingMedia(res.data.media || []);
+        if (res.data.parcel_name) {
+          setParcelInfo({
+            name: res.data.parcel_name,
+            region: res.data.region,
+            area_sqm: res.data.area_sqm,
+          });
         }
-        if (res.data.owner_id) {
-          // Owner info might not have a dedicated endpoint — try to get from parcel
-          // or skip gracefully
+        if (res.data.owner_name) {
+          setOwnerInfo({ name: res.data.owner_name, phone: res.data.owner_phone });
         }
       })
       .catch((err) => console.error('Failed to load visit request', err))
@@ -208,7 +212,7 @@ export default function VisitDetail() {
         });
       }
       setUploaded((prev) => [...prev, ...files.map((f) => f.name)]);
-      setMedia((prev) => [...prev, ...files.map((f) => ({ name: f.name, type: f.type.startsWith('video') ? 'video' : 'photo' }))]);
+      setExistingMedia((prev) => [...prev, ...files.map((f) => ({ name: f.name, type: f.type.startsWith('video') ? 'video' : 'photo', uploaded_at: new Date().toISOString() }))]);
     } catch (err) {
       console.error('Upload failed', err);
     } finally {
@@ -357,17 +361,17 @@ export default function VisitDetail() {
       </UploadZone>
 
       {/* Uploaded files */}
-      {(uploaded.length > 0 || media.length > 0) && (
+      {existingMedia.length > 0 && (
         <UploadedList>
-          {media.map((m, i) => (
+          {existingMedia.map((m, i) => (
             <motion.div
-              key={i}
+              key={m.id || i}
               initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
             >
               <UploadedItem>
                 {m.type === 'video' ? <Video size={16} /> : <Camera size={16} />}
-                {m.name}
+                {m.name || `${m.type} #${i + 1}`}
                 <CheckCircle2 size={14} style={{ marginLeft: 'auto' }} />
               </UploadedItem>
             </motion.div>

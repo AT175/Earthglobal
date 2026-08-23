@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import styled from 'styled-components';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle, CheckCircle2, Ruler, ArrowLeftRight } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Ruler, ArrowLeftRight, Camera, Video, Radio, ChevronRight, Film, ClipboardList } from 'lucide-react';
 import { Card, Badge, Button, Skeleton, ParcelMap } from '@earthglobal/design-system';
 import api from '../services/api';
 import OwnerLayout from '../components/OwnerLayout';
@@ -68,13 +68,15 @@ export default function ParcelDetail() {
   const navigate = useNavigate();
   const [parcel, setParcel] = useState(null);
   const [alerts, setAlerts] = useState([]);
+  const [visits, setVisits] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([api.get(`/parcels/${id}`), api.get(`/parcels/${id}/alerts`)])
-      .then(([parcelRes, alertsRes]) => {
+    Promise.all([api.get(`/parcels/${id}`), api.get(`/parcels/${id}/alerts`), api.get('/visit-requests')])
+      .then(([parcelRes, alertsRes, visitsRes]) => {
         setParcel(parcelRes.data);
         setAlerts(alertsRes.data);
+        setVisits((visitsRes.data || []).filter((v) => v.parcel_id === id));
       })
       .catch((err) => console.error('Failed to load parcel', err))
       .finally(() => setLoading(false));
@@ -156,6 +158,40 @@ export default function ParcelDetail() {
               </Badge>
             </AlertRow>
           ))}
+        </AlertList>
+      )}
+
+      {/* Visit history */}
+      <SectionTitle>
+        <ClipboardList size={20} style={{ display: 'inline' }} /> Visit History
+      </SectionTitle>
+      {visits.length === 0 ? (
+        <Card>No visits requested for this parcel yet.</Card>
+      ) : (
+        <AlertList>
+          {visits.map((v) => {
+            const VIcon = v.type === 'video' ? Video : v.type === 'live' ? Radio : Camera;
+            const tone = v.status === 'completed' ? 'success' : v.status === 'in_progress' ? 'primary' : v.status === 'cancelled' ? 'neutral' : 'warning';
+            return (
+              <AlertRow key={v.id} as={Link} to={`/visits/${v.id}`} style={{ textDecoration: 'none', cursor: 'pointer' }}>
+                <AlertMeta>
+                  <VIcon size={20} color="#3ba7ff" aria-hidden="true" />
+                  <div>
+                    <strong>{tCommon(`visitType.${v.type}`)}</strong>
+                    <div style={{ fontSize: '0.85em', opacity: 0.7, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {new Date(v.requested_at).toLocaleDateString()}
+                      {v.agent_name && <span>• {v.agent_name}</span>}
+                      {parseInt(v.media_count, 10) > 0 && <span style={{ display: 'flex', alignItems: 'center', gap: 2 }}><Film size={11} /> {v.media_count}</span>}
+                    </div>
+                  </div>
+                </AlertMeta>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Badge tone={tone}>{tCommon(`status.${v.status}`)}</Badge>
+                  <ChevronRight size={16} style={{ opacity: 0.4 }} />
+                </div>
+              </AlertRow>
+            );
+          })}
         </AlertList>
       )}
     </OwnerLayout>

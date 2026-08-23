@@ -16,6 +16,8 @@ const ValidationRequests = lazy(() => import('./pages/ValidationRequests'));
 const BuyLand = lazy(() => import('./pages/BuyLand'));
 const SellerDashboard = lazy(() => import('./pages/SellerDashboard'));
 const Pricing = lazy(() => import('./pages/Pricing'));
+const MyVisits = lazy(() => import('./pages/owner/MyVisits'));
+const VisitDetailOwner = lazy(() => import('./pages/owner/VisitDetailOwner'));
 
 // Agent pages
 const VisitList = lazy(() => import('./pages/agent/VisitList'));
@@ -104,6 +106,8 @@ export default function App() {
             <Route path="/validation" element={<RequireAuth><ValidationRequests /></RequireAuth>} />
             <Route path="/sell" element={<RequireAuth><SellerDashboard /></RequireAuth>} />
             <Route path="/pricing" element={<RequireAuth><Pricing /></RequireAuth>} />
+            <Route path="/visits" element={<RequireAuth><MyVisits /></RequireAuth>} />
+            <Route path="/visits/:id" element={<RequireAuth><VisitDetailOwner /></RequireAuth>} />
             <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
 
             {/* Agent routes */}

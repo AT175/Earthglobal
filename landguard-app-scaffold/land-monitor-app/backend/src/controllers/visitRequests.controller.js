@@ -269,7 +269,8 @@ exports.list = async (req, res, next) => {
     if (req.user.role === 'owner') {
       query = `SELECT v.*, p.name as parcel_name, p.region,
                       o.name as owner_name, o.phone as owner_phone,
-                      a.name as agent_name
+                      a.name as agent_name,
+                      (SELECT COUNT(*) FROM media m WHERE m.visit_request_id = v.id) AS media_count
                FROM visit_requests v
                JOIN parcels p ON v.parcel_id = p.id
                JOIN owners o ON v.owner_id = o.id
@@ -278,7 +279,8 @@ exports.list = async (req, res, next) => {
       params = [req.user.id];
     } else if (req.user.role === 'agent') {
       query = `SELECT v.*, p.name as parcel_name, p.region,
-                      o.name as owner_name, o.phone as owner_phone
+                      o.name as owner_name, o.phone as owner_phone,
+                      (SELECT COUNT(*) FROM media m WHERE m.visit_request_id = v.id) AS media_count
                FROM visit_requests v
                JOIN parcels p ON v.parcel_id = p.id
                JOIN owners o ON v.owner_id = o.id
@@ -287,7 +289,8 @@ exports.list = async (req, res, next) => {
     } else {
       query = `SELECT v.*, p.name as parcel_name, p.region,
                       o.name as owner_name, o.phone as owner_phone,
-                      a.name as agent_name
+                      a.name as agent_name,
+                      (SELECT COUNT(*) FROM media m WHERE m.visit_request_id = v.id) AS media_count
                FROM visit_requests v
                JOIN parcels p ON v.parcel_id = p.id
                JOIN owners o ON v.owner_id = o.id
@@ -433,6 +436,64 @@ exports.uploadMedia = async (req, res, next) => {
       [req.params.id, fakeUrl, type]
     );
     res.status(201).json(result.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /visit-requests/:id/media — retrieve all media for a visit (owner or agent)
+exports.getMedia = async (req, res, next) => {
+  try {
+    const result = await db.query(
+      `SELECT m.* FROM media m
+       JOIN visit_requests v ON m.visit_request_id = v.id
+       WHERE m.visit_request_id = $1
+       ORDER BY m.uploaded_at ASC`,
+      [req.params.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /visit-requests/:id/detail — full visit detail with parcel, owner, agent, and media
+exports.getDetail = async (req, res, next) => {
+  try {
+    const visitResult = await db.query(
+      `SELECT v.*, p.name as parcel_name, p.region, p.area_sqm,
+              o.name as owner_name, o.phone as owner_phone,
+              a.name as agent_name, a.phone as agent_phone, a.region as agent_region
+       FROM visit_requests v
+       JOIN parcels p ON v.parcel_id = p.id
+       JOIN owners o ON v.owner_id = o.id
+       LEFT JOIN agents a ON v.agent_id = a.id
+       WHERE v.id = $1`,
+      [req.params.id]
+    );
+
+    if (!visitResult.rows[0]) return res.status(404).json({ error: 'Visit not found' });
+
+    const visit = visitResult.rows[0];
+
+    // Authorization: owner can only see their own, agent can only see assigned
+    if (req.user.role === 'owner' && visit.owner_id !== req.user.id) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+    if (req.user.role === 'agent' && visit.agent_id !== req.user.id) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    // Fetch media
+    const mediaResult = await db.query(
+      `SELECT * FROM media WHERE visit_request_id = $1 ORDER BY uploaded_at ASC`,
+      [req.params.id]
+    );
+
+    visit.media = mediaResult.rows;
+    visit.media_count = mediaResult.rows.length;
+
+    res.json(visit);
   } catch (err) {
     next(err);
   }

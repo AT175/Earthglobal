@@ -10,6 +10,8 @@ router.get('/', requireAuth, controller.list);
 router.get('/my-stats', requireAuth, requireRole('agent'), controller.myStats);
 router.get('/available', requireAuth, requireRole('agent'), controller.available);
 router.get('/unassigned', requireAuth, requireRole('admin'), controller.unassigned);
+router.get('/:id/detail', requireAuth, controller.getDetail);
+router.get('/:id/media', requireAuth, controller.getMedia);
 router.post('/:id/claim', requireAuth, requireRole('agent'), controller.claim);
 router.post('/', requireAuth, controller.create);
 router.patch('/:id', requireAuth, controller.updateStatus);
