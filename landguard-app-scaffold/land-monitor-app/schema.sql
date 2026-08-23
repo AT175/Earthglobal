@@ -128,7 +128,7 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN ALTER TYPE plan_period ADD VALUE IF NOT EXISTS 'one_time'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
--- plan_category: 'search' = one-off land search batches (quick/validated/taboo)
+-- plan_category: 'search' = one-off land search batches (quick/validated/turbo)
 --                'monitoring' = recurring land monitoring subscriptions
 DO $$ BEGIN
     CREATE TYPE plan_category AS ENUM ('search', 'monitoring');
@@ -250,7 +250,7 @@ VALUES
      true, true, false,
      1, 5, 150.00, 40.00, true, 2,
      'Quick Search + validated search from the assembly planner. Delivered in 1-5 working days. Pay more for faster delivery.'),
-    ('Taboo Search', 'search', 'taboo_search', 'week', 300.00, 0, 5,
+    ('Turbo Search', 'search', 'taboo_search', 'week', 300.00, 0, 5,
      true, true, true,
      1, 5, 300.00, 80.00, true, 3,
      'Quick Search + Validated Search + field verification. Delivered in 1-5 days. Price based on delivery speed.')
