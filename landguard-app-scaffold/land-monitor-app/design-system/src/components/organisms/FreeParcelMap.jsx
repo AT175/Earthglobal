@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import {
   MapContainer,
   TileLayer,
+  WMSTileLayer,
   Polygon,
   useMap,
 } from 'react-leaflet';
@@ -117,6 +118,13 @@ const fallbackTiles = {
     maxZoom: 19,
     maxNativeZoom: 19,
   },
+  ndviFallback: {
+    url: 'https://services.sentinel-hub.com/ogc/wms/5758d8eb-2aa7-4f6e-9bd2-5f62e2c1f2c2',
+    layers: 'NDVI',
+    attribution: '&copy; Sentinel Hub',
+    maxZoom: 18,
+    maxNativeZoom: 16,
+  },
 };
 
 const layerOptions = [
@@ -153,8 +161,20 @@ function DynamicTileLayer({ layerType, eeTiles, path }) {
     if (eeTiles.ndvi) {
       return <TileLayer url={eeTiles.ndvi.url} attribution={eeTiles.ndvi.attribution} maxZoom={19} maxNativeZoom={19} />;
     }
-    // No NDVI available — show satellite as fallback
-    return <TileLayer url={fallbackTiles.satellite.url} attribution={fallbackTiles.satellite.attribution} maxZoom={fallbackTiles.satellite.maxZoom} maxNativeZoom={fallbackTiles.satellite.maxNativeZoom} />;
+    // No Earth Engine NDVI available — use free Sentinel Hub WMS NDVI tiles
+    const ndvi = fallbackTiles.ndviFallback;
+    return (
+      <WMSTileLayer
+        url={ndvi.url}
+        layers={ndvi.layers}
+        attribution={ndvi.attribution}
+        maxZoom={ndvi.maxZoom}
+        maxNativeZoom={ndvi.maxNativeZoom}
+        format="image/png"
+        transparent
+        tileSize={256}
+      />
+    );
   }
 
   if (layerType === 'satellite' && eeTiles.satellite) {
