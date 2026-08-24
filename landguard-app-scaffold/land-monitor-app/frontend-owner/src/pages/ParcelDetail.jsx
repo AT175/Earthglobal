@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import styled from 'styled-components';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle, CheckCircle2, Ruler, ArrowLeftRight, Camera, Video, Radio, ChevronRight, Film, ClipboardList } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Ruler, ArrowLeftRight, Camera, Video, Radio, ChevronRight, Film, ClipboardList, FileText } from 'lucide-react';
 import { Card, Badge, Button, Skeleton, ParcelMap } from '@earthglobal/design-system';
 import api from '../services/api';
 import OwnerLayout from '../components/OwnerLayout';
@@ -112,6 +112,9 @@ export default function ParcelDetail() {
           </Button>
           <Button variant="secondary" onClick={() => navigate('/sell')}>
             List for Sale
+          </Button>
+          <Button variant="secondary" onClick={() => navigate('/site-plans')}>
+            <FileText size={16} style={{ display: 'inline' }} /> Site Plans
           </Button>
         </div>
       </Header>

@@ -652,6 +652,7 @@ export default function PlanningDashboard() {
       if (parcel) startParcelEdit(parcelId, parcel.properties);
     };
     window.__deleteParcel = (parcelId, name) => deleteParcel(parcelId, name);
+    window.__generateSitePlan = (parcelId) => generateSitePlan(parcelId);
     window.__verifyHazard = (hazardId) => updateHazardStatus(hazardId, 'verified');
     window.__resolveHazard = (hazardId) => updateHazardStatus(hazardId, 'resolved');
     window.__falsePosHazard = (hazardId) => updateHazardStatus(hazardId, 'false_positive');
@@ -659,6 +660,7 @@ export default function PlanningDashboard() {
     return () => {
       delete window.__editParcel;
       delete window.__deleteParcel;
+      delete window.__generateSitePlan;
       delete window.__verifyHazard;
       delete window.__resolveHazard;
       delete window.__falsePosHazard;
@@ -1126,6 +1128,20 @@ export default function PlanningDashboard() {
     }
   };
 
+  // ── Generate site plan for a parcel ──
+  const generateSitePlan = async (parcelId) => {
+    const parcel = parcelsFC?.features?.find(f => f.properties.id === parcelId);
+    const parcelName = parcel?.properties?.name || 'this parcel';
+    if (!confirm(`Generate a site plan for "${parcelName}"?`)) return;
+    try {
+      showToast('Generating site plan...');
+      const { data } = await api.post('/site-plans/generate', { parcel_id: parcelId });
+      showToast(`Site plan generated (status: ${data.status}). Assembly can certify it from the dashboard.`);
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Failed to generate site plan', 'error');
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -1444,6 +1460,7 @@ export default function PlanningDashboard() {
                       const p = feature.properties;
                       layer.bindPopup(`<b>${p.name}</b><br/>${p.region || ''}<br/>${Math.round(p.area_sqm)} m²<br/>Owner: ${p.owner_name || '—'}<br/>
                         <button onclick="window.__editParcel('${p.id}')" style="margin-top:4px;cursor:pointer">Edit Boundary</button>
+                        <button onclick="window.__generateSitePlan('${p.id}')" style="margin-left:4px;cursor:pointer;color:#5ce1ff">Generate Site Plan</button>
                         <button onclick="window.__deleteParcel('${p.id}','${p.name}')" style="margin-left:4px;cursor:pointer;color:red">Delete</button>`);
                     }
                   }}

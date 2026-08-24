@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import styled from 'styled-components';
 import {
-  LayoutDashboard, FileCheck, Landmark, CreditCard, User, LogOut, MapPin, Shield, ClipboardList,
+  LayoutDashboard, FileCheck, Landmark, CreditCard, User, LogOut, MapPin, Shield, ClipboardList, FileText,
 } from 'lucide-react';
 import { LanguageSwitcher } from '@earthglobal/design-system';
 
@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { to: '/sell', labelKey: 'nav.sell', fallbackLabel: 'Sell Land', icon: Landmark },
   { to: '/pricing', labelKey: 'nav.pricing', fallbackLabel: 'Subscribe', icon: CreditCard },
   { to: '/validation', labelKey: 'nav.validation', fallbackLabel: 'Validation', icon: FileCheck },
+  { to: '/site-plans', labelKey: 'nav.sitePlans', fallbackLabel: 'Site Plans', icon: FileText },
   { to: '/profile', labelKey: 'nav.profile', fallbackLabel: 'Profile', icon: User },
 ];
 

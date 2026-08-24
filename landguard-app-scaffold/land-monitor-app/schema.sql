@@ -1177,6 +1177,71 @@ DO $$ BEGIN ALTER TABLE assembly_users ADD COLUMN IF NOT EXISTS address TEXT; EX
 DO $$ BEGIN ALTER TABLE assembly_users ADD COLUMN IF NOT EXISTS notification_email BOOLEAN NOT NULL DEFAULT true; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE assembly_users ADD COLUMN IF NOT EXISTS notification_push BOOLEAN NOT NULL DEFAULT true; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 
+-- =========================================================
+-- SITE PLANS
+-- =========================================================
+-- A site plan is a layout drawing for a parcel showing boundary,
+-- buildings, setbacks, dimensions, north arrow, and scale.
+-- Owners, admins, and assembly planning officers can generate
+-- site plans. Assembly can certify them; uncertified plans are
+-- draft/unsigned. Owners can request certified site plans.
+-- =========================================================
+
+DO $$ BEGIN
+    CREATE TYPE site_plan_status AS ENUM ('draft', 'certified', 'rejected', 'expired');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS site_plans (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    parcel_id UUID NOT NULL REFERENCES parcels(id) ON DELETE CASCADE,
+    organization_id UUID REFERENCES organizations(id) ON DELETE SET NULL,
+    generated_by UUID,                       -- references owners, admins, or assembly_users
+    generated_by_role VARCHAR(30) NOT NULL,  -- 'owner' | 'admin' | 'assembly'
+    plan_data JSONB NOT NULL DEFAULT '{}',   -- { buildings: [], setbacks: {}, north: deg, scale: ratio, area_sqm, perimeter_m }
+    plan_image_url TEXT,                     -- rendered image URL (if generated)
+    status site_plan_status NOT NULL DEFAULT 'draft',
+    certified_by UUID REFERENCES assembly_users(id),
+    certified_at TIMESTAMPTZ,
+    rejection_reason TEXT,
+    title VARCHAR(255),
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_site_plans_parcel ON site_plans (parcel_id);
+CREATE INDEX IF NOT EXISTS idx_site_plans_org ON site_plans (organization_id);
+CREATE INDEX IF NOT EXISTS idx_site_plans_status ON site_plans (status);
+CREATE INDEX IF NOT EXISTS idx_site_plans_generated_by ON site_plans (generated_by);
+
+-- =========================================================
+-- SITE PLAN REQUESTS (owner asks assembly for a certified plan)
+-- =========================================================
+DO $$ BEGIN
+    CREATE TYPE site_plan_request_status AS ENUM ('pending', 'in_progress', 'completed', 'cancelled');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS site_plan_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    parcel_id UUID NOT NULL REFERENCES parcels(id) ON DELETE CASCADE,
+    owner_id UUID NOT NULL REFERENCES owners(id) ON DELETE CASCADE,
+    organization_id UUID REFERENCES organizations(id) ON DELETE SET NULL,
+    status site_plan_request_status NOT NULL DEFAULT 'pending',
+    purpose TEXT,                             -- e.g. 'building permit', 'land sale', 'mortgage'
+    notes TEXT,
+    assigned_to UUID REFERENCES assembly_users(id),
+    resulting_plan_id UUID REFERENCES site_plans(id) ON DELETE SET NULL,
+    fee_amount NUMERIC(10, 2) DEFAULT 0,
+    fee_paid BOOLEAN NOT NULL DEFAULT false,
+    requested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    completed_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_site_plan_requests_parcel ON site_plan_requests (parcel_id);
+CREATE INDEX IF NOT EXISTS idx_site_plan_requests_owner ON site_plan_requests (owner_id);
+CREATE INDEX IF NOT EXISTS idx_site_plan_requests_org ON site_plan_requests (organization_id);
+CREATE INDEX IF NOT EXISTS idx_site_plan_requests_status ON site_plan_requests (status);
+
 -- Reset search_path to the app default (pooled connections reuse this session)
 SET search_path TO earthglobal, public, extensions;
 
