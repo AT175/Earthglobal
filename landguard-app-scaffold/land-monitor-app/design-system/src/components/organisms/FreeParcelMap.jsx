@@ -129,6 +129,7 @@ const fallbackTiles = {
 
 const layerOptions = [
   { value: 'satellite', label: 'Satellite' },
+  { value: 'recent', label: 'Recent (Sentinel-2)' },
   { value: 'osm', label: 'Street' },
   { value: 'ndvi', label: 'NDVI' },
   { value: 'terrain', label: 'Terrain' },
@@ -177,8 +178,18 @@ function DynamicTileLayer({ layerType, eeTiles, path }) {
     );
   }
 
+  // 'recent' layer: use Earth Engine Sentinel-2 tiles if available (10m/px, ~5-day cadence)
+  if (layerType === 'recent') {
+    if (eeTiles.satellite) {
+      return <TileLayer url={eeTiles.satellite.url} attribution={eeTiles.satellite.attribution || '&copy; Copernicus Sentinel-2 via EE'} maxZoom={18} maxNativeZoom={16} />;
+    }
+    // No EE tiles available — fall back to Esri (still works, just not "recent")
+    const fb = fallbackTiles.satellite;
+    return <TileLayer url={fb.url} attribution={fb.attribution + ' (EE unavailable)'} maxZoom={fb.maxZoom} maxNativeZoom={fb.maxNativeZoom} />;
+  }
+
   // Always use Esri World Imagery for satellite — it's higher resolution (sub-meter)
-  // than Sentinel-2 (10m/px). EE tiles are only used for NDVI.
+  // than Sentinel-2 (10m/px). EE tiles are only used for NDVI and 'recent'.
   const tile = fallbackTiles[layerType] || fallbackTiles.satellite;
   return <TileLayer url={tile.url} attribution={tile.attribution} maxZoom={tile.maxZoom} maxNativeZoom={tile.maxNativeZoom} />;
 }

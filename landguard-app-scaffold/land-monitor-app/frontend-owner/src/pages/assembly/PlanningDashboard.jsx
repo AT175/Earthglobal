@@ -1423,6 +1423,9 @@ export default function PlanningDashboard() {
               {baseLayer === 'satellite' && (
                 <TileLayer url={fallbackSatellite} attribution="Tiles &copy; Esri" maxZoom={19} maxNativeZoom={19} />
               )}
+              {baseLayer === 'recent' && (
+                <TileLayer url={satelliteTiles?.url || fallbackSatellite} attribution={satelliteTiles?.attribution || '&copy; Copernicus Sentinel-2 via EE'} maxZoom={18} maxNativeZoom={16} />
+              )}
               {baseLayer === 'street' && (
                 <TileLayer url={fallbackStreet} attribution="&copy; OpenStreetMap, &copy; CARTO" maxZoom={19} />
               )}
@@ -1623,7 +1626,11 @@ export default function PlanningDashboard() {
               <LayerControlTitle><Layers size={14} /> Base Layer</LayerControlTitle>
               <LayerToggle>
                 <input type="radio" name="baseLayer" checked={baseLayer === 'satellite'} onChange={() => setBaseLayer('satellite')} />
-                <Satellite size={14} /> Satellite
+                <Satellite size={14} /> Satellite (Esri)
+              </LayerToggle>
+              <LayerToggle>
+                <input type="radio" name="baseLayer" checked={baseLayer === 'recent'} onChange={() => setBaseLayer('recent')} />
+                <Clock size={14} color="#5ce1ff" /> Recent (Sentinel-2)
               </LayerToggle>
               <LayerToggle>
                 <input type="radio" name="baseLayer" checked={baseLayer === 'street'} onChange={() => setBaseLayer('street')} />
