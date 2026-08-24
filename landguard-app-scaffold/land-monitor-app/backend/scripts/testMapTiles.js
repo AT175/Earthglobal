@@ -32,7 +32,7 @@ async function test() {
   }
 
   // 3. Test satellite tiles with bbox
-  const bbox = '-2.36,-2.35,7.37,7.38';
+  const bbox = '-2.36,7.37,-2.35,7.38';
   console.log(`\n3. GET /map-tiles/satellite?bbox=${bbox}`);
   try {
     const res = await axios.get(`${API_URL}/map-tiles/satellite`, { headers, params: { bbox } });

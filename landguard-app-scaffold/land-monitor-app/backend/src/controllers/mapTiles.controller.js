@@ -27,7 +27,7 @@ exports.getSatelliteTiles = async (req, res, next) => {
     // (or a global composite if no bbox is provided)
     const collection = ee.ImageCollection('COPERNICUS/S2_HARMONIZED');
 
-    let filtered = collection.filterDate('2024-01-01', '2025-12-31')
+    let filtered = collection.filterDate('2025-01-01', '2025-12-31')
       .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20));
 
     // If a bbox is provided, filter to that region for better imagery
@@ -53,11 +53,12 @@ exports.getSatelliteTiles = async (req, res, next) => {
     // Get the map ID + token for tile serving
     visualized.getMapId({ min: 0, max: 255 }, (err, map) => {
       if (err) {
-        console.error('Earth Engine getMapId failed:', err.message);
-        return res.json({ url: null, provider: 'fallback' });
+        console.error('Earth Engine getMapId failed:', err.message || err);
+        return res.json({ url: null, provider: 'fallback', error: err.message || String(err) });
       }
 
       const tileUrl = `https://earthengine.googleapis.com/v1/${map.mapid}/tiles/{z}/{x}/{y}`;
+      console.log('Satellite tiles: returning EE tile URL', map.mapid);
       res.json({
         url: tileUrl,
         token: map.token,
@@ -95,7 +96,7 @@ exports.getNdviTiles = async (req, res, next) => {
     const region = ee.Geometry.Rectangle([minLng, minLat, maxLng, maxLat], 'EPSG:4326', false);
 
     const collection = ee.ImageCollection('COPERNICUS/S2_HARMONIZED')
-      .filterDate('2024-01-01', '2025-12-31')
+      .filterDate('2025-01-01', '2025-12-31')
       .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20))
       .filterBounds(region);
 
@@ -115,11 +116,12 @@ exports.getNdviTiles = async (req, res, next) => {
 
     visualized.getMapId({ min: 0, max: 255 }, (err, map) => {
       if (err) {
-        console.error('Earth Engine NDVI getMapId failed:', err.message);
-        return res.json({ url: null, provider: 'fallback' });
+        console.error('Earth Engine NDVI getMapId failed:', err.message || err);
+        return res.json({ url: null, provider: 'fallback', error: err.message || String(err) });
       }
 
       const tileUrl = `https://earthengine.googleapis.com/v1/${map.mapid}/tiles/{z}/{x}/{y}`;
+      console.log('NDVI tiles: returning EE tile URL', map.mapid);
       res.json({
         url: tileUrl,
         token: map.token,
