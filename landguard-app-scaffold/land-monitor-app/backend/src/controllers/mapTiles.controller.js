@@ -53,8 +53,9 @@ exports.getSatelliteTiles = async (req, res, next) => {
     // Get the map ID + token for tile serving
     visualized.getMapId({ min: 0, max: 255 }, (err, map) => {
       if (err) {
-        console.error('Earth Engine getMapId failed:', err.message || err);
-        return res.json({ url: null, provider: 'fallback', error: err.message || String(err) });
+        const errMsg = typeof err === 'object' ? JSON.stringify(err) : String(err);
+        console.error('Earth Engine getMapId failed:', errMsg);
+        return res.json({ url: null, provider: 'fallback', error: errMsg });
       }
 
       const tileUrl = `https://earthengine.googleapis.com/v1/${map.mapid}/tiles/{z}/{x}/{y}`;
@@ -116,8 +117,9 @@ exports.getNdviTiles = async (req, res, next) => {
 
     visualized.getMapId({ min: 0, max: 255 }, (err, map) => {
       if (err) {
-        console.error('Earth Engine NDVI getMapId failed:', err.message || err);
-        return res.json({ url: null, provider: 'fallback', error: err.message || String(err) });
+        const errMsg = typeof err === 'object' ? JSON.stringify(err) : String(err);
+        console.error('Earth Engine NDVI getMapId failed:', errMsg);
+        return res.json({ url: null, provider: 'fallback', error: errMsg });
       }
 
       const tileUrl = `https://earthengine.googleapis.com/v1/${map.mapid}/tiles/{z}/{x}/{y}`;
