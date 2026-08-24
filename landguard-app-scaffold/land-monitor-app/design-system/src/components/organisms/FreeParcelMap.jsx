@@ -97,21 +97,25 @@ const fallbackTiles = {
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics',
     maxZoom: 19,
+    maxNativeZoom: 19,
   },
   terrain: {
     url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
     attribution: '&copy; OpenStreetMap contributors, &copy; OpenTopoMap',
-    maxZoom: 17,
+    maxZoom: 19,
+    maxNativeZoom: 17,
   },
   street: {
     url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
     attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
     maxZoom: 19,
+    maxNativeZoom: 19,
   },
   osm: {
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
     attribution: '&copy; OpenStreetMap contributors',
     maxZoom: 19,
+    maxNativeZoom: 19,
   },
 };
 
@@ -144,21 +148,21 @@ function Recenter({ center, zoom }) {
 // Dynamic tile layer that switches between Earth Engine and fallback tiles
 function DynamicTileLayer({ layerType, eeTiles, path }) {
   // For satellite/ndvi: use Earth Engine tiles if available, else fallback
-  // For terrain/street: always use free tiles
+  // For terrain/street/osm: always use free tiles
   if (layerType === 'ndvi') {
     if (eeTiles.ndvi) {
-      return <TileLayer url={eeTiles.ndvi.url} attribution={eeTiles.ndvi.attribution} maxZoom={19} />;
+      return <TileLayer url={eeTiles.ndvi.url} attribution={eeTiles.ndvi.attribution} maxZoom={19} maxNativeZoom={19} />;
     }
     // No NDVI available — show satellite as fallback
-    return <TileLayer url={fallbackTiles.satellite.url} attribution={fallbackTiles.satellite.attribution} maxZoom={fallbackTiles.satellite.maxZoom} />;
+    return <TileLayer url={fallbackTiles.satellite.url} attribution={fallbackTiles.satellite.attribution} maxZoom={fallbackTiles.satellite.maxZoom} maxNativeZoom={fallbackTiles.satellite.maxNativeZoom} />;
   }
 
   if (layerType === 'satellite' && eeTiles.satellite) {
-    return <TileLayer url={eeTiles.satellite.url} attribution={eeTiles.satellite.attribution} maxZoom={19} />;
+    return <TileLayer url={eeTiles.satellite.url} attribution={eeTiles.satellite.attribution} maxZoom={19} maxNativeZoom={19} />;
   }
 
   const tile = fallbackTiles[layerType] || fallbackTiles.satellite;
-  return <TileLayer url={tile.url} attribution={tile.attribution} maxZoom={tile.maxZoom} />;
+  return <TileLayer url={tile.url} attribution={tile.attribution} maxZoom={tile.maxZoom} maxNativeZoom={tile.maxNativeZoom} />;
 }
 
 /**
@@ -240,6 +244,7 @@ export default function FreeParcelMap({ path = [], center, status = 'active', he
       <MapContainer
         center={resolvedCenter ? [resolvedCenter.lat, resolvedCenter.lng] : [0, 0]}
         zoom={17}
+        maxZoom={19}
         scrollWheelZoom
         style={{ width: '100%', height: '100%' }}
       >
