@@ -26,6 +26,13 @@ export function createI18n(appResources = {}, options = {}) {
       defaultNS: 'app',
       interpolation: { escapeValue: false }, // React already escapes
       detection: { order: ['localStorage', 'navigator'], caches: ['localStorage'] },
+      // Return the last segment of the key (after final dot) instead of the
+      // full dotted key path when a translation is missing.  e.g. "dashboard.title"
+      // → "title" rather than showing the raw dotted path in the UI.
+      parseMissingKeyHandler: (key) => {
+        const parts = key.split('.');
+        return parts[parts.length - 1];
+      },
       ...options,
     });
 
@@ -68,6 +75,7 @@ export const commonResources = {
         notifications: 'Notifications',
         settings: 'Settings',
         myVisits: 'My Visits',
+        available: 'Available',
         profile: 'Profile',
         parcelOnboarding: 'Parcel Onboarding',
         agents: 'Agents',
@@ -106,6 +114,7 @@ export const commonResources = {
         notifications: 'Notificaciones',
         settings: 'Ajustes',
         myVisits: 'Mis visitas',
+        available: 'Disponible',
         profile: 'Perfil',
         parcelOnboarding: 'Registrar parcela',
         agents: 'Agentes',

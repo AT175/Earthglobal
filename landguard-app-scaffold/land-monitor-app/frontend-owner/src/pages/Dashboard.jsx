@@ -197,7 +197,7 @@ export default function Dashboard() {
             </Link>
             <LiveAlertClose
               onClick={() => setLiveAlert(null)}
-              aria-label={t('dashboard.dismissAlert', { ns: 'common' })}
+              aria-label={t('realtime.dismissAlert', { ns: 'common' })}
             >
               <X size={16} aria-hidden="true" />
             </LiveAlertClose>
