@@ -108,10 +108,16 @@ const fallbackTiles = {
     attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
     maxZoom: 19,
   },
+  osm: {
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 19,
+  },
 };
 
 const layerOptions = [
   { value: 'satellite', label: 'Satellite' },
+  { value: 'osm', label: 'Street' },
   { value: 'ndvi', label: 'NDVI' },
   { value: 'terrain', label: 'Terrain' },
   { value: 'street', label: 'Dark' },
