@@ -1421,14 +1421,14 @@ export default function PlanningDashboard() {
             <MapContainer center={DEFAULT_CENTER} zoom={14} scrollWheelZoom style={{ width: '100%', height: '100%' }}>
               {/* Base layer */}
               {baseLayer === 'satellite' && (
-                <TileLayer url={satelliteTiles?.url || fallbackSatellite} attribution={satelliteTiles?.attribution || 'Tiles &copy; Esri'} maxZoom={19} />
+                <TileLayer url={fallbackSatellite} attribution="Tiles &copy; Esri" maxZoom={19} maxNativeZoom={19} />
               )}
               {baseLayer === 'street' && (
                 <TileLayer url={fallbackStreet} attribution="&copy; OpenStreetMap, &copy; CARTO" maxZoom={19} />
               )}
               {baseLayer === 'detection' && detectionResult?.tileUrl && (
                 <>
-                  <TileLayer url={satelliteTiles?.url || fallbackSatellite} attribution="" maxZoom={19} />
+                  <TileLayer url={fallbackSatellite} attribution="" maxZoom={19} />
                   <TileLayer url={detectionResult.tileUrl} attribution={detectionResult.attribution} maxZoom={19} opacity={0.6} />
                 </>
               )}

@@ -177,10 +177,8 @@ function DynamicTileLayer({ layerType, eeTiles, path }) {
     );
   }
 
-  if (layerType === 'satellite' && eeTiles.satellite) {
-    return <TileLayer url={eeTiles.satellite.url} attribution={eeTiles.satellite.attribution} maxZoom={19} maxNativeZoom={19} />;
-  }
-
+  // Always use Esri World Imagery for satellite — it's higher resolution (sub-meter)
+  // than Sentinel-2 (10m/px). EE tiles are only used for NDVI.
   const tile = fallbackTiles[layerType] || fallbackTiles.satellite;
   return <TileLayer url={tile.url} attribution={tile.attribution} maxZoom={tile.maxZoom} maxNativeZoom={tile.maxNativeZoom} />;
 }
