@@ -51,18 +51,21 @@ exports.getSatelliteTiles = async (req, res, next) => {
     const visualized = composite.visualize(visParams);
 
     // Get the map ID + token for tile serving
-    visualized.getMapId({ min: 0, max: 255 }, (err, map) => {
-      if (err) {
-        const errMsg = typeof err === 'object' ? JSON.stringify(err) : String(err);
+    visualized.getMapId({ min: 0, max: 255 }, (errOrResult, map) => {
+      // EE library versions differ: some call (err, map), others call (map)
+      const result = map || errOrResult;
+      const err = map ? errOrResult : null;
+      if (err || !result || !result.mapid) {
+        const errMsg = err ? (typeof err === 'object' ? JSON.stringify(err).substring(0, 200) : String(err)) : 'No mapid in result';
         console.error('Earth Engine getMapId failed:', errMsg);
         return res.json({ url: null, provider: 'fallback', error: errMsg });
       }
 
-      const tileUrl = `https://earthengine.googleapis.com/v1/${map.mapid}/tiles/{z}/{x}/{y}`;
-      console.log('Satellite tiles: returning EE tile URL', map.mapid);
+      const tileUrl = result.urlFormat || `https://earthengine.googleapis.com/v1/${result.mapid}/tiles/{z}/{x}/{y}`;
+      console.log('Satellite tiles: returning EE tile URL', result.mapid);
       res.json({
         url: tileUrl,
-        token: map.token,
+        token: result.token,
         provider: 'earth-engine',
         attribution: 'Imagery &copy; Copernicus Sentinel-2 via Google Earth Engine',
       });
@@ -115,18 +118,20 @@ exports.getNdviTiles = async (req, res, next) => {
 
     const visualized = ndvi.visualize(visParams);
 
-    visualized.getMapId({ min: 0, max: 255 }, (err, map) => {
-      if (err) {
-        const errMsg = typeof err === 'object' ? JSON.stringify(err) : String(err);
+    visualized.getMapId({ min: 0, max: 255 }, (errOrResult, map) => {
+      const result = map || errOrResult;
+      const err = map ? errOrResult : null;
+      if (err || !result || !result.mapid) {
+        const errMsg = err ? (typeof err === 'object' ? JSON.stringify(err).substring(0, 200) : String(err)) : 'No mapid in result';
         console.error('Earth Engine NDVI getMapId failed:', errMsg);
         return res.json({ url: null, provider: 'fallback', error: errMsg });
       }
 
-      const tileUrl = `https://earthengine.googleapis.com/v1/${map.mapid}/tiles/{z}/{x}/{y}`;
-      console.log('NDVI tiles: returning EE tile URL', map.mapid);
+      const tileUrl = result.urlFormat || `https://earthengine.googleapis.com/v1/${result.mapid}/tiles/{z}/{x}/{y}`;
+      console.log('NDVI tiles: returning EE tile URL', result.mapid);
       res.json({
         url: tileUrl,
-        token: map.token,
+        token: result.token,
         provider: 'earth-engine',
         attribution: 'NDVI &copy; Copernicus Sentinel-2 via Google Earth Engine',
       });
