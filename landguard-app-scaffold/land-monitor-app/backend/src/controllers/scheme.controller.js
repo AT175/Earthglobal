@@ -545,14 +545,22 @@ exports.extractBuildingsForParcel = async (req, res, next) => {
 
     // Get stats and features
     const statsResult = await new Promise((resolve, reject) => {
-      stats.evaluate((result, err) => {
-        if (err) reject(err); else resolve(result);
+      stats.evaluate((resultOrErr, err) => {
+        const hasErr = err != null;
+        const result = hasErr ? null : resultOrErr;
+        const actualErr = hasErr ? err : (resultOrErr && resultOrErr.error ? resultOrErr : null);
+        if (actualErr && !result) reject(actualErr);
+        else resolve(result || resultOrErr);
       });
     });
 
     const features = await new Promise((resolve, reject) => {
-      builtUpPolygons.toList(500).evaluate((features, err) => {
-        if (err) reject(err); else resolve(features || []);
+      builtUpPolygons.toList(500).evaluate((resultOrErr, err) => {
+        const hasErr = err != null;
+        const result = hasErr ? null : resultOrErr;
+        const actualErr = hasErr ? err : (resultOrErr && resultOrErr.error ? resultOrErr : null);
+        if (actualErr && !result) reject(actualErr);
+        else resolve(result || resultOrErr || []);
       });
     });
 

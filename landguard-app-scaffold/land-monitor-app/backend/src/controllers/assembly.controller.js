@@ -687,13 +687,15 @@ exports.detectBuildings = async (req, res, next) => {
     const builtupVis = builtup.visualize({ palette: ['000000', 'ff0000'], min: 0, max: 1 });
 
     // 5. Get map ID for tile serving (so frontend can overlay the detection result)
-    builtupVis.getMapId({ min: 0, max: 255 }, (err, map) => {
-      if (err) {
-        console.error('EE building detection getMapId failed:', err.message);
+    builtupVis.getMapId({ min: 0, max: 255 }, (errOrResult, map) => {
+      const result = map || errOrResult;
+      const err = map ? errOrResult : null;
+      if (err || !result || !result.mapid) {
+        console.error('EE building detection getMapId failed:', err ? String(err).substring(0, 200) : 'no mapid');
         return res.status(500).json({ error: 'Building detection failed', detected: false });
       }
 
-      const tileUrl = `https://earthengine.googleapis.com/v1/${map.mapid}/tiles/{z}/{x}/{y}`;
+      const tileUrl = result.urlFormat || `https://earthengine.googleapis.com/v1/${result.mapid}/tiles/{z}/{x}/{y}`;
 
       // 6. Compute statistics: count of built-up pixels in the region
       //    Each Sentinel-2 pixel = 10m x 10m = 100 sqm
@@ -859,11 +861,13 @@ exports.getSatelliteTiles = async (req, res, next) => {
     const composite = filtered.median();
     const visualized = composite.visualize({ bands: ['B4', 'B3', 'B2'], min: 0, max: 3000, gamma: 1.4 });
 
-    visualized.getMapId({ min: 0, max: 255 }, (err, map) => {
-      if (err) return res.json({ url: null, provider: 'fallback' });
+    visualized.getMapId({ min: 0, max: 255 }, (errOrResult, map) => {
+      const result = map || errOrResult;
+      const err = map ? errOrResult : null;
+      if (err || !result || !result.mapid) return res.json({ url: null, provider: 'fallback' });
       res.json({
-        url: `https://earthengine.googleapis.com/v1/${map.mapid}/tiles/{z}/{x}/{y}`,
-        token: map.token,
+        url: result.urlFormat || `https://earthengine.googleapis.com/v1/${result.mapid}/tiles/{z}/{x}/{y}`,
+        token: result.token,
         provider: 'earth-engine',
         attribution: 'Imagery &copy; Copernicus Sentinel-2 via Google Earth Engine',
       });

@@ -133,13 +133,16 @@ async function resolveFAOBoundary(org) {
  */
 async function getGeometryBbox(geometry) {
   return new Promise((resolve, reject) => {
-    geometry.bounds().getInfo((err, info) => {
+    geometry.bounds().getInfo((infoOrErr, info) => {
+      const hasErr = info != null;
+      const actualInfo = hasErr ? info : infoOrErr;
+      const err = hasErr ? infoOrErr : null;
       if (err) {
         reject(err);
         return;
       }
       // info.coordinates is a polygon (the bounding box)
-      const coords = info.coordinates?.[0] || [];
+      const coords = actualInfo.coordinates?.[0] || [];
       if (coords.length === 0) {
         reject(new Error('Could not determine bbox from geometry'));
         return;
@@ -160,12 +163,15 @@ async function getGeometryBbox(geometry) {
 
 function evaluateFeatureCount(collection) {
   return new Promise((resolve) => {
-    collection.size().getInfo((err, count) => {
+    collection.size().getInfo((countOrErr, count) => {
+      const hasErr = count != null;
+      const actualCount = hasErr ? count : countOrErr;
+      const err = hasErr ? countOrErr : null;
       if (err) {
-        console.error('[FAO] count error:', err.message);
+        console.error('[FAO] count error:', String(err).substring(0, 200));
         resolve(0);
       } else {
-        resolve(count || 0);
+        resolve(actualCount || 0);
       }
     });
   });
@@ -173,9 +179,12 @@ function evaluateFeatureCount(collection) {
 
 function evaluateFeatureList(collection, limit) {
   return new Promise((resolve) => {
-    collection.toList(limit).getInfo((err, features) => {
+    collection.toList(limit).getInfo((featuresOrErr, features) => {
+      const hasErr = features != null;
+      const actualFeatures = hasErr ? features : featuresOrErr;
+      const err = hasErr ? featuresOrErr : null;
       if (err) {
-        console.error('[FAO] list error:', err.message);
+        console.error('[FAO] list error:', String(err).substring(0, 200));
         resolve([]);
       } else {
         resolve(features || []);

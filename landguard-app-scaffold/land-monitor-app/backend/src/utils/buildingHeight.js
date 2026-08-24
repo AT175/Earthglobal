@@ -69,10 +69,20 @@ async function estimateHeightFromShadow(s2Image, region, centroid) {
 
     const [shadowResult, builtupResult] = await Promise.all([
       new Promise((resolve, reject) => {
-        shadowStats.evaluate((r, e) => e ? reject(e) : resolve(r));
+        shadowStats.evaluate((rOrErr, err) => {
+          const hasErr = err != null;
+          const r = hasErr ? null : rOrErr;
+          const e = hasErr ? err : (rOrErr && rOrErr.error ? rOrErr : null);
+          if (e && !r) reject(e); else resolve(r || rOrErr);
+        });
       }),
       new Promise((resolve, reject) => {
-        builtupStats.evaluate((r, e) => e ? reject(e) : resolve(r));
+        builtupStats.evaluate((rOrErr, err) => {
+          const hasErr = err != null;
+          const r = hasErr ? null : rOrErr;
+          const e = hasErr ? err : (rOrErr && rOrErr.error ? rOrErr : null);
+          if (e && !r) reject(e); else resolve(r || rOrErr);
+        });
       }),
     ]);
 
@@ -153,10 +163,20 @@ async function estimateHeightFromDEM(centroid) {
 
     const [buildingResult, groundResult] = await Promise.all([
       new Promise((resolve, reject) => {
-        buildingElev.evaluate((r, e) => e ? reject(e) : resolve(r));
+        buildingElev.evaluate((rOrErr, err) => {
+          const hasErr = err != null;
+          const r = hasErr ? null : rOrErr;
+          const e = hasErr ? err : (rOrErr && rOrErr.error ? rOrErr : null);
+          if (e && !r) reject(e); else resolve(r || rOrErr);
+        });
       }),
       new Promise((resolve, reject) => {
-        groundElev.evaluate((r, e) => e ? reject(e) : resolve(r));
+        groundElev.evaluate((rOrErr, err) => {
+          const hasErr = err != null;
+          const r = hasErr ? null : rOrErr;
+          const e = hasErr ? err : (rOrErr && rOrErr.error ? rOrErr : null);
+          if (e && !r) reject(e); else resolve(r || rOrErr);
+        });
       }),
     ]);
 

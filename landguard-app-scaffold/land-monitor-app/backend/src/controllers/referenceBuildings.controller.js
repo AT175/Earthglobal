@@ -64,8 +64,12 @@ exports.getGoogleBuildings = async (req, res, next) => {
 
     // Get count first to avoid downloading too many features
     const countInfo = await new Promise((resolve, reject) => {
-      buildingsInArea.size().evaluate((count, err) => {
-        if (err) reject(err); else resolve(count);
+      buildingsInArea.size().evaluate((resultOrErr, err) => {
+        const hasErr = err != null;
+        const result = hasErr ? null : resultOrErr;
+        const actualErr = hasErr ? err : (resultOrErr && resultOrErr.error ? resultOrErr : null);
+        if (actualErr && !result) reject(actualErr);
+        else resolve(result || resultOrErr);
       });
     });
 
@@ -77,8 +81,12 @@ exports.getGoogleBuildings = async (req, res, next) => {
 
     // Get the features as a list
     const featuresList = await new Promise((resolve, reject) => {
-      limited.toList(maxBuildings).evaluate((features, err) => {
-        if (err) reject(err); else resolve(features || []);
+      limited.toList(maxBuildings).evaluate((resultOrErr, err) => {
+        const hasErr = err != null;
+        const result = hasErr ? null : resultOrErr;
+        const actualErr = hasErr ? err : (resultOrErr && resultOrErr.error ? resultOrErr : null);
+        if (actualErr && !result) reject(actualErr);
+        else resolve(result || resultOrErr || []);
       });
     });
 

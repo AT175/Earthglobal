@@ -66,23 +66,28 @@ async function computeParcelNdvi(boundaryGeojson) {
         gamma: 1.4,
       });
 
-      visualized.getMapId({ min: 0, max: 255 }, (mapErr, map) => {
-        if (mapErr) {
-          console.error('EE getMapId failed:', mapErr.message);
+      visualized.getMapId({ min: 0, max: 255 }, (errOrResult, map) => {
+        const result = map || errOrResult;
+        const mapErr = map ? errOrResult : null;
+        if (mapErr || !result || !result.mapid) {
+          console.error('EE getMapId failed:', mapErr ? String(mapErr).substring(0, 200) : 'no mapid');
           resolve(null);
           return;
         }
 
-        const imageUrl = `https://earthengine.googleapis.com/v1/${map.mapid}/tiles/{z}/{x}/{y}`;
+        const imageUrl = result.urlFormat || `https://earthengine.googleapis.com/v1/${result.mapid}/tiles/{z}/{x}/{y}`;
 
         // Extract the NDVI mean value
-        ndviValue.getInfo((infoErr, info) => {
+        ndviValue.getInfo((infoOrErr, info) => {
+          const hasErr = info != null;
+          const actualInfo = hasErr ? info : infoOrErr;
+          const infoErr = hasErr ? infoOrErr : null;
           if (infoErr) {
-            console.error('EE NDVI getInfo failed:', infoErr.message);
+            console.error('EE NDVI getInfo failed:', String(infoErr).substring(0, 200));
             resolve(null);
             return;
           }
-          const meanNdvi = info.nd ? info.nd : null;
+          const meanNdvi = actualInfo.nd ? actualInfo.nd : null;
           if (meanNdvi === null || meanNdvi === undefined) {
             console.error('EE NDVI returned null — possibly no imagery in date range');
             resolve(null);

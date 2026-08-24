@@ -147,25 +147,34 @@ async function runBuildingChangeDetection(options) {
     // ── 8. Get tile URLs for all three layers ──
     const [beforeMap, afterMap, changeMap] = await Promise.all([
       new Promise((resolve, reject) => {
-        beforeVis.getMapId({ min: 0, max: 255 }, (err, map) => {
-          if (err) reject(err); else resolve(map);
+        beforeVis.getMapId({ min: 0, max: 255 }, (errOrResult, map) => {
+          const result = map || errOrResult;
+          const err = map ? errOrResult : null;
+          if (err || !result || !result.mapid) reject(err || new Error('getMapId returned no mapid'));
+          else resolve(result);
         });
       }),
       new Promise((resolve, reject) => {
-        afterVis.getMapId({ min: 0, max: 255 }, (err, map) => {
-          if (err) reject(err); else resolve(map);
+        afterVis.getMapId({ min: 0, max: 255 }, (errOrResult, map) => {
+          const result = map || errOrResult;
+          const err = map ? errOrResult : null;
+          if (err || !result || !result.mapid) reject(err || new Error('getMapId returned no mapid'));
+          else resolve(result);
         });
       }),
       new Promise((resolve, reject) => {
-        changeVis.getMapId({ min: 0, max: 255 }, (err, map) => {
-          if (err) reject(err); else resolve(map);
+        changeVis.getMapId({ min: 0, max: 255 }, (errOrResult, map) => {
+          const result = map || errOrResult;
+          const err = map ? errOrResult : null;
+          if (err || !result || !result.mapid) reject(err || new Error('getMapId returned no mapid'));
+          else resolve(result);
         });
       }),
     ]);
 
-    const beforeTileUrl = `https://earthengine.googleapis.com/v1/${beforeMap.mapid}/tiles/{z}/{x}/{y}`;
-    const afterTileUrl = `https://earthengine.googleapis.com/v1/${afterMap.mapid}/tiles/{z}/{x}/{y}`;
-    const changeTileUrl = `https://earthengine.googleapis.com/v1/${changeMap.mapid}/tiles/{z}/{x}/{y}`;
+    const beforeTileUrl = beforeMap.urlFormat || `https://earthengine.googleapis.com/v1/${beforeMap.mapid}/tiles/{z}/{x}/{y}`;
+    const afterTileUrl = afterMap.urlFormat || `https://earthengine.googleapis.com/v1/${afterMap.mapid}/tiles/{z}/{x}/{y}`;
+    const changeTileUrl = changeMap.urlFormat || `https://earthengine.googleapis.com/v1/${changeMap.mapid}/tiles/{z}/{x}/{y}`;
 
     // ── 9. Compute statistics ──
     const stats = cleaned.reduceRegion({
@@ -176,8 +185,14 @@ async function runBuildingChangeDetection(options) {
     });
 
     const statsResult = await new Promise((resolve, reject) => {
-      stats.evaluate((result, err) => {
-        if (err) reject(err); else resolve(result);
+      stats.evaluate((resultOrErr, err) => {
+        // EE evaluate callback: (result) on success, (result, err) or (err) on failure
+        // Some versions call (result), some call (result, err), some call (err)
+        const hasErr = err != null;
+        const result = hasErr ? null : resultOrErr;
+        const actualErr = hasErr ? err : (resultOrErr && resultOrErr.error ? resultOrErr : null);
+        if (actualErr && !result) reject(actualErr);
+        else resolve(result || resultOrErr);
       });
     });
 
@@ -201,8 +216,12 @@ async function runBuildingChangeDetection(options) {
       .filter(ee.Filter.gte('count', 3));
 
     const featuresList = await new Promise((resolve, reject) => {
-      newBuildingPolygons.toList(500).evaluate((features, err) => {
-        if (err) reject(err); else resolve(features || []);
+      newBuildingPolygons.toList(500).evaluate((resultOrErr, err) => {
+        const hasErr = err != null;
+        const result = hasErr ? null : resultOrErr;
+        const actualErr = hasErr ? err : (resultOrErr && resultOrErr.error ? resultOrErr : null);
+        if (actualErr && !result) reject(actualErr);
+        else resolve(result || resultOrErr || []);
       });
     });
 

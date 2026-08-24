@@ -252,13 +252,15 @@ exports.detectHazards = async (req, res, next) => {
       min: 0, max: 1,
     });
 
-    hazardVis.getMapId({ min: 0, max: 255 }, (err, map) => {
-      if (err) {
-        console.error('EE hazard detection getMapId failed:', err.message);
+    hazardVis.getMapId({ min: 0, max: 255 }, (errOrResult, map) => {
+      const result = map || errOrResult;
+      const err = map ? errOrResult : null;
+      if (err || !result || !result.mapid) {
+        console.error('EE hazard detection getMapId failed:', err ? String(err).substring(0, 200) : 'no mapid');
         return res.status(500).json({ error: 'Hazard detection failed', detected: false });
       }
 
-      const tileUrl = `https://earthengine.googleapis.com/v1/${map.mapid}/tiles/{z}/{x}/{y}`;
+      const tileUrl = result.urlFormat || `https://earthengine.googleapis.com/v1/${result.mapid}/tiles/{z}/{x}/{y}`;
 
       // ── Process each hazard type: compute stats + vectorize + save to DB ──
       const detectionResults = {};
