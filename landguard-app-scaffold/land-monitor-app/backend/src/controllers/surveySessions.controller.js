@@ -53,18 +53,29 @@ exports.finalize = async (req, res, next) => {
     const session = sessionResult.rows[0];
     if (!session) return res.status(404).json({ error: 'Session not found' });
 
-    const points = session.raw_points; // array of { lat, lng }
+    const points = session.raw_points; // array of { lat, lng, accuracy }
     if (!points || points.length < 3) {
       return res.status(400).json({ error: 'Need at least 3 points to form a boundary' });
     }
 
-    // Build a closed GeoJSON polygon from the captured points
-    const coordinates = points.map((p) => [p.lng, p.lat]);
+    // If points have accuracy data, apply server-side outlier removal
+    let cleanedPoints = points;
+    if (points[0]?.accuracy != null && points.length >= 4) {
+      cleanedPoints = removeOutliers(points);
+    }
+
+    // Build a closed GeoJSON polygon from the cleaned points
+    const coordinates = cleanedPoints.map((p) => [p.lng, p.lat]);
     coordinates.push(coordinates[0]); // close the ring
     const boundaryGeojson = { type: 'Polygon', coordinates: [coordinates] };
 
     const areaSqm = turf.area(boundaryGeojson);
     const perimeterM = turf.length(turf.polygonToLine(boundaryGeojson), { units: 'meters' });
+
+    // Compute average accuracy if available
+    const avgAccuracy = cleanedPoints[0]?.accuracy != null
+      ? cleanedPoints.reduce((sum, p) => sum + (p.accuracy || 0), 0) / cleanedPoints.length
+      : null;
 
     const parcelResult = await db.query(
       `INSERT INTO parcels (owner_id, name, boundary, region, area_sqm, perimeter_m, survey_date)
@@ -75,19 +86,58 @@ exports.finalize = async (req, res, next) => {
     const parcel = parcelResult.rows[0];
 
     await db.query(
-      `UPDATE survey_sessions SET parcel_id = $1, completed_at = now() WHERE id = $2`,
-      [parcel.id, req.params.id]
+      `UPDATE survey_sessions SET parcel_id = $1, completed_at = now(), gps_accuracy_m = $2 WHERE id = $3`,
+      [parcel.id, avgAccuracy, req.params.id]
     );
 
     res.status(201).json({
       ...parcel,
       boundary: JSON.parse(parcel.boundary_geojson),
       boundary_geojson: undefined,
+      points_used: cleanedPoints.length,
+      points_removed: points.length - cleanedPoints.length,
+      avg_accuracy_m: avgAccuracy,
     });
   } catch (err) {
     next(err);
   }
 };
+
+// Median Absolute Deviation (MAD) outlier removal for GPS points
+function removeOutliers(points) {
+  const lats = points.map((p) => p.lat).sort((a, b) => a - b);
+  const lngs = points.map((p) => p.lng).sort((a, b) => a - b);
+  const medLat = lats[Math.floor(lats.length / 2)];
+  const medLng = lngs[Math.floor(lngs.length / 2)];
+
+  // Compute distances from median
+  const withDist = points.map((p) => ({
+    ...p,
+    dist: haversineDist(p.lat, p.lng, medLat, medLng),
+  }));
+
+  // MAD
+  const dists = withDist.map((p) => p.dist).sort((a, b) => a - b);
+  const medDist = dists[Math.floor(dists.length / 2)];
+
+  if (medDist === 0) return points; // can't filter if all points are identical
+
+  const threshold = medDist * 3;
+  const filtered = withDist.filter((p) => p.dist <= threshold);
+
+  // Keep at least 60% of points
+  const minKeep = Math.ceil(points.length * 0.6);
+  return filtered.length >= minKeep ? filtered : withDist.slice(0, minKeep);
+}
+
+function haversineDist(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 // POST /survey-sessions/import — upload GeoJSON/KML/Shapefile/GPX for preview before saving
 exports.importFile = async (req, res, next) => {
