@@ -228,7 +228,7 @@ export default function Dashboard() {
         <ChartCard>
           <ChartTitle>{t('dashboard.areaByParcel')}</ChartTitle>
           <AreaBarChart
-            data={parcels.map((p) => ({ name: p.name, value: p.area_sqm / 10000 }))}
+            data={parcels.map((p) => ({ name: p.name, value: Number(p.area_sqm) / 10000 }))}
             unit="ha"
           />
         </ChartCard>
@@ -255,7 +255,7 @@ export default function Dashboard() {
                 <Badge tone="primary">{parcel.region || 'Unregioned'}</Badge>
                 <MetaRow>
                   <Ruler size={14} aria-hidden="true" />
-                  {(parcel.area_sqm / 10000).toFixed(2)} ha
+                  {(Number(parcel.area_sqm) / 10000).toFixed(2)} ha
                 </MetaRow>
                 <MetaRow>
                   <MapPin size={14} aria-hidden="true" />

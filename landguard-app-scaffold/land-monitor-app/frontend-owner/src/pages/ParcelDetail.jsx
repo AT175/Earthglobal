@@ -119,11 +119,11 @@ export default function ParcelDetail() {
       <StatsRow>
         <span>
           <Ruler size={16} aria-hidden="true" />
-          {(parcel.area_sqm / 10000).toFixed(2)} ha
+          {(Number(parcel.area_sqm) / 10000).toFixed(2)} ha
         </span>
         <span>
           <ArrowLeftRight size={16} aria-hidden="true" />
-          {t('parcelDetail.perimeter', { value: parcel.perimeter_m?.toFixed(0) })}
+          {t('parcelDetail.perimeter', { value: Number(parcel.perimeter_m)?.toFixed(0) })}
         </span>
       </StatsRow>
 

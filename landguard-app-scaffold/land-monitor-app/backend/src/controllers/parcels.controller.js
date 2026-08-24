@@ -152,6 +152,8 @@ exports.listImages = async (req, res, next) => {
 function formatParcel(row) {
   return {
     ...row,
+    area_sqm: row.area_sqm != null ? Number(row.area_sqm) : null,
+    perimeter_m: row.perimeter_m != null ? Number(row.perimeter_m) : null,
     boundary: row.boundary_geojson ? JSON.parse(row.boundary_geojson) : null,
     boundary_geojson: undefined,
   };
