@@ -149,6 +149,66 @@ exports.listImages = async (req, res, next) => {
   }
 };
 
+// GET /parcels/:id/buildings — list buildings detected on a parcel (owner view)
+exports.listBuildings = async (req, res, next) => {
+  try {
+    // Verify the parcel belongs to the owner (or user is admin/assembly)
+    const parcelRes = await db.query(
+      `SELECT owner_id, area_sqm FROM parcels WHERE id = $1`,
+      [req.params.id]
+    );
+    const parcel = parcelRes.rows[0];
+    if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
+
+    if (req.user.role === 'owner' && parcel.owner_id !== req.user.id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const result = await db.query(
+      `SELECT id, area_sqm, estimated_height_m, estimated_floors,
+              height_confidence, height_method, status, in_protected_area,
+              centroid_lat, centroid_lng, detected_at, first_seen_in_image,
+              latest_image, notes, metadata,
+              ST_AsGeoJSON(footprint) AS footprint_geojson
+       FROM buildings
+       WHERE parcel_id = $1
+       ORDER BY detected_at DESC`,
+      [req.params.id]
+    );
+
+    const buildings = result.rows.map((r) => ({
+      ...r,
+      area_sqm: r.area_sqm != null ? Number(r.area_sqm) : null,
+      estimated_height_m: r.estimated_height_m != null ? Number(r.estimated_height_m) : null,
+      footprint: r.footprint_geojson ? JSON.parse(r.footprint_geojson) : null,
+      footprint_geojson: undefined,
+    }));
+
+    const totalBuildingArea = buildings.reduce((sum, b) => sum + (b.area_sqm || 0), 0);
+    const parcelArea = Number(parcel.area_sqm) || 0;
+    const coveragePct = parcelArea > 0 ? (totalBuildingArea / parcelArea) * 100 : 0;
+
+    res.json({
+      buildings,
+      summary: {
+        count: buildings.length,
+        totalBuildingArea: Math.round(totalBuildingArea),
+        parcelArea: Math.round(parcelArea),
+        coveragePct: coveragePct.toFixed(1),
+        tallestBuilding: buildings.reduce((max, b) => Math.max(max, b.estimated_height_m || 0), 0),
+        avgHeight: buildings.length > 0
+          ? (buildings.reduce((sum, b) => sum + (b.estimated_height_m || 0), 0) / buildings.length).toFixed(1)
+          : 0,
+        permitted: buildings.filter(b => b.status === 'verified_permitted').length,
+        unpermitted: buildings.filter(b => b.status === 'verified_unpermitted').length,
+        unverified: buildings.filter(b => b.status === 'unverified').length,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 function formatParcel(row) {
   return {
     ...row,
