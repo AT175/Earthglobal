@@ -83,6 +83,41 @@ app.get('/status', async (_req, res) => {
   }
 });
 
+app.get('/health/ee', async (req, res) => {
+  const { init, isReady } = require('./config/earthEngine');
+  const hasEnv = !!process.env.EE_SERVICE_ACCOUNT_JSON;
+  const envLength = process.env.EE_SERVICE_ACCOUNT_JSON?.length || 0;
+  let parseOk = false;
+  let parseError = null;
+  let email = null;
+  if (hasEnv) {
+    try {
+      const parsed = JSON.parse(process.env.EE_SERVICE_ACCOUNT_JSON);
+      parseOk = true;
+      email = parsed.client_email;
+    } catch (e) {
+      parseError = e.message;
+    }
+  }
+  let ready = false;
+  let initError = null;
+  try {
+    ready = await init();
+  } catch (e) {
+    initError = e.message;
+  }
+  res.json({
+    eeEnvSet: hasEnv,
+    eeEnvLength: envLength,
+    parseOk,
+    parseError,
+    serviceAccountEmail: email,
+    eeReady: ready,
+    eeIsReady: isReady(),
+    initError,
+  });
+});
+
 app.use('/auth', authRoutes);
 app.use('/parcels', parcelRoutes);
 app.use('/survey-sessions', surveySessionRoutes);
