@@ -74,14 +74,14 @@ export const mapStyles = {
 export const parcelPolygonStyles = {
   active: {
     fillColor: '#1677ff',
-    fillOpacity: 0.18,
+    fillOpacity: 0,
     strokeColor: '#3ba7ff',
     strokeWeight: 2,
     strokeOpacity: 0.9,
   },
   draft: {
     fillColor: '#5ce1ff',
-    fillOpacity: 0.12,
+    fillOpacity: 0,
     strokeColor: '#5ce1ff',
     strokeWeight: 2,
     strokeOpacity: 0.8,
@@ -89,7 +89,7 @@ export const parcelPolygonStyles = {
   },
   alert: {
     fillColor: '#ff6048',
-    fillOpacity: 0.2,
+    fillOpacity: 0,
     strokeColor: '#ff6048',
     strokeWeight: 2,
     strokeOpacity: 0.9,

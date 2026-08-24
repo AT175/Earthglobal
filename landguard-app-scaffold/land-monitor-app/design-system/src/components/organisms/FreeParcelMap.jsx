@@ -129,9 +129,9 @@ const layerOptions = [
 
 // Polygon colors matching the EarthGlobal theme
 const polygonColors = {
-  active: { color: '#3ba7ff', fillColor: '#1677ff', fillOpacity: 0.18 },
-  draft: { color: '#5ce1ff', fillColor: '#5ce1ff', fillOpacity: 0.12 },
-  alert: { color: '#ff6048', fillColor: '#ff6048', fillOpacity: 0.2 },
+  active: { color: '#3ba7ff', fillColor: '#1677ff', fillOpacity: 0 },
+  draft: { color: '#5ce1ff', fillColor: '#5ce1ff', fillOpacity: 0 },
+  alert: { color: '#ff6048', fillColor: '#ff6048', fillOpacity: 0 },
 };
 
 // Helper component to recenter the map when path changes
