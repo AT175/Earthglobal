@@ -299,6 +299,7 @@ CREATE TABLE IF NOT EXISTS visit_requests (
     price_charged NUMERIC(10, 2),
     plan_credit_used BOOLEAN NOT NULL DEFAULT false,
     agent_notes TEXT,
+    owner_notes TEXT,
     survey_session_id UUID REFERENCES survey_sessions(id) ON DELETE SET NULL
 );
 

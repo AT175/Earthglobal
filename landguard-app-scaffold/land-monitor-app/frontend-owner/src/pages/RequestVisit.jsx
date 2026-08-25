@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { useTranslation } from 'react-i18next';
-import { Camera, Video, Radio } from 'lucide-react';
+import { Camera, Video, Radio, CheckCircle2 } from 'lucide-react';
 import { Card, Button } from '@earthglobal/design-system';
 import api from '../services/api';
 import { useRoleLayout } from '../hooks/useRoleLayout';
@@ -81,19 +81,22 @@ export default function RequestVisit() {
   const navigate = useNavigate();
   const { Layout, routePrefix } = useRoleLayout();
   const [type, setType] = useState('photo');
+  const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
     try {
-      await api.post('/visit-requests', { parcel_id: id, type });
-      navigate(`${routePrefix}/parcels/${id}`);
+      await api.post('/visit-requests', { parcel_id: id, type, notes });
+      setSuccess(true);
+      setTimeout(() => navigate(`${routePrefix}/parcels/${id}`), 1500);
     } catch (err) {
       console.error('Failed to create visit request', err);
-      setError(t('requestVisit.error'));
+      setError(err.response?.data?.error || t('requestVisit.error'));
     } finally {
       setSubmitting(false);
     }
@@ -122,13 +125,43 @@ export default function RequestVisit() {
           </OptionGrid>
         </Fieldset>
 
+        <div style={{ marginBottom: 16 }}>
+          <label htmlFor="notes" style={{ display: 'block', fontSize: '0.875rem', color: '#9ca3af', marginBottom: 6 }}>
+            {t('requestVisit.notesLabel')}
+          </label>
+          <textarea
+            id="notes"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder={t('requestVisit.notesPlaceholder')}
+            style={{
+              width: '100%',
+              minHeight: 80,
+              padding: '10px 12px',
+              borderRadius: 8,
+              border: '1px solid #2a2f45',
+              background: '#161a2e',
+              color: '#e5e7eb',
+              fontSize: '0.875rem',
+              fontFamily: 'inherit',
+              resize: 'vertical',
+            }}
+          />
+        </div>
+
         {error && (
           <p role="alert" style={{ color: '#f87171', marginBottom: 16 }}>
             {error}
           </p>
         )}
 
-        <Button type="submit" disabled={submitting} fullWidth>
+        {success && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#4ade80', marginBottom: 16, fontSize: '0.9rem' }}>
+            <CheckCircle2 size={18} /> {t('requestVisit.success')}
+          </div>
+        )}
+
+        <Button type="submit" disabled={submitting || success} fullWidth>
           {submitting ? t('requestVisit.submitting') : t('requestVisit.submit')}
         </Button>
       </FormCard>

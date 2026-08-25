@@ -308,7 +308,7 @@ exports.list = async (req, res, next) => {
 // POST /visit-requests — owner requests a visit; auto-assigns agent by region
 exports.create = async (req, res, next) => {
   try {
-    const { parcel_id, type, scheduled_at } = req.body;
+    const { parcel_id, type, scheduled_at, owner_notes } = req.body;
 
     // Check for available subscription credit
     const subResult = await db.query(
@@ -319,14 +319,14 @@ exports.create = async (req, res, next) => {
     const useCredit = subscription && subscription.credits_remaining > 0;
 
     // Find the best agent for this parcel's region
-    const bestAgent = await findBestAgent(parcelId);
+    const bestAgent = await findBestAgent(parcel_id);
     const agentId = bestAgent?.id || null;
     const initialStatus = agentId ? 'assigned' : 'pending';
 
     const result = await db.query(
-      `INSERT INTO visit_requests (parcel_id, owner_id, agent_id, type, status, scheduled_at, plan_credit_used)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [parcel_id, req.user.id, agentId, type, initialStatus, scheduled_at || null, useCredit]
+      `INSERT INTO visit_requests (parcel_id, owner_id, agent_id, type, status, scheduled_at, plan_credit_used, owner_notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [parcel_id, req.user.id, agentId, type, initialStatus, scheduled_at || null, useCredit, owner_notes || null]
     );
 
     if (useCredit) {

@@ -64,6 +64,9 @@ export default {
       requestVisit: {
         title: 'Request a Visit',
         question: 'What kind of visit do you need?',
+        notesLabel: 'Notes (optional)',
+        notesPlaceholder: 'Any specific instructions or details for the agent...',
+        success: 'Visit request submitted successfully! Redirecting...',
         submit: 'Submit request',
         submitting: 'Submitting...',
         error: 'Something went wrong submitting your request. Please try again.',
@@ -173,6 +176,9 @@ export default {
       requestVisit: {
         title: 'Solicitar una visita',
         question: '¿Qué tipo de visita necesitas?',
+        notesLabel: 'Notas (opcional)',
+        notesPlaceholder: 'Instrucciones o detalles específicos para el agente...',
+        success: '¡Solicitud de visita enviada con éxito! Redirigiendo...',
         submit: 'Enviar solicitud',
         submitting: 'Enviando...',
         error: 'Algo salió mal al enviar tu solicitud. Inténtalo de nuevo.',
