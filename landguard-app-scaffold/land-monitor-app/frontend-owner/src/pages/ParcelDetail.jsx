@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import styled from 'styled-components';
 import { useTranslation } from 'react-i18next';
 import {
@@ -11,6 +11,7 @@ import {
 import { Card, Badge, Button, Skeleton, ParcelMap } from '@earthglobal/design-system';
 import api from '../services/api';
 import OwnerLayout from '../components/OwnerLayout';
+import SalesManagerLayout from '../components/SalesManagerLayout';
 import { verifyBoundary, createBoundaryTracker } from '../utils/gpsUtils';
 
 const Header = styled.div`
@@ -323,6 +324,8 @@ export default function ParcelDetail() {
   const { t: tCommon } = useTranslation('common');
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const routePrefix = location.pathname.startsWith('/sales-manager') ? '/sales-manager' : '';
   const [parcel, setParcel] = useState(null);
   const [alerts, setAlerts] = useState([]);
   const [visits, setVisits] = useState([]);
@@ -549,18 +552,20 @@ ${data.alerts.length > 0 ? '<table><tr><th>Type</th><th>Detected</th><th>Verifie
     .slice(0, 12)
     .reverse();
 
+  const Layout = routePrefix ? SalesManagerLayout : OwnerLayout;
+
   return (
-    <OwnerLayout>
+    <Layout>
       <Header>
         <Title>{parcel.name}</Title>
         <div style={{ display: 'flex', gap: 8 }}>
-          <Button onClick={() => navigate(`/parcels/${id}/request-visit`)}>
+          <Button onClick={() => navigate(`${routePrefix}/parcels/${id}/request-visit`)}>
             {t('parcelDetail.requestVisit')}
           </Button>
-          <Button variant="secondary" onClick={() => navigate('/sell')}>
+          <Button variant="secondary" onClick={() => navigate(`${routePrefix}/sell`)}>
             List for Sale
           </Button>
-          <Button variant="secondary" onClick={() => navigate('/site-plans')}>
+          <Button variant="secondary" onClick={() => navigate(`${routePrefix}/site-plans`)}>
             <FileText size={16} style={{ display: 'inline' }} /> Site Plans
           </Button>
         </div>
@@ -1236,7 +1241,7 @@ ${data.alerts.length > 0 ? '<table><tr><th>Type</th><th>Detected</th><th>Verifie
             const VIcon = v.type === 'video' ? Video : v.type === 'live' ? Radio : Camera;
             const tone = v.status === 'completed' ? 'success' : v.status === 'in_progress' ? 'primary' : v.status === 'cancelled' ? 'neutral' : 'warning';
             return (
-              <AlertRow key={v.id} as={Link} to={`/visits/${v.id}`} style={{ textDecoration: 'none', cursor: 'pointer' }}>
+              <AlertRow key={v.id} as={Link} to={`${routePrefix}/visits/${v.id}`} style={{ textDecoration: 'none', cursor: 'pointer' }}>
                 <AlertMeta>
                   <VIcon size={20} color="#3ba7ff" aria-hidden="true" />
                   <div>
@@ -1257,6 +1262,6 @@ ${data.alerts.length > 0 ? '<table><tr><th>Type</th><th>Detected</th><th>Verifie
           })}
         </AlertList>
       )}
-    </OwnerLayout>
+    </Layout>
   );
 }

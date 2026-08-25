@@ -8,6 +8,9 @@ import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 
+// Sales Manager pages
+const SalesManagerDashboard = lazy(() => import('./pages/sales-manager/SalesManagerDashboard'));
+
 // Owner pages
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const ParcelDetail = lazy(() => import('./pages/ParcelDetail'));
@@ -82,6 +85,7 @@ function AutoRoute() {
         return <Navigate to="/admin" replace />;
       }
       if (user.role === 'assembly') return <Navigate to="/assembly" replace />;
+      if (user.isSalesManager) return <Navigate to="/sales-manager" replace />;
     } catch {}
   }
   // Default: owner dashboard
@@ -99,6 +103,18 @@ export default function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/buy-land" element={<BuyLand />} />
+
+            {/* Sales Manager routes */}
+            <Route path="/sales-manager" element={<RequireAuth><SalesManagerDashboard /></RequireAuth>} />
+            <Route path="/sales-manager/parcels/:id" element={<RequireAuth><ParcelDetail /></RequireAuth>} />
+            <Route path="/sales-manager/parcels/:id/request-visit" element={<RequireAuth><RequestVisit /></RequireAuth>} />
+            <Route path="/sales-manager/validation" element={<RequireAuth><ValidationRequests /></RequireAuth>} />
+            <Route path="/sales-manager/sell" element={<RequireAuth><SellerDashboard /></RequireAuth>} />
+            <Route path="/sales-manager/buy-land" element={<RequireAuth><BuyLand /></RequireAuth>} />
+            <Route path="/sales-manager/site-plans" element={<RequireAuth><SitePlans /></RequireAuth>} />
+            <Route path="/sales-manager/visits" element={<RequireAuth><MyVisits /></RequireAuth>} />
+            <Route path="/sales-manager/visits/:id" element={<RequireAuth><VisitDetailOwner /></RequireAuth>} />
+            <Route path="/sales-manager/profile" element={<RequireAuth><Profile /></RequireAuth>} />
 
             {/* Owner routes */}
             <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />

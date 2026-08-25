@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { Card, Badge, Skeleton } from '@earthglobal/design-system';
 import api from '../../services/api';
-import OwnerLayout from '../../components/OwnerLayout';
+import { useRoleLayout } from '../../hooks/useRoleLayout';
 
 const Title = styled.h1`
   font-size: ${({ theme }) => theme.fontSizes['2xl']};
@@ -171,6 +171,7 @@ const fmtDate = (d) => d
 export default function MyVisits() {
   const { t } = useTranslation();
   const { t: tCommon } = useTranslation('common');
+  const { Layout, routePrefix } = useRoleLayout();
   const [visits, setVisits] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -200,7 +201,7 @@ export default function MyVisits() {
   ];
 
   return (
-    <OwnerLayout>
+    <Layout>
       <Title>My Visits</Title>
       <Subtitle>Track your field visit requests and view agent reports.</Subtitle>
 
@@ -253,7 +254,7 @@ export default function MyVisits() {
             const colors = TYPE_COLORS[v.type] || TYPE_COLORS.photo;
             return (
               <motion.div key={v.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.03 }}>
-                <VisitRow as={Link} to={`/visits/${v.id}`} interactive>
+                <VisitRow as={Link} to={`${routePrefix}/visits/${v.id}`} interactive>
                   <VisitLeft>
                     <VisitTypeIcon style={{ background: colors.bg, color: colors.color }}>
                       <Icon size={20} />
@@ -282,6 +283,6 @@ export default function MyVisits() {
           })}
         </List>
       )}
-    </OwnerLayout>
+    </Layout>
   );
 }

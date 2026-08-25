@@ -7,7 +7,7 @@ import {
   TrendingUp, Package, Receipt as ReceiptIcon, ChevronRight,
 } from 'lucide-react';
 import api from '../services/api';
-import OwnerLayout from '../components/OwnerLayout';
+import { useRoleLayout } from '../hooks/useRoleLayout';
 
 const Header = styled.div`margin-bottom: 24px;`;
 const Title = styled.h1`font-size: 1.75rem; display: flex; align-items: center; gap: 8px;`;
@@ -123,6 +123,7 @@ const Toast = styled.div`
 
 export default function SellerDashboard() {
   const navigate = useNavigate();
+  const { Layout } = useRoleLayout();
   const [activeTab, setActiveTab] = useState('listings');
   const [listings, setListings] = useState([]);
   const [sales, setSales] = useState([]);
@@ -269,7 +270,7 @@ export default function SellerDashboard() {
   ];
 
   return (
-    <OwnerLayout>
+    <Layout>
       <Header>
         <Title><Landmark size={24} /> Land Sale Dashboard</Title>
         <Subtitle>List your land for sale, manage purchase requests, and track your sales.</Subtitle>
@@ -585,6 +586,6 @@ export default function SellerDashboard() {
           {toast.msg}
         </Toast>
       )}
-    </OwnerLayout>
+    </Layout>
   );
 }

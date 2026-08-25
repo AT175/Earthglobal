@@ -47,6 +47,19 @@ export default {
         detected: 'Detected {{date}}',
         perimeter: '{{value}}m perimeter',
       },
+      // ── Sales Manager ──
+      salesManager: {
+        title: 'Sales Manager Dashboard',
+        overview: 'Overview',
+        parcels: 'All Parcels',
+        listLand: 'List Land for Sale',
+        browseLand: 'Browse Land',
+        validation: 'Validation',
+        sitePlans: 'Site Plans',
+        universalAccess: 'Universal access across all assemblies',
+        commission: '10% commission per sale',
+        freeRegistration: 'Free registration',
+      },
       // ── Owner: Request Visit ──
       requestVisit: {
         title: 'Request a Visit',
@@ -144,6 +157,18 @@ export default {
         noAlerts: 'No se detectaron cambios.',
         detected: 'Detectado el {{date}}',
         perimeter: 'Perímetro de {{value}}m',
+      },
+      salesManager: {
+        title: 'Panel de Gerente de Ventas',
+        overview: 'Resumen',
+        parcels: 'Todas las Parcelas',
+        listLand: 'Vender Terreno',
+        browseLand: 'Explorar Terrenos',
+        validation: 'Validación',
+        sitePlans: 'Planos de Sitio',
+        universalAccess: 'Acceso universal en todas las asambleas',
+        commission: '10% de comisión por venta',
+        freeRegistration: 'Registro gratuito',
       },
       requestVisit: {
         title: 'Solicitar una visita',

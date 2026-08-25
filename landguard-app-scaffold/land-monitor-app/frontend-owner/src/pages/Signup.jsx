@@ -4,7 +4,8 @@ import { motion } from 'framer-motion';
 import styled, { keyframes } from 'styled-components';
 import {
   MapPin, Mail, Lock, ArrowRight, AlertCircle, Eye, EyeOff,
-  User, Phone, ArrowLeft, CheckCircle2, Loader, Landmark,
+  User, Phone, ArrowLeft, Satellite, CheckCircle2, Shield,
+  Landmark, Briefcase, Loader,
 } from 'lucide-react';
 import api from '../services/api';
 
@@ -318,7 +319,13 @@ export default function Signup() {
     setError('');
 
     try {
-      await api.post('/auth/signup', form);
+      const { data } = await api.post('/auth/signup', form);
+      if (data.token) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify({ ...data.owner, role: data.role || 'owner' }));
+        navigate('/');
+        return;
+      }
       setSuccess(true);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to create account');
@@ -403,12 +410,15 @@ export default function Signup() {
           {error && <ErrorBox style={{ marginBottom: 16 }}><AlertCircle size={16} /> {error}</ErrorBox>}
 
           <Form onSubmit={handleSubmit}>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
               <RoleOption $selected={form.account_type === 'owner'} onClick={() => setForm({ ...form, account_type: 'owner' })}>
                 <User size={18} /> Land Owner
               </RoleOption>
               <RoleOption $selected={form.account_type === 'seller'} onClick={() => setForm({ ...form, account_type: 'seller' })}>
                 <Landmark size={18} /> Land Seller
+              </RoleOption>
+              <RoleOption $selected={form.account_type === 'sales_manager'} onClick={() => setForm({ ...form, account_type: 'sales_manager' })}>
+                <Briefcase size={18} /> Sales Manager
               </RoleOption>
             </div>
             <InputGroup>

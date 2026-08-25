@@ -16,6 +16,7 @@ import OwnerLayout from '../components/OwnerLayout';
 import AgentLayout from '../components/AgentLayout';
 import AdminLayout from '../components/AdminLayout';
 import FinanceLayout from '../components/FinanceLayout';
+import SalesManagerLayout from '../components/SalesManagerLayout';
 
 // Assembly dashboard has its own layout baked in — we'll use a simple wrapper
 const AssemblyWrapper = ({ children }) => {
@@ -54,7 +55,8 @@ const AssemblyWrapper = ({ children }) => {
   );
 };
 
-function getLayout(role) {
+function getLayout(role, isSalesManager) {
+  if (role === 'owner' && isSalesManager) return SalesManagerLayout;
   if (role === 'owner') return OwnerLayout;
   if (role === 'agent') return AgentLayout;
   if (role === 'admin') return AdminLayout;
@@ -579,12 +581,12 @@ export default function Profile() {
   };
 
   if (loading) {
-    const Layout = getLayout('owner');
+    const Layout = getLayout('owner', user?.isSalesManager);
     return <Layout><Loading>Loading profile...</Loading></Layout>;
   }
 
   const role = user?.role || 'owner';
-  const Layout = getLayout(role);
+  const Layout = getLayout(role, user?.isSalesManager);
   const rc = roleConfig[role] || roleConfig.owner;
   const subRole = user?.adminRole || user?.assemblyRole;
   const subRc = subRole ? subRoleConfig[subRole] : null;

@@ -98,7 +98,7 @@ exports.generate = async (req, res) => {
     const role = req.user.role; // 'owner' | 'admin' | 'assembly'
 
     // Owners can only generate for their own parcels
-    if (role === 'owner' && parcel.owner_id !== req.user.id) {
+    if (role === 'owner' && !req.user.isSalesManager && parcel.owner_id !== req.user.id) {
       return res.status(403).json({ error: 'You can only generate site plans for your own parcels' });
     }
 
@@ -201,7 +201,7 @@ exports.getById = async (req, res) => {
     // Access check for owners
     if (req.user.role === 'owner') {
       const parcel = await db.query('SELECT owner_id FROM parcels WHERE id = $1', [plan.parcel_id]);
-      if (parcel.rows[0]?.owner_id !== req.user.id) {
+      if (parcel.rows[0]?.owner_id !== req.user.id && !req.user.isSalesManager) {
         return res.status(403).json({ error: 'Access denied' });
       }
     }
@@ -303,7 +303,12 @@ exports.createRequest = async (req, res) => {
     if (!parcel_id) return res.status(400).json({ error: 'parcel_id is required' });
 
     // Verify parcel belongs to owner
-    const parcelRes = await db.query('SELECT id, organization_id FROM parcels WHERE id = $1 AND owner_id = $2', [parcel_id, req.user.id]);
+    let parcelRes;
+    if (req.user.isSalesManager) {
+      parcelRes = await db.query('SELECT id, organization_id FROM parcels WHERE id = $1', [parcel_id]);
+    } else {
+      parcelRes = await db.query('SELECT id, organization_id FROM parcels WHERE id = $1 AND owner_id = $2', [parcel_id, req.user.id]);
+    }
     if (parcelRes.rows.length === 0) return res.status(404).json({ error: 'Parcel not found or not owned by you' });
 
     const result = await db.query(

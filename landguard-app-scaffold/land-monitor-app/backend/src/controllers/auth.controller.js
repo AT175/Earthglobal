@@ -10,7 +10,7 @@ const otpStore = new Map();
 // ── Helper: find user across owners, agents, admins, assembly_users ──
 async function findUserByEmail(email) {
   // Check owners
-  let result = await db.query('SELECT id, name, email, phone, password_hash, approved FROM owners WHERE email = $1', [email]);
+  let result = await db.query('SELECT id, name, email, phone, password_hash, approved, is_sales_manager, account_type FROM owners WHERE email = $1', [email]);
   if (result.rows[0]) return { ...result.rows[0], role: 'owner' };
 
   // Check agents
@@ -43,15 +43,37 @@ exports.signup = async (req, res, next) => {
     const existing = await findUserByEmail(email);
     if (existing) return res.status(409).json({ error: 'An account with this email already exists' });
 
-    // account_type: 'owner' (default, for monitoring) or 'seller' (for land sale marketplace)
-    const acctType = account_type === 'seller' ? 'seller' : 'owner';
+    // account_type: 'owner' (default), 'seller' (land sale marketplace), or 'sales_manager' (universal land sales professional)
+    const validTypes = ['owner', 'seller', 'sales_manager'];
+    const acctType = validTypes.includes(account_type) ? account_type : 'owner';
+    const isSalesManager = acctType === 'sales_manager';
+
+    // Sales managers get auto-approved (free registration); others require admin approval
+    const approved = isSalesManager;
 
     const result = await db.query(
-      `INSERT INTO owners (name, email, phone, password_hash, approved, account_type) VALUES ($1, $2, $3, $4, false, $5) RETURNING id, name, email, phone, account_type`,
-      [name, email, phone, passwordHash, acctType]
+      `INSERT INTO owners (name, email, phone, password_hash, approved, account_type, is_sales_manager) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, name, email, phone, account_type, is_sales_manager`,
+      [name, email, phone, passwordHash, approved, acctType, isSalesManager]
     );
 
     const owner = result.rows[0];
+
+    if (isSalesManager) {
+      // Auto-login for sales managers — no admin approval needed
+      const token = jwt.sign(
+        { id: owner.id, role: 'owner', accountType: 'sales_manager', isSalesManager: true },
+        process.env.JWT_SECRET,
+        { expiresIn: '30d' }
+      );
+      return res.status(201).json({
+        success: true,
+        message: 'Sales Manager account created successfully. You can now log in.',
+        token,
+        owner: { id: owner.id, name: owner.name, email: owner.email, phone: owner.phone, account_type: owner.account_type, is_sales_manager: true },
+        role: 'owner',
+      });
+    }
+
     // Don't return a token — account must be approved by admin first
     res.status(201).json({
       success: true,
@@ -129,8 +151,8 @@ exports.login = async (req, res, next) => {
       return res.status(403).json({ error: 'Your assembly account has been deactivated. Contact your administrator.' });
     }
 
-    // Check if owner is approved
-    if (user.role === 'owner' && user.approved === false) {
+    // Check if owner is approved (sales managers are auto-approved)
+    if (user.role === 'owner' && user.approved === false && !user.is_sales_manager) {
       return res.status(403).json({ error: 'Your account is pending administrator approval. Please check back later.' });
     }
 
@@ -143,8 +165,19 @@ exports.login = async (req, res, next) => {
     // Clear failed attempts on successful login
     recordSuccessfulLogin(email);
 
+    // Check for sales_manager flag on owner accounts
+    let isSalesManager = false;
+    let accountType = null;
+    if (user.role === 'owner') {
+      const smResult = await db.query('SELECT is_sales_manager, account_type FROM owners WHERE id = $1', [user.id]);
+      if (smResult.rows[0]) {
+        isSalesManager = smResult.rows[0].is_sales_manager;
+        accountType = smResult.rows[0].account_type;
+      }
+    }
+
     const token = jwt.sign(
-      { id: user.id, role: user.role, organizationId: user.organization_id, assemblyRole: user.assembly_role, adminRole: user.admin_role },
+      { id: user.id, role: user.role, organizationId: user.organization_id, assemblyRole: user.assembly_role, adminRole: user.admin_role, isSalesManager, accountType },
       process.env.JWT_SECRET,
       { expiresIn: '30d' }
     );
@@ -156,6 +189,7 @@ exports.login = async (req, res, next) => {
     if (user.organization_id) userInfo.organizationId = user.organization_id;
     if (user.assembly_role) userInfo.assemblyRole = user.assembly_role;
     if (user.admin_role) userInfo.adminRole = user.admin_role;
+    if (isSalesManager) { userInfo.isSalesManager = true; userInfo.accountType = accountType; }
 
     res.json({ token, owner: userInfo, role: user.role });
   } catch (err) {

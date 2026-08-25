@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { Card, Badge } from '@earthglobal/design-system';
 import api from '../services/api';
-import OwnerLayout from '../components/OwnerLayout';
+import { useRoleLayout } from '../hooks/useRoleLayout';
 
 const Header = styled.div`
   margin-bottom: ${({ theme }) => theme.spacing[8]};
@@ -167,6 +167,7 @@ const statusColors = {
 
 export default function ValidationRequests() {
   const { t } = useTranslation();
+  const { Layout } = useRoleLayout();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -246,7 +247,7 @@ export default function ValidationRequests() {
   };
 
   return (
-    <OwnerLayout>
+    <Layout>
       <Header>
         <Title><FileCheck size={28} /> Search Validation</Title>
         <Subtitle>
@@ -440,6 +441,6 @@ export default function ValidationRequests() {
           {toast.msg}
         </Toast>
       )}
-    </OwnerLayout>
+    </Layout>
   );
 }

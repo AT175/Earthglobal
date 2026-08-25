@@ -10,7 +10,7 @@ const db = require('../config/db');
 const { ee, init } = require('../config/earthEngine');
 
 // ── Helper: get parcel boundary as EE geometry ──
-async function getParcel(parcelId, userId, userRole) {
+async function getParcel(parcelId, userId, userRole, isSalesManager = false) {
   const result = await db.query(
     `SELECT id, owner_id, name, region, area_sqm, perimeter_m,
             ST_AsGeoJSON(boundary) AS boundary_geojson
@@ -19,7 +19,8 @@ async function getParcel(parcelId, userId, userRole) {
   );
   const parcel = result.rows[0];
   if (!parcel) return null;
-  if (userRole === 'owner' && parcel.owner_id !== userId) return null;
+  // Sales managers can monitor any parcel; regular owners only their own
+  if (userRole === 'owner' && !isSalesManager && parcel.owner_id !== userId) return null;
   parcel.boundary = JSON.parse(parcel.boundary_geojson);
   return parcel;
 }
@@ -57,7 +58,7 @@ function eeMapId(image, visParams) {
 // ═══════════════════════════════════════════════════════════
 exports.floodMonitor = async (req, res, next) => {
   try {
-    const parcel = await getParcel(req.params.id, req.user.id, req.user.role);
+    const parcel = await getParcel(req.params.id, req.user.id, req.user.role, req.user.isSalesManager);
     if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
 
     const ready = await init();
@@ -128,7 +129,7 @@ exports.floodMonitor = async (req, res, next) => {
 // ═══════════════════════════════════════════════════════════
 exports.encroachmentCheck = async (req, res, next) => {
   try {
-    const parcel = await getParcel(req.params.id, req.user.id, req.user.role);
+    const parcel = await getParcel(req.params.id, req.user.id, req.user.role, req.user.isSalesManager);
     if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
 
     // Find buildings whose footprint intersects the parcel boundary
@@ -179,7 +180,7 @@ exports.encroachmentCheck = async (req, res, next) => {
 // ═══════════════════════════════════════════════════════════
 exports.lulcClassify = async (req, res, next) => {
   try {
-    const parcel = await getParcel(req.params.id, req.user.id, req.user.role);
+    const parcel = await getParcel(req.params.id, req.user.id, req.user.role, req.user.isSalesManager);
     if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
 
     const ready = await init();
@@ -254,7 +255,7 @@ exports.lulcClassify = async (req, res, next) => {
 // ═══════════════════════════════════════════════════════════
 exports.fireDetect = async (req, res, next) => {
   try {
-    const parcel = await getParcel(req.params.id, req.user.id, req.user.role);
+    const parcel = await getParcel(req.params.id, req.user.id, req.user.role, req.user.isSalesManager);
     if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
 
     const ready = await init();
@@ -307,7 +308,7 @@ exports.fireDetect = async (req, res, next) => {
 // ═══════════════════════════════════════════════════════════
 exports.soilMoisture = async (req, res, next) => {
   try {
-    const parcel = await getParcel(req.params.id, req.user.id, req.user.role);
+    const parcel = await getParcel(req.params.id, req.user.id, req.user.role, req.user.isSalesManager);
     if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
 
     const ready = await init();
@@ -368,7 +369,7 @@ exports.soilMoisture = async (req, res, next) => {
 // ═══════════════════════════════════════════════════════════
 exports.rainfall = async (req, res, next) => {
   try {
-    const parcel = await getParcel(req.params.id, req.user.id, req.user.role);
+    const parcel = await getParcel(req.params.id, req.user.id, req.user.role, req.user.isSalesManager);
     if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
 
     const ready = await init();
@@ -436,7 +437,7 @@ exports.rainfall = async (req, res, next) => {
 // ═══════════════════════════════════════════════════════════
 exports.historicalImagery = async (req, res, next) => {
   try {
-    const parcel = await getParcel(req.params.id, req.user.id, req.user.role);
+    const parcel = await getParcel(req.params.id, req.user.id, req.user.role, req.user.isSalesManager);
     if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
 
     const ready = await init();
@@ -490,7 +491,7 @@ exports.historicalImagery = async (req, res, next) => {
 // ═══════════════════════════════════════════════════════════
 exports.treeCoverLoss = async (req, res, next) => {
   try {
-    const parcel = await getParcel(req.params.id, req.user.id, req.user.role);
+    const parcel = await getParcel(req.params.id, req.user.id, req.user.role, req.user.isSalesManager);
     if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
 
     const ready = await init();
@@ -548,7 +549,7 @@ exports.treeCoverLoss = async (req, res, next) => {
 // ═══════════════════════════════════════════════════════════
 exports.landSurfaceTemp = async (req, res, next) => {
   try {
-    const parcel = await getParcel(req.params.id, req.user.id, req.user.role);
+    const parcel = await getParcel(req.params.id, req.user.id, req.user.role, req.user.isSalesManager);
     if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
 
     const ready = await init();
@@ -605,7 +606,7 @@ exports.landSurfaceTemp = async (req, res, next) => {
 // ═══════════════════════════════════════════════════════════
 exports.multiIndex = async (req, res, next) => {
   try {
-    const parcel = await getParcel(req.params.id, req.user.id, req.user.role);
+    const parcel = await getParcel(req.params.id, req.user.id, req.user.role, req.user.isSalesManager);
     if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
 
     const ready = await init();
@@ -685,7 +686,7 @@ exports.multiIndex = async (req, res, next) => {
 // ═══════════════════════════════════════════════════════════
 exports.waterDetect = async (req, res, next) => {
   try {
-    const parcel = await getParcel(req.params.id, req.user.id, req.user.role);
+    const parcel = await getParcel(req.params.id, req.user.id, req.user.role, req.user.isSalesManager);
     if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
 
     const ready = await init();
@@ -738,7 +739,7 @@ exports.waterDetect = async (req, res, next) => {
 // ═══════════════════════════════════════════════════════════
 exports.carbonStock = async (req, res, next) => {
   try {
-    const parcel = await getParcel(req.params.id, req.user.id, req.user.role);
+    const parcel = await getParcel(req.params.id, req.user.id, req.user.role, req.user.isSalesManager);
     if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
 
     const ready = await init();
@@ -801,7 +802,7 @@ exports.carbonStock = async (req, res, next) => {
 // ═══════════════════════════════════════════════════════════
 exports.valuation = async (req, res, next) => {
   try {
-    const parcel = await getParcel(req.params.id, req.user.id, req.user.role);
+    const parcel = await getParcel(req.params.id, req.user.id, req.user.role, req.user.isSalesManager);
     if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
 
     // Get buildings count
@@ -912,7 +913,7 @@ exports.valuation = async (req, res, next) => {
 // ═══════════════════════════════════════════════════════════
 exports.evidencePackage = async (req, res, next) => {
   try {
-    const parcel = await getParcel(req.params.id, req.user.id, req.user.role);
+    const parcel = await getParcel(req.params.id, req.user.id, req.user.role, req.user.isSalesManager);
     if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
 
     // Gather all monitoring data
@@ -970,7 +971,7 @@ exports.evidencePackage = async (req, res, next) => {
 // ═══════════════════════════════════════════════════════════
 exports.monitoringSummary = async (req, res, next) => {
   try {
-    const parcel = await getParcel(req.params.id, req.user.id, req.user.role);
+    const parcel = await getParcel(req.params.id, req.user.id, req.user.role, req.user.isSalesManager);
     if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
 
     const ready = await init();
@@ -1025,3 +1026,4 @@ exports.monitoringSummary = async (req, res, next) => {
     next(err);
   }
 };
+

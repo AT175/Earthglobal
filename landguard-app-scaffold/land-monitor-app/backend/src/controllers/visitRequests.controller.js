@@ -480,7 +480,7 @@ exports.getDetail = async (req, res, next) => {
     const visit = visitResult.rows[0];
 
     // Authorization: owner can only see their own, agent can only see assigned
-    if (req.user.role === 'owner' && visit.owner_id !== req.user.id) {
+    if (req.user.role === 'owner' && !req.user.isSalesManager && visit.owner_id !== req.user.id) {
       return res.status(403).json({ error: 'Not authorized' });
     }
     if (req.user.role === 'agent' && visit.agent_id !== req.user.id) {

@@ -2,17 +2,26 @@ const db = require('../config/db');
 const turf = require('@turf/turf');
 const { computeParcelNdvi } = require('../jobs/ndviChangeDetection');
 
-// GET /parcels — list parcels belonging to the authenticated owner
+// GET /parcels — list parcels belonging to the authenticated owner (sales managers see all)
 exports.listForOwner = async (req, res, next) => {
   try {
-    const result = await db.query(
-      `SELECT id, name, region, survey_date, area_sqm, perimeter_m,
-              ST_AsGeoJSON(boundary) AS boundary_geojson
-       FROM parcels WHERE owner_id = $1
-       ORDER BY created_at DESC`,
-      [req.user.id]
-    );
-    res.json(result.rows.map(formatParcel));
+    if (req.user.isSalesManager) {
+      const result = await db.query(
+        `SELECT id, name, region, survey_date, area_sqm, perimeter_m, owner_id,
+                ST_AsGeoJSON(boundary) AS boundary_geojson
+         FROM parcels ORDER BY created_at DESC LIMIT 500`
+      );
+      res.json(result.rows.map(formatParcel));
+    } else {
+      const result = await db.query(
+        `SELECT id, name, region, survey_date, area_sqm, perimeter_m,
+                ST_AsGeoJSON(boundary) AS boundary_geojson
+         FROM parcels WHERE owner_id = $1
+         ORDER BY created_at DESC`,
+        [req.user.id]
+      );
+      res.json(result.rows.map(formatParcel));
+    }
   } catch (err) {
     next(err);
   }
@@ -30,8 +39,8 @@ exports.getById = async (req, res, next) => {
     const parcel = result.rows[0];
     if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
 
-    // Owners can only view their own parcel; admins/agents can view any
-    if (req.user.role === 'owner' && parcel.owner_id !== req.user.id) {
+    // Owners can only view their own parcel; sales managers can view any; admins/agents can view any
+    if (req.user.role === 'owner' && !req.user.isSalesManager && parcel.owner_id !== req.user.id) {
       return res.status(403).json({ error: 'Forbidden' });
     }
     res.json(formatParcel(parcel));
@@ -160,7 +169,7 @@ exports.listBuildings = async (req, res, next) => {
     const parcel = parcelRes.rows[0];
     if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
 
-    if (req.user.role === 'owner' && parcel.owner_id !== req.user.id) {
+    if (req.user.role === 'owner' && !req.user.isSalesManager && parcel.owner_id !== req.user.id) {
       return res.status(403).json({ error: 'Forbidden' });
     }
 

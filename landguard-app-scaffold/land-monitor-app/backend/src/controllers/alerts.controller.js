@@ -17,8 +17,19 @@ exports.listForParcel = async (req, res, next) => {
 // Returns [{ month: '2026-01', verified: 3, unverified: 5 }, ...] for the last 12 months.
 exports.trends = async (req, res, next) => {
   try {
-    const result = await db.query(
-      `SELECT
+    let query, params;
+    if (req.user.isSalesManager) {
+      query = `SELECT
+         to_char(date_trunc('month', detected_at), 'YYYY-MM') AS month,
+         COUNT(*) FILTER (WHERE verified = true)  AS verified,
+         COUNT(*) FILTER (WHERE verified = false) AS unverified
+       FROM alerts a
+       WHERE a.detected_at >= now() - interval '12 months'
+       GROUP BY date_trunc('month', detected_at)
+       ORDER BY date_trunc('month', detected_at)`;
+      params = [];
+    } else {
+      query = `SELECT
          to_char(date_trunc('month', detected_at), 'YYYY-MM') AS month,
          COUNT(*) FILTER (WHERE verified = true)  AS verified,
          COUNT(*) FILTER (WHERE verified = false) AS unverified
@@ -27,9 +38,10 @@ exports.trends = async (req, res, next) => {
        WHERE p.owner_id = $1
          AND a.detected_at >= now() - interval '12 months'
        GROUP BY date_trunc('month', detected_at)
-       ORDER BY date_trunc('month', detected_at)`,
-      [req.user.id]
-    );
+       ORDER BY date_trunc('month', detected_at)`;
+      params = [req.user.id];
+    }
+    const result = await db.query(query, params);
     res.json(result.rows);
   } catch (err) {
     next(err);

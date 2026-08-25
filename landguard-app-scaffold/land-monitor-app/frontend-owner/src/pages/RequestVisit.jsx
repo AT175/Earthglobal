@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Camera, Video, Radio } from 'lucide-react';
 import { Card, Button } from '@earthglobal/design-system';
 import api from '../services/api';
-import OwnerLayout from '../components/OwnerLayout';
+import { useRoleLayout } from '../hooks/useRoleLayout';
 
 const Title = styled.h1`
   font-size: ${({ theme }) => theme.fontSizes['2xl']};
@@ -79,6 +79,7 @@ export default function RequestVisit() {
   const { t: tCommon } = useTranslation('common');
   const { id } = useParams();
   const navigate = useNavigate();
+  const { Layout, routePrefix } = useRoleLayout();
   const [type, setType] = useState('photo');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -89,7 +90,7 @@ export default function RequestVisit() {
     setError(null);
     try {
       await api.post('/visit-requests', { parcel_id: id, type });
-      navigate(`/parcels/${id}`);
+      navigate(`${routePrefix}/parcels/${id}`);
     } catch (err) {
       console.error('Failed to create visit request', err);
       setError(t('requestVisit.error'));
@@ -99,7 +100,7 @@ export default function RequestVisit() {
   };
 
   return (
-    <OwnerLayout>
+    <Layout>
       <Title>{t('requestVisit.title')}</Title>
       <FormCard as="form" onSubmit={handleSubmit}>
         <Fieldset>
@@ -131,6 +132,6 @@ export default function RequestVisit() {
           {submitting ? t('requestVisit.submitting') : t('requestVisit.submit')}
         </Button>
       </FormCard>
-    </OwnerLayout>
+    </Layout>
   );
 }

@@ -1242,6 +1242,32 @@ CREATE INDEX IF NOT EXISTS idx_site_plan_requests_owner ON site_plan_requests (o
 CREATE INDEX IF NOT EXISTS idx_site_plan_requests_org ON site_plan_requests (organization_id);
 CREATE INDEX IF NOT EXISTS idx_site_plan_requests_status ON site_plan_requests (status);
 
+-- =========================================================
+-- SALES MANAGER ROLE
+-- =========================================================
+-- Sales managers are land professionals who list land for sale across
+-- all assemblies/tenants. They have universal access to monitoring tools,
+-- marketplace, validation, and field visits. Registration is free.
+-- They are stored in the owners table with account_type = 'sales_manager'.
+
+DO $$ BEGIN ALTER TABLE owners ADD COLUMN IF NOT EXISTS is_sales_manager BOOLEAN NOT NULL DEFAULT false; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+-- Track sales manager activity across tenants
+CREATE TABLE IF NOT EXISTS sales_manager_activity (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    sales_manager_id UUID NOT NULL REFERENCES owners(id) ON DELETE CASCADE,
+    organization_id UUID REFERENCES organizations(id) ON DELETE SET NULL,
+    activity_type VARCHAR(50) NOT NULL,
+    parcel_id UUID REFERENCES parcels(id) ON DELETE SET NULL,
+    listing_id UUID REFERENCES land_listings(id) ON DELETE SET NULL,
+    description TEXT,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_sma_manager ON sales_manager_activity(sales_manager_id);
+CREATE INDEX IF NOT EXISTS idx_sma_org ON sales_manager_activity(organization_id);
+CREATE INDEX IF NOT EXISTS idx_sma_type ON sales_manager_activity(activity_type);
+
 -- Reset search_path to the app default (pooled connections reuse this session)
 SET search_path TO earthglobal, public, extensions;
 

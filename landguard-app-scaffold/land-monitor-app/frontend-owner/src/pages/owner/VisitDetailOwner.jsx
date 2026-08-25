@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { Card, Badge, Button, Skeleton, ParcelMap } from '@earthglobal/design-system';
 import api from '../../services/api';
-import OwnerLayout from '../../components/OwnerLayout';
+import { useRoleLayout } from '../../hooks/useRoleLayout';
 
 const BackBtn = styled.button`
   display: flex;
@@ -174,6 +174,7 @@ export default function VisitDetailOwner() {
   const { t: tCommon } = useTranslation('common');
   const { id } = useParams();
   const navigate = useNavigate();
+  const { Layout, routePrefix } = useRoleLayout();
   const [visit, setVisit] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -189,24 +190,24 @@ export default function VisitDetailOwner() {
 
   if (loading) {
     return (
-      <OwnerLayout>
+      <Layout>
         <Skeleton $height="2rem" $width="50%" style={{ marginBottom: 24 }} />
         <Skeleton $height="200px" />
-      </OwnerLayout>
+      </Layout>
     );
   }
 
   if (error || !visit) {
     return (
-      <OwnerLayout>
-        <BackBtn onClick={() => navigate('/visits')}>
+      <Layout>
+        <BackBtn onClick={() => navigate(`${routePrefix}/visits`)}>
           <ArrowLeft size={16} /> Back to visits
         </BackBtn>
         <Card style={{ textAlign: 'center', padding: '2rem', color: '#f87171' }}>
           <AlertCircle size={32} style={{ marginBottom: 8 }} />
           {error || 'Visit not found'}
         </Card>
-      </OwnerLayout>
+      </Layout>
     );
   }
 
@@ -215,8 +216,8 @@ export default function VisitDetailOwner() {
   const media = visit.media || [];
 
   return (
-    <OwnerLayout>
-      <BackBtn onClick={() => navigate('/visits')}>
+    <Layout>
+      <BackBtn onClick={() => navigate(`${routePrefix}/visits`)}>
         <ArrowLeft size={16} /> Back to visits
       </BackBtn>
 
@@ -362,15 +363,15 @@ export default function VisitDetailOwner() {
 
       {/* Actions */}
       <div style={{ marginTop: 24, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <Button variant="secondary" onClick={() => navigate(`/parcels/${visit.parcel_id}`)}>
+        <Button variant="secondary" onClick={() => navigate(`${routePrefix}/parcels/${visit.parcel_id}`)}>
           <MapPin size={16} /> View Parcel
         </Button>
         {visit.status === 'completed' && (
-          <Button variant="ghost" onClick={() => navigate('/visits')}>
+          <Button variant="ghost" onClick={() => navigate(`${routePrefix}/visits`)}>
             <ArrowLeft size={16} /> Back to All Visits
           </Button>
         )}
       </div>
-    </OwnerLayout>
+    </Layout>
   );
 }

@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { Card, Badge, Button, Skeleton } from '@earthglobal/design-system';
 import api from '../services/api';
-import OwnerLayout from '../components/OwnerLayout';
+import { useRoleLayout } from '../hooks/useRoleLayout';
 
 const Header = styled.div`
   margin-bottom: ${({ theme }) => theme.spacing[8]};
@@ -279,6 +279,7 @@ function PlanPreviewSvg({ planData }) {
 
 export default function SitePlans() {
   const navigate = useNavigate();
+  const { Layout } = useRoleLayout();
   const [tab, setTab] = useState('plans');
   const [plans, setPlans] = useState([]);
   const [requests, setRequests] = useState([]);
@@ -352,7 +353,7 @@ export default function SitePlans() {
   };
 
   return (
-    <OwnerLayout>
+    <Layout>
       <Header>
         <Title>Site Plans</Title>
         <Subtitle>Generate and request certified site plans for your parcels</Subtitle>
@@ -536,6 +537,6 @@ export default function SitePlans() {
           </Modal>
         )}
       </AnimatePresence>
-    </OwnerLayout>
+    </Layout>
   );
 }
