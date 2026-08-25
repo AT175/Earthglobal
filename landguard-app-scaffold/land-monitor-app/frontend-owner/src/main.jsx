@@ -4,7 +4,14 @@ import { createI18n } from '@earthglobal/design-system';
 import App from './App';
 import ownerResources from './i18n/resources';
 
-createI18n(ownerResources);
+createI18n(ownerResources, {
+  returnNull: false,
+  returnEmptyString: false,
+  parseMissingKeyHandler: (key) => {
+    const parts = key.split('.');
+    return parts[parts.length - 1];
+  },
+});
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 
