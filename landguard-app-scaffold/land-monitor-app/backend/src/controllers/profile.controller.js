@@ -15,7 +15,7 @@ const ROLE_TABLES = {
   owner: {
     table: 'owners',
     // Columns that can be read/updated via profile
-    profileColumns: 'id, name, email, phone, avatar_url, bio, address, region, account_type, approved, created_at, notification_email, notification_sms, notification_push',
+    profileColumns: 'id, name, email, phone, avatar_url, bio, address, region, account_type, is_sales_manager, approved, created_at, notification_email, notification_sms, notification_push',
     editableFields: ['name', 'phone', 'avatar_url', 'bio', 'address', 'region', 'notification_email', 'notification_sms', 'notification_push'],
   },
   agent: {
@@ -163,7 +163,7 @@ exports.getStats = async (req, res, next) => {
     if (role === 'owner') {
       const [parcels, alerts, visits, subscriptions] = await Promise.all([
         db.query('SELECT COUNT(*) AS count FROM parcels WHERE owner_id = $1', [userId]),
-        db.query('SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE verified = false) AS unverified FROM alerts WHERE owner_id = $1', [userId]),
+        db.query('SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE a.verified = false) AS unverified FROM alerts a JOIN parcels p ON a.parcel_id = p.id WHERE p.owner_id = $1', [userId]),
         db.query('SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE status = \'completed\') AS completed FROM visit_requests WHERE owner_id = $1', [userId]),
         db.query('SELECT COUNT(*) AS count, MAX(created_at) AS latest FROM subscriptions WHERE owner_id = $1 AND status = \'active\'', [userId]),
       ]);
