@@ -424,7 +424,7 @@ export default function SitePlans() {
                   <PlanPreview>
                     <PlanPreviewSvg planData={plan.plan_data} />
                   </PlanPreview>
-                  <div style={{ fontSize: '0.8em', color: ${({ theme }) => theme.colors.textMuted}, display: 'flex', justifyContent: 'space-between' }}>
+                  <div style={{ fontSize: '0.8em', color: '#aab7d4', display: 'flex', justifyContent: 'space-between' }}>
                     <span>Created {new Date(plan.created_at).toLocaleDateString()}</span>
                     {plan.certified_at && <span>Certified {new Date(plan.certified_at).toLocaleDateString()}</span>}
                   </div>
