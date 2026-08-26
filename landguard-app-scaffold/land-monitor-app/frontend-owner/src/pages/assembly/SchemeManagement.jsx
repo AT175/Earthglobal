@@ -661,10 +661,12 @@ export default function SchemeManagement() {
                 )}
 
                 <MapPanel>
-                  <MapContainer center={DEFAULT_CENTER} zoom={13} style={{ width: '100%', height: '100%' }}>
+                  <MapContainer center={DEFAULT_CENTER} zoom={13} scrollWheelZoom maxZoom={19} minZoom={2} style={{ width: '100%', height: '100%' }}>
                     <TileLayer
-                      url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-                      attribution="&copy; CARTO"
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      attribution="&copy; OpenStreetMap contributors"
+                      maxZoom={19}
+                      maxNativeZoom={19}
                     />
                     {schemeParcels && schemeParcels.features?.length > 0 && (
                       <GeoJSON

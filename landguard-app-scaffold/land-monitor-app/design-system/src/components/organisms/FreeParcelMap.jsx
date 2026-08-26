@@ -33,6 +33,13 @@ const MapWrapper = styled.div`
     background: ${({ theme }) => theme.colors.backgroundSecondary};
   }
 
+  .leaflet-pane { z-index: 1; }
+  .leaflet-tile-pane { z-index: 2; }
+  .leaflet-overlay-pane { z-index: 3; }
+  .leaflet-marker-pane { z-index: 4; }
+  .leaflet-popup-pane { z-index: 5; }
+  .leaflet-control { z-index: 1000; }
+
   .leaflet-control-attribution {
     background: ${({ theme }) => theme.colors.surface}CC !important;
     color: ${({ theme }) => theme.colors.textMuted} !important;
@@ -65,7 +72,7 @@ const StyleSwitcher = styled.div`
   position: absolute;
   top: ${({ theme }) => theme.spacing[3]};
   right: ${({ theme }) => theme.spacing[3]};
-  z-index: 1000;
+  z-index: 400;
   display: flex;
   gap: ${({ theme }) => theme.spacing[1]};
   background: ${({ theme }) => theme.colors.surface}CC;
@@ -93,6 +100,7 @@ const StyleButton = styled.button`
 `;
 
 // Free fallback tile layers — no API key required
+// Using multiple reliable providers with proper subdomains
 const fallbackTiles = {
   satellite: {
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
@@ -107,8 +115,8 @@ const fallbackTiles = {
     maxNativeZoom: 17,
   },
   street: {
-    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; OpenStreetMap contributors',
     maxZoom: 19,
     maxNativeZoom: 19,
   },
@@ -133,7 +141,7 @@ const layerOptions = [
   { value: 'osm', label: 'Street' },
   { value: 'ndvi', label: 'NDVI' },
   { value: 'terrain', label: 'Terrain' },
-  { value: 'street', label: 'Dark' },
+  { value: 'street', label: 'Street' },
 ];
 
 // Polygon colors matching the EarthGlobal theme
@@ -273,8 +281,10 @@ export default function FreeParcelMap({ path = [], center, status = 'active', he
       <MapContainer
         center={resolvedCenter ? [resolvedCenter.lat, resolvedCenter.lng] : [0, 0]}
         zoom={17}
+        minZoom={2}
         maxZoom={19}
         scrollWheelZoom
+        zoomControl
         style={{ width: '100%', height: '100%' }}
       >
         <DynamicTileLayer layerType={layerType} eeTiles={eeTiles} path={path} />

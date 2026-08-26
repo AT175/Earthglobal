@@ -1188,7 +1188,7 @@ export default function PlanningDashboard() {
   const parcelList = parcelsFC?.features || [];
 
   const fallbackSatellite = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-  const fallbackStreet = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+  const fallbackStreet = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 
   return (
     <Page>
@@ -1418,7 +1418,7 @@ export default function PlanningDashboard() {
         {/* ── Map ── */}
         <MapArea>
           <MapWrapper>
-            <MapContainer center={DEFAULT_CENTER} zoom={14} scrollWheelZoom style={{ width: '100%', height: '100%' }}>
+            <MapContainer center={DEFAULT_CENTER} zoom={14} scrollWheelZoom maxZoom={19} minZoom={2} style={{ width: '100%', height: '100%' }}>
               {/* Base layer */}
               {baseLayer === 'satellite' && (
                 <TileLayer url={fallbackSatellite} attribution="Tiles &copy; Esri" maxZoom={19} maxNativeZoom={19} />
@@ -1427,7 +1427,7 @@ export default function PlanningDashboard() {
                 <TileLayer url={satelliteTiles?.url || fallbackSatellite} attribution={satelliteTiles?.attribution || '&copy; Copernicus Sentinel-2 via EE'} maxZoom={18} maxNativeZoom={16} />
               )}
               {baseLayer === 'street' && (
-                <TileLayer url={fallbackStreet} attribution="&copy; OpenStreetMap, &copy; CARTO" maxZoom={19} />
+                <TileLayer url={fallbackStreet} attribution="&copy; OpenStreetMap, &copy; CARTO" maxZoom={19} maxNativeZoom={19} />
               )}
               {baseLayer === 'detection' && detectionResult?.tileUrl && (
                 <>
