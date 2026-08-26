@@ -91,7 +91,7 @@ export default function RequestVisit() {
     setSubmitting(true);
     setError(null);
     try {
-      await api.post('/visit-requests', { parcel_id: id, type, notes });
+      await api.post('/visit-requests', { parcel_id: id, type, owner_notes: notes });
       setSuccess(true);
       setTimeout(() => navigate(`${routePrefix}/parcels/${id}`), 1500);
     } catch (err) {

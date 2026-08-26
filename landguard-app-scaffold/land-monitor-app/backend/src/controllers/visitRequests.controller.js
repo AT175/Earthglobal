@@ -364,30 +364,37 @@ exports.create = async (req, res, next) => {
     const parcelName = parcelRow.rows[0]?.name || 'your parcel';
 
     if (agentId) {
-      // Notify the assigned agent
-      await createNotification({
-        ownerId: null,
-        agentId,
-        title: 'New visit assigned to you',
-        body: `${type} visit for "${parcelName}" has been auto-assigned to you.`,
-      });
-      // Notify the owner
-      await createNotification({
-        ownerId: req.user.id,
-        agentId: null,
-        title: 'Visit request assigned',
-        body: `Your ${type} visit for "${parcelName}" has been assigned to ${bestAgent.name}.`,
-      });
+      // Notify the assigned agent (non-critical — don't fail the request if notifications break)
+      try {
+        await createNotification({
+          ownerId: null,
+          agentId,
+          title: 'New visit assigned to you',
+          body: `${type} visit for "${parcelName}" has been auto-assigned to you.`,
+        });
+        await createNotification({
+          ownerId: req.user.id,
+          agentId: null,
+          title: 'Visit request assigned',
+          body: `Your ${type} visit for "${parcelName}" has been assigned to ${bestAgent.name}.`,
+        });
+      } catch (notifErr) {
+        logger.warn({ visitId: visit.id, error: notifErr.message }, 'Failed to create visit notifications — visit still created');
+      }
       logger.info({ visitId: visit.id, agentId }, 'Visit auto-assigned to agent');
     } else {
-      // No agent available — notify all active agents in the region (if any)
       logger.warn({ visitId: visit.id }, 'No active agent found for visit — left unassigned');
     }
 
-    bus.emit('visit:status', { visit, ownerId: visit.owner_id, agentId: visit.agent_id });
+    try {
+      bus.emit('visit:status', { visit, ownerId: visit.owner_id, agentId: visit.agent_id });
+    } catch (busErr) {
+      logger.warn({ visitId: visit.id, error: busErr.message }, 'Failed to emit visit:status event — visit still created');
+    }
 
     res.status(201).json(visit);
   } catch (err) {
+    logger.error('[Visit Request Create] Error: %s | parcel_id=%s type=%s user=%s', err.message, req.body?.parcel_id, req.body?.type, req.user?.id);
     next(err);
   }
 };
