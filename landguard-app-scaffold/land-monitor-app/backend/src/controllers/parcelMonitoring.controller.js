@@ -8,6 +8,7 @@
  */
 const db = require('../config/db');
 const { ee, init } = require('../config/earthEngine');
+const logger = require('../config/logger');
 
 // ── Helper: get parcel boundary as EE geometry ──
 async function getParcel(parcelId, userId, userRole, isSalesManager = false) {
@@ -31,10 +32,15 @@ function boundaryToEE(boundaryGeojson) {
   return ee.Geometry.Polygon([ring]);
 }
 
-// ── Helper: EE getInfo as promise ──
+// ── Helper: EE getInfo as promise (with 30s timeout) ──
 function eeInfo(computedObject) {
   return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error('Earth Engine request timed out after 30s'));
+    }, 30000);
+
     computedObject.getInfo((err, info) => {
+      clearTimeout(timer);
       if (err) reject(err);
       else resolve(info);
     });
@@ -120,6 +126,7 @@ exports.floodMonitor = async (req, res, next) => {
         : 'No flooding detected in the last 14 days. The parcel appears dry based on satellite radar and optical imagery.',
     });
   } catch (err) {
+    logger.error('[Monitoring] %s', err.message);
     next(err);
   }
 };
@@ -144,7 +151,7 @@ exports.encroachmentCheck = async (req, res, next) => {
              ST_AsGeoJSON(b.footprint) AS footprint_geojson,
              ST_AsGeoJSON(ST_Centroid(b.footprint)) AS centroid_geojson
        FROM buildings b
-       WHERE b.parcel_id IS NULL OR b.parcel_id != $1
+       WHERE (b.parcel_id IS NULL OR b.parcel_id != $1)
        AND ST_DWithin(b.footprint, (SELECT bl FROM boundary_line), 15)
        ORDER BY distance_m ASC
        LIMIT 20`,
@@ -171,6 +178,7 @@ exports.encroachmentCheck = async (req, res, next) => {
         : 'No structures detected near your boundary. Your parcel borders appear clear of encroachment.',
     });
   } catch (err) {
+    logger.error('[Monitoring] %s', err.message);
     next(err);
   }
 };
@@ -246,6 +254,7 @@ exports.lulcClassify = async (req, res, next) => {
         : 'Unable to classify land cover for this parcel.',
     });
   } catch (err) {
+    logger.error('[Monitoring] %s', err.message);
     next(err);
   }
 };
@@ -299,6 +308,7 @@ exports.fireDetect = async (req, res, next) => {
         : 'No burn scars detected in the last 30 days. Your parcel appears free of fire damage.',
     });
   } catch (err) {
+    logger.error('[Monitoring] %s', err.message);
     next(err);
   }
 };
@@ -360,6 +370,7 @@ exports.soilMoisture = async (req, res, next) => {
       }`,
     });
   } catch (err) {
+    logger.error('[Monitoring] %s', err.message);
     next(err);
   }
 };
@@ -428,6 +439,7 @@ exports.rainfall = async (req, res, next) => {
         : `Rainfall this month (${rainfall30}mm) is near the historical average (${histAvg != null ? histAvg + 'mm' : 'unknown'}). Conditions are normal for this season.`,
     });
   } catch (err) {
+    logger.error('[Monitoring] %s', err.message);
     next(err);
   }
 };
@@ -464,13 +476,13 @@ exports.historicalImagery = async (req, res, next) => {
           .filterBounds(region);
         const image = collection.median().visualize({ bands: ['B4', 'B3', 'B2'], min: 0, max: 3000, gamma: 1.4 });
         const result = await eeMapId(image, { min: 0, max: 255 });
-        const ndvi = collection.median().normalizedDifference(['B8', 'B4']);
+        const ndvi = collection.median().normalizedDifference(['B8', 'B4']).rename('ndvi');
         const ndviVal = await eeInfo(ndvi.reduceRegion({ reducer: ee.Reducer.mean(), geometry: region, scale: 10, maxPixels: 1e9 }));
         snapshots.push({
           label: interval.label,
           date: interval.start.toISOString().slice(0, 10),
           tileUrl: result.urlFormat || `https://earthengine.googleapis.com/v1/${result.mapid}/tiles/{z}/{x}/{y}`,
-          ndvi: ndviVal.nd != null ? Number(ndviVal.nd.toFixed(3)) : null,
+          ndvi: ndviVal.ndvi != null ? Number(ndviVal.ndvi.toFixed(3)) : null,
         });
       } catch (e) { /* skip failed snapshots */ }
     }
@@ -482,6 +494,7 @@ exports.historicalImagery = async (req, res, next) => {
         : 'Limited historical imagery available for this location.',
     });
   } catch (err) {
+    logger.error('[Monitoring] %s', err.message);
     next(err);
   }
 };
@@ -508,7 +521,7 @@ exports.treeCoverLoss = async (req, res, next) => {
     // Tree cover in 2000 within parcel
     const treeArea = treecover2000.gte(30).multiply(ee.Image.pixelArea());
     const treeInfo = await eeInfo(treeArea.reduceRegion({ reducer: ee.Reducer.sum(), geometry: region, scale: 30, maxPixels: 1e9 }));
-    const treeCover2000_sqm = treeArea.sum ? Math.round(treeInfo.sum) : 0;
+    const treeCover2000_sqm = treeInfo.sum ? Math.round(treeInfo.sum) : 0;
 
     // Total loss area
     const lossArea = loss.eq(1).multiply(ee.Image.pixelArea());
@@ -540,6 +553,7 @@ exports.treeCoverLoss = async (req, res, next) => {
         : 'Your parcel did not have significant tree cover (>=30% canopy) in 2000. Tree cover loss monitoring is most relevant for forested areas.',
     });
   } catch (err) {
+    logger.error('[Monitoring] %s', err.message);
     next(err);
   }
 };
@@ -565,8 +579,13 @@ exports.landSurfaceTemp = async (req, res, next) => {
       .filterBounds(region)
       .filter(ee.Filter.lt('CLOUD_COVER', 30));
 
+    // Check if any imagery exists by getting collection size
+    const countInfo = await eeInfo(landsat.size());
+    if (!countInfo || countInfo === 0) {
+      return res.json({ lst: null, message: 'No Landsat imagery available in the last 90 days' });
+    }
+
     const image = landsat.sort('CLOUD_COVER', true).first();
-    if (!image) return res.json({ lst: null, message: 'No Landsat imagery available in the last 90 days' });
 
     // Compute LST from thermal band (ST_B10)
     const lst = image.select('ST_B10').multiply(0.00341802).add(149.0).subtract(273.15);
@@ -597,6 +616,7 @@ exports.landSurfaceTemp = async (req, res, next) => {
         : 'Unable to compute land surface temperature from available Landsat imagery.',
     });
   } catch (err) {
+    logger.error('[Monitoring] %s', err.message);
     next(err);
   }
 };
@@ -623,17 +643,17 @@ exports.multiIndex = async (req, res, next) => {
       .filterBounds(region)
       .median();
 
-    const ndvi = image.normalizedDifference(['B8', 'B4']);
+    const ndvi = image.normalizedDifference(['B8', 'B4']).rename('ndvi');
     const evi = image.expression(
       '2.5 * ((NIR - RED) / (NIR + 6 * RED - 7.5 * BLUE + 1))',
       { NIR: image.select('B8'), RED: image.select('B4'), BLUE: image.select('B2') }
-    );
+    ).rename('evi');
     const savi = image.expression(
       '((NIR - RED) / (NIR + RED + 0.5)) * 1.5',
       { NIR: image.select('B8'), RED: image.select('B4') }
-    );
-    const gndvi = image.normalizedDifference(['B8', 'B3']);
-    const ndre = image.normalizedDifference(['B8', 'B5']); // Red edge for nitrogen
+    ).rename('savi');
+    const gndvi = image.normalizedDifference(['B8', 'B3']).rename('gndvi');
+    const ndre = image.normalizedDifference(['B8', 'B5']).rename('ndre');
 
     const [ndviInfo, eviInfo, saviInfo, gndviInfo, ndreInfo] = await Promise.all([
       eeInfo(ndvi.reduceRegion({ reducer: ee.Reducer.mean(), geometry: region, scale: 10, maxPixels: 1e9 })),
@@ -645,9 +665,9 @@ exports.multiIndex = async (req, res, next) => {
 
     const indices = [
       {
-        name: 'NDVI', value: ndviInfo.nd != null ? Number(ndviInfo.nd.toFixed(3)) : null,
+        name: 'NDVI', value: ndviInfo.ndvi != null ? Number(ndviInfo.ndvi.toFixed(3)) : null,
         label: 'Normalized Difference Vegetation Index',
-        interpretation: ndviInfo.nd != null ? (ndviInfo.nd > 0.5 ? 'Healthy dense vegetation' : ndviInfo.nd > 0.3 ? 'Moderate vegetation' : ndviInfo.nd > 0.1 ? 'Sparse vegetation' : 'Bare soil or built-up') : 'N/A',
+        interpretation: ndviInfo.ndvi != null ? (ndviInfo.ndvi > 0.5 ? 'Healthy dense vegetation' : ndviInfo.ndvi > 0.3 ? 'Moderate vegetation' : ndviInfo.ndvi > 0.1 ? 'Sparse vegetation' : 'Bare soil or built-up') : 'N/A',
       },
       {
         name: 'EVI', value: eviInfo.evi != null ? Number(eviInfo.evi.toFixed(3)) : null,
@@ -660,14 +680,14 @@ exports.multiIndex = async (req, res, next) => {
         interpretation: saviInfo.savi != null ? (saviInfo.savi > 0.4 ? 'Good vegetation with soil background corrected' : 'Low vegetation, soil influence high') : 'N/A',
       },
       {
-        name: 'GNDVI', value: gndviInfo.nd != null ? Number(gndviInfo.nd.toFixed(3)) : null,
+        name: 'GNDVI', value: gndviInfo.gndvi != null ? Number(gndviInfo.gndvi.toFixed(3)) : null,
         label: 'Green NDVI (Chlorophyll)',
-        interpretation: gndviInfo.nd != null ? (gndviInfo.nd > 0.5 ? 'High chlorophyll content' : gndviInfo.nd > 0.3 ? 'Moderate chlorophyll' : 'Low chlorophyll, possible nutrient deficiency') : 'N/A',
+        interpretation: gndviInfo.gndvi != null ? (gndviInfo.gndvi > 0.5 ? 'High chlorophyll content' : gndviInfo.gndvi > 0.3 ? 'Moderate chlorophyll' : 'Low chlorophyll, possible nutrient deficiency') : 'N/A',
       },
       {
-        name: 'NDRE', value: ndreInfo.nd != null ? Number(ndreInfo.nd.toFixed(3)) : null,
+        name: 'NDRE', value: ndreInfo.ndre != null ? Number(ndreInfo.ndre.toFixed(3)) : null,
         label: 'Red Edge (Nitrogen Stress)',
-        interpretation: ndreInfo.nd != null ? (ndreInfo.nd > 0.3 ? 'Sufficient nitrogen' : ndreInfo.nd > 0.1 ? 'Moderate nitrogen' : 'Nitrogen deficiency likely — consider fertilization') : 'N/A',
+        interpretation: ndreInfo.ndre != null ? (ndreInfo.ndre > 0.3 ? 'Sufficient nitrogen' : ndreInfo.ndre > 0.1 ? 'Moderate nitrogen' : 'Nitrogen deficiency likely — consider fertilization') : 'N/A',
       },
     ];
 
@@ -677,6 +697,7 @@ exports.multiIndex = async (req, res, next) => {
       interpretation: `${indices.filter(i => i.value != null).length} vegetation indices computed. Cross-reference them: if NDVI is moderate but NDRE is low, nitrogen fertilizer may help. If EVI is lower than NDVI, vegetation may be sparse or young.`,
     });
   } catch (err) {
+    logger.error('[Monitoring] %s', err.message);
     next(err);
   }
 };
@@ -730,6 +751,7 @@ exports.waterDetect = async (req, res, next) => {
         : 'No significant water bodies detected on or near your parcel. Consider rainwater harvesting or well installation for water supply.',
     });
   } catch (err) {
+    logger.error('[Monitoring] %s', err.message);
     next(err);
   }
 };
@@ -756,16 +778,16 @@ exports.carbonStock = async (req, res, next) => {
       .filterBounds(region)
       .median();
 
-    const ndvi = image.normalizedDifference(['B8', 'B4']);
-    const ndmi = image.normalizedDifference(['B8', 'B11']);
+    const ndvi = image.normalizedDifference(['B8', 'B4']).rename('ndvi');
+    const ndmi = image.normalizedDifference(['B8', 'B11']).rename('ndmi');
 
     const [ndviInfo, ndmiInfo] = await Promise.all([
       eeInfo(ndvi.reduceRegion({ reducer: ee.Reducer.mean(), geometry: region, scale: 10, maxPixels: 1e9 })),
       eeInfo(ndmi.reduceRegion({ reducer: ee.Reducer.mean(), geometry: region, scale: 10, maxPixels: 1e9 })),
     ]);
 
-    const ndviMean = ndviInfo.nd || 0;
-    const ndmiMean = ndmiInfo.nd || 0;
+    const ndviMean = ndviInfo.ndvi || 0;
+    const ndmiMean = ndmiInfo.ndmi || 0;
 
     // Rough above-ground biomass (AGB) estimation from NDVI
     // Using a simplified relationship: AGB (t/ha) ≈ NDVI * 200 for tropical regions
@@ -793,6 +815,7 @@ exports.carbonStock = async (req, res, next) => {
         : `Estimated carbon stock: ${carbonStock_t.toFixed(1)} tonnes C. Low carbon value — the parcel has limited vegetation. Tree planting could generate future carbon credit income.`,
     });
   } catch (err) {
+    logger.error('[Monitoring] %s', err.message);
     next(err);
   }
 };
@@ -904,6 +927,7 @@ exports.valuation = async (req, res, next) => {
       disclaimer: 'This estimate is for informational purposes only and is not a formal appraisal. Market prices vary significantly. Consult a licensed valuer for official valuation.',
     });
   } catch (err) {
+    logger.error('[Monitoring] %s', err.message);
     next(err);
   }
 };
@@ -921,7 +945,7 @@ exports.evidencePackage = async (req, res, next) => {
       db.query(`SELECT id, area_sqm, estimated_height_m, estimated_floors, status, detected_at, in_protected_area, notes FROM buildings WHERE parcel_id = $1 ORDER BY detected_at DESC`, [req.params.id]),
       db.query(`SELECT id, image_url, ndvi_value, captured_at, source FROM parcel_images WHERE parcel_id = $1 ORDER BY captured_at DESC LIMIT 10`, [req.params.id]),
       db.query(`SELECT id, alert_type, detected_at, verified, verified_at FROM alerts WHERE parcel_id = $1 ORDER BY detected_at DESC`, [req.params.id]),
-      db.query(`SELECT id, type, status, requested_at, agent_name FROM visit_requests WHERE parcel_id = $1 ORDER BY requested_at DESC`, [req.params.id]),
+      db.query(`SELECT v.id, v.type, v.status, v.requested_at, a.name AS agent_name FROM visit_requests v LEFT JOIN agents a ON v.agent_id = a.id WHERE v.parcel_id = $1 ORDER BY v.requested_at DESC`, [req.params.id]),
     ]);
 
     const ownerRes = await db.query(`SELECT name, email, phone FROM owners WHERE id = $1`, [parcel.owner_id]);
@@ -962,6 +986,7 @@ exports.evidencePackage = async (req, res, next) => {
       },
     });
   } catch (err) {
+    logger.error('[Monitoring] %s', err.message);
     next(err);
   }
 };
@@ -1023,6 +1048,7 @@ exports.monitoringSummary = async (req, res, next) => {
 
     res.json(summary);
   } catch (err) {
+    logger.error('[Monitoring] %s', err.message);
     next(err);
   }
 };

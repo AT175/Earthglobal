@@ -275,6 +275,15 @@ const MonitorStat = styled.div`
   }
 `;
 
+const MonitorError = styled.div`
+  font-size: 0.8rem;
+  color: #f87171;
+  padding: 8px 12px;
+  background: rgba(248,113,113,0.08);
+  border-radius: ${({ theme }) => theme.radii.sm};
+  border-left: 3px solid #f87171;
+`;
+
 const LulcBar = styled.div`
   display: flex;
   height: 24px;
@@ -346,13 +355,19 @@ export default function ParcelDetail() {
   const [gpsResult, setGpsResult] = useState(null);
   const trackerRef = useRef(null);
 
+  const [monitorErrors, setMonitorErrors] = useState({});
+
   const fetchMonitor = async (key, endpoint) => {
     setMonitorLoading(prev => ({ ...prev, [key]: true }));
+    setMonitorErrors(prev => ({ ...prev, [key]: null }));
     try {
       const res = await api.get(`/parcels/${id}/${endpoint}`);
       setMonitorData(prev => ({ ...prev, [key]: res.data }));
     } catch (err) {
-      console.error(`Failed to fetch ${key}:`, err.message);
+      const msg = err.response?.data?.error || err.message || 'Failed to fetch';
+      console.error(`Failed to fetch ${key}:`, msg);
+      setMonitorErrors(prev => ({ ...prev, [key]: msg }));
+      setMonitorData(prev => ({ ...prev, [key]: { error: msg } }));
     } finally {
       setMonitorLoading(prev => ({ ...prev, [key]: false }));
     }
@@ -849,6 +864,7 @@ ${data.visitMedia.length > 0 ? '<table><tr><th>Type</th><th>Visit</th><th>Agent<
         <MonitorCard>
           <MonitorHeader><ShieldCheck size={18} color="#f87171" /> Boundary Encroachment</MonitorHeader>
           {monitorLoading.encroachment ? <span style={{ color: '#aab7d4', fontSize: '0.85rem' }}>Checking...</span> :
+           monitorData.encroachment?.error ? <><MonitorError>{monitorData.encroachment.error}</MonitorError><Button variant="secondary" style={{ marginTop: 4 }} onClick={() => fetchMonitor('encroachment', 'encroachment')}>Retry</Button></> :
            monitorData.encroachment ? (
             <>
               <MonitorValue $color={monitorData.encroachment.hasEncroachment ? '#f87171' : '#22c55e'}>
@@ -875,6 +891,7 @@ ${data.visitMedia.length > 0 ? '<table><tr><th>Type</th><th>Visit</th><th>Agent<
         <MonitorCard>
           <MonitorHeader><Droplets size={18} color="#3b82f6" /> Flood Monitoring</MonitorHeader>
           {monitorLoading.flood ? <span style={{ color: '#aab7d4', fontSize: '0.85rem' }}>Analyzing radar...</span> :
+           monitorData.flood?.error ? <><MonitorError>{monitorData.flood.error}</MonitorError><Button variant="secondary" style={{ marginTop: 4 }} onClick={() => fetchMonitor('flood', 'flood')}>Retry</Button></> :
            monitorData.flood ? (
             <>
               <MonitorValue $color={monitorData.flood.floodDetected ? '#3b82f6' : '#22c55e'}>
@@ -901,6 +918,7 @@ ${data.visitMedia.length > 0 ? '<table><tr><th>Type</th><th>Visit</th><th>Agent<
         <MonitorCard>
           <MonitorHeader><Flame size={18} color="#f97316" /> Fire & Burn Detection</MonitorHeader>
           {monitorLoading.fire ? <span style={{ color: '#aab7d4', fontSize: '0.85rem' }}>Scanning for burn scars...</span> :
+           monitorData.fire?.error ? <><MonitorError>{monitorData.fire.error}</MonitorError><Button variant="secondary" style={{ marginTop: 4 }} onClick={() => fetchMonitor('fire', 'fire')}>Retry</Button></> :
            monitorData.fire ? (
             <>
               <MonitorValue $color={monitorData.fire.burnDetected ? '#f97316' : '#22c55e'}>
@@ -926,7 +944,8 @@ ${data.visitMedia.length > 0 ? '<table><tr><th>Type</th><th>Visit</th><th>Agent<
         {/* Land Use / Land Cover */}
         <MonitorCard>
           <MonitorHeader><MapPin size={18} color="#84cc16" /> Land Use / Land Cover</MonitorHeader>
-          {monitorLoading.lulc ? <span style={{ color: '#aab7d4', fontSize: '0.85rem' }}>Classifying land cover...</span> :
+          {monitorLoading.lulc ? <span style={{ color: '#aab7d4', fontSize: '0.85rem' }}>Classifying land use...</span> :
+           monitorData.lulc?.error ? <><MonitorError>{monitorData.lulc.error}</MonitorError><Button variant="secondary" style={{ marginTop: 4 }} onClick={() => fetchMonitor('lulc', 'lulc')}>Retry</Button></> :
            monitorData.lulc && monitorData.lulc.classes?.length > 0 ? (
             <>
               <LulcBar>
@@ -958,7 +977,8 @@ ${data.visitMedia.length > 0 ? '<table><tr><th>Type</th><th>Visit</th><th>Agent<
         {/* Soil Moisture */}
         <MonitorCard>
           <MonitorHeader><Droplets size={18} color="#06b6d4" /> Soil Moisture</MonitorHeader>
-          {monitorLoading.soilMoisture ? <span style={{ color: '#aab7d4', fontSize: '0.85rem' }}>Measuring soil moisture...</span> :
+          {monitorLoading.soilMoisture ? <span style={{ color: '#aab7d4', fontSize: '0.85rem' }}>Analyzing soil...</span> :
+           monitorData.soilMoisture?.error ? <><MonitorError>{monitorData.soilMoisture.error}</MonitorError><Button variant="secondary" style={{ marginTop: 4 }} onClick={() => fetchMonitor('soilMoisture', 'soil-moisture')}>Retry</Button></> :
            monitorData.soilMoisture && monitorData.soilMoisture.vvBackscatter != null ? (
             <>
               <MonitorValue $color={
@@ -986,6 +1006,7 @@ ${data.visitMedia.length > 0 ? '<table><tr><th>Type</th><th>Visit</th><th>Agent<
         <MonitorCard>
           <MonitorHeader><Droplets size={18} color="#60a5fa" /> Rainfall Context</MonitorHeader>
           {monitorLoading.rainfall ? <span style={{ color: '#aab7d4', fontSize: '0.85rem' }}>Fetching rainfall data...</span> :
+           monitorData.rainfall?.error ? <><MonitorError>{monitorData.rainfall.error}</MonitorError><Button variant="secondary" style={{ marginTop: 4 }} onClick={() => fetchMonitor('rainfall', 'rainfall')}>Retry</Button></> :
            monitorData.rainfall && monitorData.rainfall.rainfall30mm != null ? (
             <>
               <MonitorValue $color={
@@ -1016,6 +1037,7 @@ ${data.visitMedia.length > 0 ? '<table><tr><th>Type</th><th>Visit</th><th>Agent<
         <MonitorCard>
           <MonitorHeader><TreePine size={18} color="#166534" /> Tree Cover Loss</MonitorHeader>
           {monitorLoading.treeLoss ? <span style={{ color: '#aab7d4', fontSize: '0.85rem' }}>Analyzing forest change...</span> :
+           monitorData.treeLoss?.error ? <><MonitorError>{monitorData.treeLoss.error}</MonitorError><Button variant="secondary" style={{ marginTop: 4 }} onClick={() => fetchMonitor('treeLoss', 'tree-cover-loss')}>Retry</Button></> :
            monitorData.treeLoss ? (
             <>
               <MonitorValue $color={monitorData.treeLoss.hasRecentLoss ? '#f87171' : '#22c55e'}>
@@ -1041,6 +1063,7 @@ ${data.visitMedia.length > 0 ? '<table><tr><th>Type</th><th>Visit</th><th>Agent<
         <MonitorCard>
           <MonitorHeader><Thermometer size={18} color="#ef4444" /> Land Surface Temperature</MonitorHeader>
           {monitorLoading.lst ? <span style={{ color: '#aab7d4', fontSize: '0.85rem' }}>Measuring temperature...</span> :
+           monitorData.lst?.error ? <><MonitorError>{monitorData.lst.error}</MonitorError><Button variant="secondary" style={{ marginTop: 4 }} onClick={() => fetchMonitor('lst', 'land-surface-temperature')}>Retry</Button></> :
            monitorData.lst && monitorData.lst.lstCelsius != null ? (
             <>
               <MonitorValue $color={monitorData.lst.lstCelsius > 35 ? '#ef4444' : monitorData.lst.lstCelsius > 25 ? '#f97316' : '#22c55e'}>
@@ -1069,6 +1092,7 @@ ${data.visitMedia.length > 0 ? '<table><tr><th>Type</th><th>Visit</th><th>Agent<
         <MonitorCard>
           <MonitorHeader><Beaker size={18} color="#a78bfa" /> Multi-Index Crop Health</MonitorHeader>
           {monitorLoading.multiIndex ? <span style={{ color: '#aab7d4', fontSize: '0.85rem' }}>Computing vegetation indices...</span> :
+           monitorData.multiIndex?.error ? <><MonitorError>{monitorData.multiIndex.error}</MonitorError><Button variant="secondary" style={{ marginTop: 4 }} onClick={() => fetchMonitor('multiIndex', 'multi-index')}>Retry</Button></> :
            monitorData.multiIndex && monitorData.multiIndex.indices?.length > 0 ? (
             <>
               {monitorData.multiIndex.indices.map((idx, i) => (
@@ -1096,6 +1120,7 @@ ${data.visitMedia.length > 0 ? '<table><tr><th>Type</th><th>Visit</th><th>Agent<
         <MonitorCard>
           <MonitorHeader><Waves size={18} color="#0ea5e9" /> Water Body Detection</MonitorHeader>
           {monitorLoading.water ? <span style={{ color: '#aab7d4', fontSize: '0.85rem' }}>Detecting water bodies...</span> :
+           monitorData.water?.error ? <><MonitorError>{monitorData.water.error}</MonitorError><Button variant="secondary" style={{ marginTop: 4 }} onClick={() => fetchMonitor('water', 'water')}>Retry</Button></> :
            monitorData.water ? (
             <>
               <MonitorValue $color={monitorData.water.hasWaterOnParcel ? '#0ea5e9' : monitorData.water.hasWaterNearby ? '#06b6d4' : '#fbbf24'}>
@@ -1117,6 +1142,7 @@ ${data.visitMedia.length > 0 ? '<table><tr><th>Type</th><th>Visit</th><th>Agent<
         <MonitorCard>
           <MonitorHeader><Leaf size={18} color="#22c55e" /> Carbon Stock Estimation</MonitorHeader>
           {monitorLoading.carbon ? <span style={{ color: '#aab7d4', fontSize: '0.85rem' }}>Estimating carbon stock...</span> :
+           monitorData.carbon?.error ? <><MonitorError>{monitorData.carbon.error}</MonitorError><Button variant="secondary" style={{ marginTop: 4 }} onClick={() => fetchMonitor('carbon', 'carbon-stock')}>Retry</Button></> :
            monitorData.carbon ? (
             <>
               <MonitorValue $color="#22c55e">
@@ -1139,6 +1165,7 @@ ${data.visitMedia.length > 0 ? '<table><tr><th>Type</th><th>Visit</th><th>Agent<
         <MonitorCard>
           <MonitorHeader><DollarSign size={18} color="#fbbf24" /> Parcel Valuation</MonitorHeader>
           {monitorLoading.valuation ? <span style={{ color: '#aab7d4', fontSize: '0.85rem' }}>Estimating value...</span> :
+           monitorData.valuation?.error ? <><MonitorError>{monitorData.valuation.error}</MonitorError><Button variant="secondary" style={{ marginTop: 4 }} onClick={() => fetchMonitor('valuation', 'valuation')}>Retry</Button></> :
            monitorData.valuation ? (
             <>
               <MonitorValue $color="#fbbf24">
