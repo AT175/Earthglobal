@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import styled from 'styled-components';
 import {
@@ -8,6 +9,7 @@ import {
   CheckCircle2, XCircle, Clock, ArrowRight, Search,
   Users, Plus, Trash2, X, Save, Mail, Phone as PhoneIcon, UserCog, Map, FileText, User,
 } from 'lucide-react';
+import { LanguageSwitcher } from '@earthglobal/design-system';
 import api from '../../services/api';
 
 // ═══════════════════════════════════════════════════════════
@@ -322,16 +324,16 @@ const ErrorState = styled.div`
 // Component
 // ═══════════════════════════════════════════════════════════
 const TABS = [
-  { id: 'overview', label: 'Overview', icon: TrendingUp, roles: ['assembly_admin', 'planning_officer', 'revenue_officer', 'inspector'] },
-  { id: 'permits', label: 'Building Permits', icon: FileCheck, roles: ['assembly_admin', 'planning_officer', 'inspector'] },
-  { id: 'buildings', label: 'Detected Buildings', icon: Building2, roles: ['assembly_admin', 'planning_officer', 'inspector'] },
-  { id: 'transactions', label: 'Land Transactions', icon: Landmark, roles: ['assembly_admin', 'planning_officer', 'revenue_officer'] },
-  { id: 'designs', label: 'Building Designs', icon: Home, roles: ['assembly_admin', 'planning_officer'] },
-  { id: 'siteplans', label: 'Site Plans', icon: FileText, roles: ['assembly_admin', 'planning_officer'] },
-  { id: 'protected', label: 'Protected Areas', icon: Trees, roles: ['assembly_admin', 'planning_officer', 'inspector'] },
-  { id: 'revenue', label: 'Revenue', icon: DollarSign, roles: ['assembly_admin', 'revenue_officer'] },
-  { id: 'alerts', label: 'Alerts', icon: AlertTriangle, roles: ['assembly_admin', 'planning_officer', 'inspector'] },
-  { id: 'users', label: 'User Management', icon: UserCog, roles: ['assembly_admin'] },
+  { id: 'overview', labelKey: 'assemblyDashboard.tabs.overview', label: 'Overview', icon: TrendingUp, roles: ['assembly_admin', 'planning_officer', 'revenue_officer', 'inspector'] },
+  { id: 'permits', labelKey: 'assemblyDashboard.tabs.permits', label: 'Building Permits', icon: FileCheck, roles: ['assembly_admin', 'planning_officer', 'inspector'] },
+  { id: 'buildings', labelKey: 'assemblyDashboard.tabs.buildings', label: 'Detected Buildings', icon: Building2, roles: ['assembly_admin', 'planning_officer', 'inspector'] },
+  { id: 'transactions', labelKey: 'assemblyDashboard.tabs.transactions', label: 'Land Transactions', icon: Landmark, roles: ['assembly_admin', 'planning_officer', 'revenue_officer'] },
+  { id: 'designs', labelKey: 'assemblyDashboard.tabs.designs', label: 'Building Designs', icon: Home, roles: ['assembly_admin', 'planning_officer'] },
+  { id: 'siteplans', labelKey: 'assemblyDashboard.tabs.siteplans', label: 'Site Plans', icon: FileText, roles: ['assembly_admin', 'planning_officer'] },
+  { id: 'protected', labelKey: 'assemblyDashboard.tabs.protected', label: 'Protected Areas', icon: Trees, roles: ['assembly_admin', 'planning_officer', 'inspector'] },
+  { id: 'revenue', labelKey: 'assemblyDashboard.tabs.revenue', label: 'Revenue', icon: DollarSign, roles: ['assembly_admin', 'revenue_officer'] },
+  { id: 'alerts', labelKey: 'assemblyDashboard.tabs.alerts', label: 'Alerts', icon: AlertTriangle, roles: ['assembly_admin', 'planning_officer', 'inspector'] },
+  { id: 'users', labelKey: 'assemblyDashboard.tabs.users', label: 'User Management', icon: UserCog, roles: ['assembly_admin'] },
 ];
 
 const statusColors = {
@@ -357,6 +359,7 @@ const statusColors = {
 
 export default function AssemblyDashboard() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState(null);
@@ -433,11 +436,11 @@ export default function AssemblyDashboard() {
         setOrgInfo(orgRes.data);
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to load data');
+      setError(err.response?.data?.error || t('assemblyDashboard.error'));
     } finally {
       setLoading(false);
     }
-  }, [filter]);
+  }, [filter, t]);
 
   useEffect(() => {
     fetchData(activeTab);
@@ -538,14 +541,15 @@ export default function AssemblyDashboard() {
           <LogoutBtn onClick={handleLogout}>
             <LogOut size={16} /> Logout
           </LogoutBtn>
+          <LanguageSwitcher />
         </UserInfo>
       </TopBar>
 
       <Container>
         <Tabs>
-          {TABS.filter(tab => !user?.assemblyRole || tab.roles.includes(user.assemblyRole)).map(({ id, label, icon: Icon }) => (
+          {TABS.filter(tab => !user?.assemblyRole || tab.roles.includes(user.assemblyRole)).map(({ id, label, labelKey, icon: Icon }) => (
             <Tab key={id} $active={activeTab === id} onClick={() => { setActiveTab(id); setFilter(''); }}>
-              <Icon size={16} /> {label}
+              <Icon size={16} /> {t(labelKey, label)}
             </Tab>
           ))}
         </Tabs>
@@ -555,74 +559,74 @@ export default function AssemblyDashboard() {
         {/* ── Overview ── */}
         {activeTab === 'overview' && (
           <>
-            {loading ? <LoadingState>Loading dashboard...</LoadingState> : stats ? (
+            {loading ? <LoadingState>{t('assemblyDashboard.loading')}</LoadingState> : stats ? (
               <>
                 <StatsGrid>
                   <StatCard $color="#1677ff" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
                     <StatIcon $bg="rgba(22,119,255,0.15)" $color="#3ba7ff"><MapPin size={22} /></StatIcon>
                     <StatValue>{stats.parcels}</StatValue>
-                    <StatLabel>Registered Parcels</StatLabel>
+                    <StatLabel>{t('assemblyDashboard.stats.registeredParcels')}</StatLabel>
                   </StatCard>
 
                   <StatCard $color="#22c55e" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
                     <StatIcon $bg="rgba(34,197,94,0.15)" $color="#4ade80"><FileCheck size={22} /></StatIcon>
                     <StatValue>{stats.permits.approved}</StatValue>
-                    <StatLabel>Approved Permits</StatLabel>
+                    <StatLabel>{t('assemblyDashboard.stats.approvedPermits')}</StatLabel>
                     <StatSub>
-                      <span><Clock size={12} /> {stats.permits.pending} pending</span>
-                      <span><XCircle size={12} /> {stats.permits.rejected} rejected</span>
+                      <span><Clock size={12} /> {stats.permits.pending} {t('assemblyDashboard.stats.pending')}</span>
+                      <span><XCircle size={12} /> {stats.permits.rejected} {t('assemblyDashboard.stats.rejected')}</span>
                     </StatSub>
                   </StatCard>
 
                   <StatCard $color="#ef4444" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
                     <StatIcon $bg="rgba(239,68,68,0.15)" $color="#f87171"><Building2 size={22} /></StatIcon>
                     <StatValue>{stats.buildings.total}</StatValue>
-                    <StatLabel>Detected Buildings</StatLabel>
+                    <StatLabel>{t('assemblyDashboard.stats.detectedBuildings')}</StatLabel>
                     <StatSub>
-                      <span><AlertTriangle size={12} /> {stats.alerts.unpermitted} unpermitted</span>
+                      <span><AlertTriangle size={12} /> {stats.alerts.unpermitted} {t('assemblyDashboard.stats.unpermitted')}</span>
                     </StatSub>
                   </StatCard>
 
                   <StatCard $color="#fbbf24" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
                     <StatIcon $bg="rgba(251,191,36,0.15)" $color="#fbbf24"><Landmark size={22} /></StatIcon>
                     <StatValue>{stats.transactions.proper + stats.transactions.improper + stats.transactions.missing}</StatValue>
-                    <StatLabel>Land Transactions</StatLabel>
+                    <StatLabel>{t('assemblyDashboard.stats.landTransactions')}</StatLabel>
                     <StatSub>
-                      <span><CheckCircle2 size={12} /> {stats.transactions.proper} proper</span>
-                      <span><XCircle size={12} /> {stats.transactions.improper + stats.transactions.missing} issues</span>
+                      <span><CheckCircle2 size={12} /> {stats.transactions.proper} {t('assemblyDashboard.stats.proper')}</span>
+                      <span><XCircle size={12} /> {stats.transactions.improper + stats.transactions.missing} {t('assemblyDashboard.stats.issues')}</span>
                     </StatSub>
                   </StatCard>
 
                   <StatCard $color="#22c55e" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
                     <StatIcon $bg="rgba(34,197,94,0.15)" $color="#4ade80"><DollarSign size={22} /></StatIcon>
                     <StatValue>{fmtMoney(stats.revenue.total)}</StatValue>
-                    <StatLabel>Total Revenue Collected</StatLabel>
+                    <StatLabel>{t('assemblyDashboard.stats.totalRevenue')}</StatLabel>
                   </StatCard>
 
                   <StatCard $color="#a855f7" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
                     <StatIcon $bg="rgba(168,85,247,0.15)" $color="#c084fc"><Trees size={22} /></StatIcon>
                     <StatValue>{stats.protectedAreas}</StatValue>
-                    <StatLabel>Protected Areas</StatLabel>
+                    <StatLabel>{t('assemblyDashboard.stats.protectedAreas')}</StatLabel>
                     <StatSub>
-                      <span><AlertTriangle size={12} /> {stats.alerts.protectedViolations} violations</span>
+                      <span><AlertTriangle size={12} /> {stats.alerts.protectedViolations} {t('assemblyDashboard.stats.violations')}</span>
                     </StatSub>
                   </StatCard>
                 </StatsGrid>
 
                 <Panel>
                   <PanelHeader>
-                    <PanelTitle><AlertTriangle size={18} /> Recent Alerts</PanelTitle>
-                    <FilterBtn $active onClick={() => setActiveTab('alerts')}>View all <ArrowRight size={12} /></FilterBtn>
+                    <PanelTitle><AlertTriangle size={18} /> {t('assemblyDashboard.panels.recentAlerts')}</PanelTitle>
+                    <FilterBtn $active onClick={() => setActiveTab('alerts')}>{t('assemblyDashboard.panels.viewAll')} <ArrowRight size={12} /></FilterBtn>
                   </PanelHeader>
                   <Table>
                     <thead><tr><th>Type</th><th>Parcel</th><th>Detected</th><th>Status</th></tr></thead>
                     <tbody>
-                      <tr><td colSpan={4}><EmptyState>No alerts in overview — check the Alerts tab for details.</EmptyState></td></tr>
+                      <tr><td colSpan={4}><EmptyState>{t('assemblyDashboard.panels.noAlertsOverview')}</EmptyState></td></tr>
                     </tbody>
                   </Table>
                 </Panel>
               </>
-            ) : <ErrorState>Failed to load stats</ErrorState>}
+            ) : <ErrorState>{t('assemblyDashboard.failedStats')}</ErrorState>}
           </>
         )}
 
@@ -630,16 +634,16 @@ export default function AssemblyDashboard() {
         {activeTab === 'permits' && (
           <Panel>
             <PanelHeader>
-              <PanelTitle><FileCheck size={18} /> Building Permits</PanelTitle>
+              <PanelTitle><FileCheck size={18} /> {t('assemblyDashboard.panels.buildingPermits')}</PanelTitle>
               <FilterBar>
                 {['', 'pending', 'approved', 'rejected'].map(f => (
                   <FilterBtn key={f} $active={filter === f} onClick={() => setFilter(f)}>
-                    {f || 'All'}
+                    {f || t('assemblyDashboard.panels.all')}
                   </FilterBtn>
                 ))}
               </FilterBar>
             </PanelHeader>
-            {loading ? <LoadingState>Loading...</LoadingState> : permits.length === 0 ? <EmptyState>No permits found</EmptyState> : (
+            {loading ? <LoadingState>{t('assemblyDashboard.loading')}</LoadingState> : permits.length === 0 ? <EmptyState>{t('assemblyDashboard.panels.noPermits')}</EmptyState> : (
               <Table>
                 <thead><tr><th>Applicant</th><th>Type</th><th>Permit #</th><th>Status</th><th>Fee Paid</th><th>Submitted</th></tr></thead>
                 <tbody>
@@ -663,16 +667,16 @@ export default function AssemblyDashboard() {
         {activeTab === 'buildings' && (
           <Panel>
             <PanelHeader>
-              <PanelTitle><Building2 size={18} /> Detected Buildings</PanelTitle>
+              <PanelTitle><Building2 size={18} /> {t('assemblyDashboard.panels.detectedBuildings')}</PanelTitle>
               <FilterBar>
                 {['', 'unverified', 'verified_permitted', 'verified_unpermitted', 'under_investigation'].map(f => (
                   <FilterBtn key={f} $active={filter === f} onClick={() => setFilter(f)}>
-                    {f ? f.replace(/_/g, ' ') : 'All'}
+                    {f ? f.replace(/_/g, ' ') : t('assemblyDashboard.panels.all')}
                   </FilterBtn>
                 ))}
               </FilterBar>
             </PanelHeader>
-            {loading ? <LoadingState>Loading...</LoadingState> : buildings.length === 0 ? <EmptyState>No buildings detected yet. Satellite imagery analysis runs automatically.</EmptyState> : (
+            {loading ? <LoadingState>{t('assemblyDashboard.loading')}</LoadingState> : buildings.length === 0 ? <EmptyState>{t('assemblyDashboard.panels.noBuildings')}</EmptyState> : (
               <Table>
                 <thead><tr><th>Parcel</th><th>Area (sqm)</th><th>Status</th><th>Protected Area</th><th>Detected</th></tr></thead>
                 <tbody>
@@ -695,27 +699,27 @@ export default function AssemblyDashboard() {
         {activeTab === 'transactions' && (
           <Panel>
             <PanelHeader>
-              <PanelTitle><Landmark size={18} /> Land Transactions</PanelTitle>
+              <PanelTitle><Landmark size={18} /> {t('assemblyDashboard.panels.landTransactions')}</PanelTitle>
               <FilterBar>
                 {['', 'proper', 'improper', 'missing', 'under_review'].map(f => (
                   <FilterBtn key={f} $active={filter === f} onClick={() => setFilter(f)}>
-                    {f ? f.replace(/_/g, ' ') : 'All'}
+                    {f ? f.replace(/_/g, ' ') : t('assemblyDashboard.panels.all')}
                   </FilterBtn>
                 ))}
               </FilterBar>
             </PanelHeader>
-            {loading ? <LoadingState>Loading...</LoadingState> : transactions.length === 0 ? <EmptyState>No transactions recorded</EmptyState> : (
+            {loading ? <LoadingState>{t('assemblyDashboard.loading')}</LoadingState> : transactions.length === 0 ? <EmptyState>{t('assemblyDashboard.panels.noTransactions')}</EmptyState> : (
               <Table>
                 <thead><tr><th>Seller</th><th>Buyer</th><th>Sale Price</th><th>Documentation</th><th>Status</th><th>Date</th></tr></thead>
                 <tbody>
-                  {transactions.map(t => (
-                    <tr key={t.id}>
-                      <td>{t.seller_name}</td>
-                      <td>{t.buyer_name}</td>
-                      <td>{fmtMoney(t.sale_price)}</td>
-                      <td><StatusBadge $bg={statusColors[t.documentation_status]?.bg} $color={statusColors[t.documentation_status]?.color}>{t.documentation_status.replace(/_/g, ' ')}</StatusBadge></td>
-                      <td><StatusBadge $bg={statusColors[t.status]?.bg} $color={statusColors[t.status]?.color}>{t.status}</StatusBadge></td>
-                      <td>{fmtDate(t.transaction_date)}</td>
+                  {transactions.map(tx => (
+                    <tr key={tx.id}>
+                      <td>{tx.seller_name}</td>
+                      <td>{tx.buyer_name}</td>
+                      <td>{fmtMoney(tx.sale_price)}</td>
+                      <td><StatusBadge $bg={statusColors[tx.documentation_status]?.bg} $color={statusColors[tx.documentation_status]?.color}>{tx.documentation_status.replace(/_/g, ' ')}</StatusBadge></td>
+                      <td><StatusBadge $bg={statusColors[tx.status]?.bg} $color={statusColors[tx.status]?.color}>{tx.status}</StatusBadge></td>
+                      <td>{fmtDate(tx.transaction_date)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -728,16 +732,16 @@ export default function AssemblyDashboard() {
         {activeTab === 'designs' && (
           <Panel>
             <PanelHeader>
-              <PanelTitle><Home size={18} /> Building Designs (Owner-Submitted)</PanelTitle>
+              <PanelTitle><Home size={18} /> {t('assemblyDashboard.panels.buildingDesigns')}</PanelTitle>
               <FilterBar>
                 {['', 'submitted', 'under_review', 'approved', 'rejected'].map(f => (
                   <FilterBtn key={f} $active={filter === f} onClick={() => setFilter(f)}>
-                    {f ? f.replace(/_/g, ' ') : 'All'}
+                    {f ? f.replace(/_/g, ' ') : t('assemblyDashboard.panels.all')}
                   </FilterBtn>
                 ))}
               </FilterBar>
             </PanelHeader>
-            {loading ? <LoadingState>Loading...</LoadingState> : designs.length === 0 ? <EmptyState>No building designs submitted</EmptyState> : (
+            {loading ? <LoadingState>{t('assemblyDashboard.loading')}</LoadingState> : designs.length === 0 ? <EmptyState>{t('assemblyDashboard.panels.noDesigns')}</EmptyState> : (
               <Table>
                 <thead><tr><th>Design Name</th><th>Designer</th><th>Parcel</th><th>Est. Cost</th><th>Status</th><th>Submitted</th></tr></thead>
                 <tbody>
@@ -762,16 +766,16 @@ export default function AssemblyDashboard() {
           <>
             <Panel style={{ marginBottom: 24 }}>
               <PanelHeader>
-                <PanelTitle><FileText size={18} /> Site Plans</PanelTitle>
+                <PanelTitle><FileText size={18} /> {t('assemblyDashboard.panels.sitePlans')}</PanelTitle>
                 <FilterBar>
                   {['', 'draft', 'certified', 'rejected'].map(f => (
                     <FilterBtn key={f} $active={filter === f} onClick={() => setFilter(f)}>
-                      {f ? f.replace(/_/g, ' ') : 'All'}
+                      {f ? f.replace(/_/g, ' ') : t('assemblyDashboard.panels.all')}
                     </FilterBtn>
                   ))}
                 </FilterBar>
               </PanelHeader>
-              {loading ? <LoadingState>Loading...</LoadingState> : sitePlans.length === 0 ? <EmptyState>No site plans generated yet</EmptyState> : (
+              {loading ? <LoadingState>{t('assemblyDashboard.loading')}</LoadingState> : sitePlans.length === 0 ? <EmptyState>{t('assemblyDashboard.panels.noSitePlans')}</EmptyState> : (
                 <Table>
                   <thead><tr><th>Title</th><th>Parcel</th><th>Owner</th><th>Generated By</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
                   <tbody>
@@ -786,8 +790,8 @@ export default function AssemblyDashboard() {
                         <td>
                           {p.status === 'draft' && (
                             <div style={{ display: 'flex', gap: 6 }}>
-                              <button onClick={async () => { try { await api.patch(`/site-plans/${p.id}/certify`); showToast('Site plan certified'); fetchData('siteplans'); } catch { showToast('Failed to certify', 'error'); } }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(34,197,94,0.3)', background: 'rgba(34,197,94,0.1)', color: '#4ade80', cursor: 'pointer', fontSize: '0.8rem' }}><CheckCircle2 size={14} /> Certify</button>
-                              <button onClick={async () => { const reason = prompt('Rejection reason:'); if (reason === null) return; try { await api.patch(`/site-plans/${p.id}/reject`, { reason }); showToast('Site plan rejected'); fetchData('siteplans'); } catch { showToast('Failed to reject', 'error'); } }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.1)', color: '#f87171', cursor: 'pointer', fontSize: '0.8rem' }}><XCircle size={14} /> Reject</button>
+                              <button onClick={async () => { try { await api.patch(`/site-plans/${p.id}/certify`); showToast('Site plan certified'); fetchData('siteplans'); } catch { showToast('Failed to certify', 'error'); } }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(34,197,94,0.3)', background: 'rgba(34,197,94,0.1)', color: '#4ade80', cursor: 'pointer', fontSize: '0.8rem' }}><CheckCircle2 size={14} /> {t('assemblyDashboard.actions.certify')}</button>
+                              <button onClick={async () => { const reason = prompt('Rejection reason:'); if (reason === null) return; try { await api.patch(`/site-plans/${p.id}/reject`, { reason }); showToast('Site plan rejected'); fetchData('siteplans'); } catch { showToast('Failed to reject', 'error'); } }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.1)', color: '#f87171', cursor: 'pointer', fontSize: '0.8rem' }}><XCircle size={14} /> {t('assemblyDashboard.actions.reject')}</button>
                             </div>
                           )}
                           {p.status === 'certified' && <span style={{ color: '#4ade80', fontSize: '0.8rem' }}>Certified {fmtDate(p.certified_at)}</span>}
@@ -802,9 +806,9 @@ export default function AssemblyDashboard() {
 
             <Panel>
               <PanelHeader>
-                <PanelTitle><Clock size={18} /> Certified Plan Requests</PanelTitle>
+                <PanelTitle><Clock size={18} /> {t('assemblyDashboard.panels.certifiedRequests')}</PanelTitle>
               </PanelHeader>
-              {sitePlanRequests.length === 0 ? <EmptyState>No site plan requests</EmptyState> : (
+              {sitePlanRequests.length === 0 ? <EmptyState>{t('assemblyDashboard.panels.noRequests')}</EmptyState> : (
                 <Table>
                   <thead><tr><th>Parcel</th><th>Owner</th><th>Purpose</th><th>Status</th><th>Requested</th><th>Actions</th></tr></thead>
                   <tbody>
@@ -817,10 +821,10 @@ export default function AssemblyDashboard() {
                         <td>{fmtDate(r.requested_at)}</td>
                         <td>
                           {r.status === 'pending' && (
-                            <button onClick={async () => { try { await api.patch(`/site-plans/requests/${r.id}`, { status: 'in_progress' }); showToast('Request accepted'); fetchData('siteplans'); } catch { showToast('Failed', 'error'); } }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(92,225,255,0.3)', background: 'rgba(92,225,255,0.1)', color: '#5ce1ff', cursor: 'pointer', fontSize: '0.8rem' }}>Start</button>
+                            <button onClick={async () => { try { await api.patch(`/site-plans/requests/${r.id}`, { status: 'in_progress' }); showToast('Request accepted'); fetchData('siteplans'); } catch { showToast('Failed', 'error'); } }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(92,225,255,0.3)', background: 'rgba(92,225,255,0.1)', color: '#5ce1ff', cursor: 'pointer', fontSize: '0.8rem' }}>{t('assemblyDashboard.actions.start')}</button>
                           )}
                           {r.status === 'in_progress' && (
-                            <button onClick={async () => { try { await api.patch(`/site-plans/requests/${r.id}`, { status: 'completed' }); showToast('Request completed'); fetchData('siteplans'); } catch { showToast('Failed', 'error'); } }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(34,197,94,0.3)', background: 'rgba(34,197,94,0.1)', color: '#4ade80', cursor: 'pointer', fontSize: '0.8rem' }}><CheckCircle2 size={14} /> Complete</button>
+                            <button onClick={async () => { try { await api.patch(`/site-plans/requests/${r.id}`, { status: 'completed' }); showToast('Request completed'); fetchData('siteplans'); } catch { showToast('Failed', 'error'); } }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(34,197,94,0.3)', background: 'rgba(34,197,94,0.1)', color: '#4ade80', cursor: 'pointer', fontSize: '0.8rem' }}><CheckCircle2 size={14} /> {t('assemblyDashboard.actions.complete')}</button>
                           )}
                         </td>
                       </tr>
@@ -836,9 +840,9 @@ export default function AssemblyDashboard() {
         {activeTab === 'protected' && (
           <Panel>
             <PanelHeader>
-              <PanelTitle><Trees size={18} /> Protected Areas</PanelTitle>
+              <PanelTitle><Trees size={18} /> {t('assemblyDashboard.panels.protectedAreas')}</PanelTitle>
             </PanelHeader>
-            {loading ? <LoadingState>Loading...</LoadingState> : protectedAreas.length === 0 ? <EmptyState>No protected areas defined</EmptyState> : (
+            {loading ? <LoadingState>{t('assemblyDashboard.loading')}</LoadingState> : protectedAreas.length === 0 ? <EmptyState>{t('assemblyDashboard.panels.noProtected')}</EmptyState> : (
               <Table>
                 <thead><tr><th>Name</th><th>Type</th><th>Description</th><th>Active</th></tr></thead>
                 <tbody>
@@ -872,16 +876,16 @@ export default function AssemblyDashboard() {
             )}
             <Panel>
               <PanelHeader>
-                <PanelTitle><DollarSign size={18} /> Revenue Records</PanelTitle>
+                <PanelTitle><DollarSign size={18} /> {t('assemblyDashboard.panels.revenue')}</PanelTitle>
                 <FilterBar>
                   {['', 'permit_fee', 'transaction_fee', 'stamp_duty', 'penalty', 'inspection_fee'].map(f => (
                     <FilterBtn key={f} $active={filter === f} onClick={() => setFilter(f)}>
-                      {f ? f.replace(/_/g, ' ') : 'All'}
+                      {f ? f.replace(/_/g, ' ') : t('assemblyDashboard.panels.all')}
                     </FilterBtn>
                   ))}
                 </FilterBar>
               </PanelHeader>
-              {loading ? <LoadingState>Loading...</LoadingState> : revenue.length === 0 ? <EmptyState>No revenue records</EmptyState> : (
+              {loading ? <LoadingState>{t('assemblyDashboard.loading')}</LoadingState> : revenue.length === 0 ? <EmptyState>{t('assemblyDashboard.panels.noRevenue')}</EmptyState> : (
                 <Table>
                   <thead><tr><th>Category</th><th>Description</th><th>Amount</th><th>Payer</th><th>Method</th><th>Date</th></tr></thead>
                   <tbody>
@@ -906,16 +910,16 @@ export default function AssemblyDashboard() {
         {activeTab === 'alerts' && (
           <Panel>
             <PanelHeader>
-              <PanelTitle><AlertTriangle size={18} /> Alerts</PanelTitle>
+              <PanelTitle><AlertTriangle size={18} /> {t('assemblyDashboard.panels.alerts')}</PanelTitle>
               <FilterBar>
                 {['', 'unpermitted_building', 'protected_area_violation', 'design_submitted', 'improper_transaction', 'clearing'].map(f => (
                   <FilterBtn key={f} $active={filter === f} onClick={() => setFilter(f)}>
-                    {f ? f.replace(/_/g, ' ') : 'All'}
+                    {f ? f.replace(/_/g, ' ') : t('assemblyDashboard.panels.all')}
                   </FilterBtn>
                 ))}
               </FilterBar>
             </PanelHeader>
-            {loading ? <LoadingState>Loading...</LoadingState> : alerts.length === 0 ? <EmptyState>No alerts — satellite monitoring is running.</EmptyState> : (
+            {loading ? <LoadingState>{t('assemblyDashboard.loading')}</LoadingState> : alerts.length === 0 ? <EmptyState>{t('assemblyDashboard.panels.noAlerts')}</EmptyState> : (
               <Table>
                 <thead><tr><th>Type</th><th>Parcel</th><th>NDVI Change</th><th>Verified</th><th>Detected</th></tr></thead>
                 <tbody>
@@ -938,7 +942,7 @@ export default function AssemblyDashboard() {
         {activeTab === 'users' && (
           <Panel>
             <PanelHeader>
-              <PanelTitle><UserCog size={18} /> Assembly Users</PanelTitle>
+              <PanelTitle><UserCog size={18} /> {t('assemblyDashboard.panels.users')}</PanelTitle>
               <AddBtn onClick={() => setShowUserForm(!showUserForm)}>
                 <Plus size={16} /> Add User
               </AddBtn>
@@ -1027,9 +1031,9 @@ export default function AssemblyDashboard() {
             )}
 
             {loading ? (
-              <LoadingState>Loading users...</LoadingState>
+              <LoadingState>{t('assemblyDashboard.loading')}</LoadingState>
             ) : orgUsers.length === 0 ? (
-              <EmptyState>No assembly users yet. Click "Add User" to create one.</EmptyState>
+              <EmptyState>{t('assemblyDashboard.empty.noResults')}</EmptyState>
             ) : (
               <div style={{ padding: 16 }}>
                 {orgUsers.map((u) => (
