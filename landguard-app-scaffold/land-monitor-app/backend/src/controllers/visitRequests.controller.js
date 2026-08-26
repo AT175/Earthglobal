@@ -310,6 +310,13 @@ exports.create = async (req, res, next) => {
   try {
     const { parcel_id, type, scheduled_at, owner_notes } = req.body;
 
+    if (!parcel_id) {
+      return res.status(400).json({ error: 'parcel_id is required' });
+    }
+    if (!type || !['photo', 'video', 'live'].includes(type)) {
+      return res.status(400).json({ error: 'type must be one of: photo, video, live' });
+    }
+
     // Check for available subscription credit
     const subResult = await db.query(
       `SELECT * FROM subscriptions WHERE owner_id = $1 AND status = 'active' ORDER BY renews_at DESC LIMIT 1`,
@@ -323,11 +330,25 @@ exports.create = async (req, res, next) => {
     const agentId = bestAgent?.id || null;
     const initialStatus = agentId ? 'assigned' : 'pending';
 
-    const result = await db.query(
-      `INSERT INTO visit_requests (parcel_id, owner_id, agent_id, type, status, scheduled_at, plan_credit_used, owner_notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [parcel_id, req.user.id, agentId, type, initialStatus, scheduled_at || null, useCredit, owner_notes || null]
-    );
+    let result;
+    try {
+      result = await db.query(
+        `INSERT INTO visit_requests (parcel_id, owner_id, agent_id, type, status, scheduled_at, plan_credit_used, owner_notes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+        [parcel_id, req.user.id, agentId, type, initialStatus, scheduled_at || null, useCredit, owner_notes || null]
+      );
+    } catch (insertErr) {
+      // owner_notes column may not exist yet on unmigrated databases — retry without it
+      if (insertErr.message && insertErr.message.includes('owner_notes')) {
+        result = await db.query(
+          `INSERT INTO visit_requests (parcel_id, owner_id, agent_id, type, status, scheduled_at, plan_credit_used)
+           VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+          [parcel_id, req.user.id, agentId, type, initialStatus, scheduled_at || null, useCredit]
+        );
+      } else {
+        throw insertErr;
+      }
+    }
 
     if (useCredit) {
       await db.query(
