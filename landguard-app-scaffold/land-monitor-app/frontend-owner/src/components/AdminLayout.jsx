@@ -1,20 +1,22 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import styled from 'styled-components';
 import {
   LayoutGrid, Users, MapPinned, Home, LogOut, Building2, UserCog, Shield, DollarSign, User, ClipboardList,
 } from 'lucide-react';
+import { LanguageSwitcher } from '@earthglobal/design-system';
 
 const NAV_ITEMS = [
-  { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutGrid },
-  { to: '/admin', label: 'Onboard Parcel', icon: MapPinned },
-  { to: '/admin/parcels', label: 'Parcels', icon: Home },
-  { to: '/admin/agents', label: 'Agents', icon: Users },
-  { to: '/admin/visits', label: 'Visit Assignments', icon: ClipboardList },
-  { to: '/admin/users', label: 'User Management', icon: UserCog },
-  { to: '/admin/organizations', label: 'Organizations', icon: Building2 },
-  { to: '/finance', label: 'Finance', icon: DollarSign },
-  { to: '/admin/profile', label: 'My Profile', icon: User },
+  { to: '/admin/dashboard', labelKey: 'nav.dashboard', fallbackLabel: 'Dashboard', icon: LayoutGrid },
+  { to: '/admin', labelKey: 'nav.parcelOnboarding', fallbackLabel: 'Onboard Parcel', icon: MapPinned },
+  { to: '/admin/parcels', labelKey: 'nav.parcels', fallbackLabel: 'Parcels', icon: Home },
+  { to: '/admin/agents', labelKey: 'nav.agents', fallbackLabel: 'Agents', icon: Users },
+  { to: '/admin/visits', labelKey: 'nav.visitAssignments', fallbackLabel: 'Visit Assignments', icon: ClipboardList },
+  { to: '/admin/users', labelKey: 'nav.userManagement', fallbackLabel: 'User Management', icon: UserCog },
+  { to: '/admin/organizations', labelKey: 'nav.organizations', fallbackLabel: 'Organizations', icon: Building2 },
+  { to: '/finance', labelKey: 'nav.finance', fallbackLabel: 'Finance', icon: DollarSign },
+  { to: '/admin/profile', labelKey: 'nav.profile', fallbackLabel: 'My Profile', icon: User },
 ];
 
 // ═══════════════════════════════════════════════════════════
@@ -126,12 +128,18 @@ const Tab = styled.button`
 export default function AdminLayout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const { t } = useTranslation('common');
   const [user, setUser] = useState(null);
 
   useEffect(() => {
     const userStr = localStorage.getItem('user');
     if (userStr) setUser(JSON.parse(userStr));
   }, []);
+
+  const navItems = NAV_ITEMS.map((item) => ({
+    ...item,
+    label: t(item.labelKey, { defaultValue: item.fallbackLabel || item.labelKey }),
+  }));
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -147,6 +155,7 @@ export default function AdminLayout({ children }) {
           EarthGlobal <span style={{ color: '#5ce1ff' }}>Admin</span>
         </Logo>
         <UserInfo>
+          <LanguageSwitcher />
           {user && (
             <UserBadge>
               <span>{user.name}</span>
@@ -154,14 +163,14 @@ export default function AdminLayout({ children }) {
             </UserBadge>
           )}
           <LogoutBtn onClick={handleLogout}>
-            <LogOut size={16} /> Logout
+            <LogOut size={16} /> {t('nav.logout', { defaultValue: 'Logout' })}
           </LogoutBtn>
         </UserInfo>
       </TopBar>
 
       <Container>
         <Tabs>
-          {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+          {navItems.map(({ to, label, icon: Icon }) => (
             <Tab key={to} $active={location.pathname === to} onClick={() => navigate(to)}>
               <Icon size={16} /> {label}
             </Tab>

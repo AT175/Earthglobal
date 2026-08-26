@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import styled from 'styled-components';
 import {
   LayoutDashboard, FileCheck, Landmark, User, LogOut, MapPin,
@@ -8,11 +9,11 @@ import {
 import { LanguageSwitcher } from '@earthglobal/design-system';
 
 const NAV_ITEMS = [
-  { to: '/sales-manager', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/sales-manager/sell', label: 'List Land for Sale', icon: Landmark },
-  { to: '/sales-manager/buy-land', label: 'Browse Land', icon: ShoppingBag },
-  { to: '/sales-manager/validation', label: 'Validation', icon: FileCheck },
-  { to: '/sales-manager/site-plans', label: 'Site Plans', icon: FileText },
+  { to: '/sales-manager', labelKey: 'nav.dashboard', fallbackLabel: 'Dashboard', icon: LayoutDashboard },
+  { to: '/sales-manager/sell', labelKey: 'nav.sell', fallbackLabel: 'List Land for Sale', icon: Landmark },
+  { to: '/sales-manager/buy-land', labelKey: 'nav.browseLand', fallbackLabel: 'Browse Land', icon: ShoppingBag },
+  { to: '/sales-manager/validation', labelKey: 'nav.validation', fallbackLabel: 'Validation', icon: FileCheck },
+  { to: '/sales-manager/site-plans', labelKey: 'nav.sitePlans', fallbackLabel: 'Site Plans', icon: FileText },
 ];
 
 const Page = styled.div`
@@ -130,12 +131,18 @@ const Tab = styled.button`
 export default function SalesManagerLayout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const { t } = useTranslation('common');
   const [user, setUser] = useState(null);
 
   useEffect(() => {
     const userStr = localStorage.getItem('user');
     if (userStr) setUser(JSON.parse(userStr));
   }, []);
+
+  const navItems = NAV_ITEMS.map((item) => ({
+    ...item,
+    label: t(item.labelKey, { defaultValue: item.fallbackLabel || item.labelKey }),
+  }));
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -159,14 +166,14 @@ export default function SalesManagerLayout({ children }) {
             </UserBadge>
           )}
           <LogoutBtn onClick={handleLogout}>
-            <LogOut size={16} /> Logout
+            <LogOut size={16} /> {t('nav.logout', { defaultValue: 'Logout' })}
           </LogoutBtn>
         </UserInfo>
       </TopBar>
 
       <Container>
         <Tabs>
-          {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+          {navItems.map(({ to, label, icon: Icon }) => (
             <Tab key={to} $active={location.pathname === to} onClick={() => navigate(to)}>
               <Icon size={16} /> {label}
             </Tab>

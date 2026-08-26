@@ -1,18 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import styled from 'styled-components';
 import {
   LayoutGrid, CreditCard, Wallet, Building2, Settings, LogOut, Shield, DollarSign, User, Split,
 } from 'lucide-react';
+import { LanguageSwitcher } from '@earthglobal/design-system';
 
 const NAV_ITEMS = [
-  { to: '/finance', label: 'Dashboard', icon: LayoutGrid },
-  { to: '/finance/plans', label: 'Plans & Subscriptions', icon: CreditCard },
-  { to: '/finance/payments', label: 'Payments & Commissions', icon: Wallet },
-  { to: '/finance/settlements', label: 'Settlements & Wallets', icon: Split },
-  { to: '/finance/tenants', label: 'Tenant Billing', icon: Building2 },
-  { to: '/finance/settings', label: 'Fee Settings', icon: Settings },
-  { to: '/finance/profile', label: 'My Profile', icon: User },
+  { to: '/finance', labelKey: 'nav.dashboard', fallbackLabel: 'Dashboard', icon: LayoutGrid },
+  { to: '/finance/plans', labelKey: 'nav.plansSubscriptions', fallbackLabel: 'Plans & Subscriptions', icon: CreditCard },
+  { to: '/finance/payments', labelKey: 'nav.paymentsCommissions', fallbackLabel: 'Payments & Commissions', icon: Wallet },
+  { to: '/finance/settlements', labelKey: 'nav.settlementsWallets', fallbackLabel: 'Settlements & Wallets', icon: Split },
+  { to: '/finance/tenants', labelKey: 'nav.tenantBilling', fallbackLabel: 'Tenant Billing', icon: Building2 },
+  { to: '/finance/settings', labelKey: 'nav.feeSettings', fallbackLabel: 'Fee Settings', icon: Settings },
+  { to: '/finance/profile', labelKey: 'nav.profile', fallbackLabel: 'My Profile', icon: User },
 ];
 
 const Page = styled.div`
@@ -121,12 +123,18 @@ const Tab = styled.button`
 export default function FinanceLayout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const { t } = useTranslation('common');
   const [user, setUser] = useState(null);
 
   useEffect(() => {
     const userStr = localStorage.getItem('user');
     if (userStr) setUser(JSON.parse(userStr));
   }, []);
+
+  const navItems = NAV_ITEMS.map((item) => ({
+    ...item,
+    label: t(item.labelKey, { defaultValue: item.fallbackLabel || item.labelKey }),
+  }));
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -144,6 +152,7 @@ export default function FinanceLayout({ children }) {
           EarthGlobal <span style={{ color: '#4ade80' }}>Finance</span>
         </Logo>
         <UserInfo>
+          <LanguageSwitcher />
           {user && (
             <UserBadge>
               <span>{user.name}</span>
@@ -151,14 +160,14 @@ export default function FinanceLayout({ children }) {
             </UserBadge>
           )}
           <LogoutBtn onClick={handleLogout}>
-            <LogOut size={16} /> Logout
+            <LogOut size={16} /> {t('nav.logout', { defaultValue: 'Logout' })}
           </LogoutBtn>
         </UserInfo>
       </TopBar>
 
       <Container>
         <Tabs>
-          {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+          {navItems.map(({ to, label, icon: Icon }) => (
             <Tab
               key={to}
               $active={location.pathname === to}

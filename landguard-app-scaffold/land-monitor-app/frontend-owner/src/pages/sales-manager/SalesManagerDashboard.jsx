@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import styled from 'styled-components';
 import {
   MapPin, AlertTriangle, TrendingUp, Building2, DollarSign,
@@ -137,6 +138,7 @@ function formatArea(sqm) {
 
 export default function SalesManagerDashboard() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [parcels, setParcels] = useState([]);
   const [alertTrends, setAlertTrends] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -180,58 +182,58 @@ export default function SalesManagerDashboard() {
           <AlertTriangle size={20} style={{ color: '#ef4444' }} />
           <span>
             New {lastAlert.alert_type || 'change'} alert detected on{' '}
-            <strong>{lastAlert.parcel_name || 'a parcel'}</strong>
+            <strong>{lastAlert.parcel_name || t('dashboard.unknownParcel')}</strong>
           </span>
         </AlertBanner>
       )}
 
-      <SectionTitle><Activity size={20} /> Sales Manager Overview</SectionTitle>
+      <SectionTitle><Activity size={20} /> {t('salesManager.overview')}</SectionTitle>
 
       <Grid>
         <StatCard>
-          <StatHeader><MapPin size={16} /> Parcels Available</StatHeader>
+          <StatHeader><MapPin size={16} /> {t('salesManager.parcelsAvailable')}</StatHeader>
           <StatValue>{loading ? <Skeleton width="60px" /> : stats.totalParcels}</StatValue>
-          <StatSub>Across all assemblies</StatSub>
+          <StatSub>{t('salesManager.acrossAssemblies')}</StatSub>
         </StatCard>
         <StatCard>
-          <StatHeader><AlertTriangle size={16} /> Active Alerts</StatHeader>
+          <StatHeader><AlertTriangle size={16} /> {t('salesManager.activeAlerts')}</StatHeader>
           <StatValue>{loading ? <Skeleton width="60px" /> : stats.totalAlerts}</StatValue>
-          <StatSub>Last 12 months</StatSub>
+          <StatSub>{t('salesManager.last12Months')}</StatSub>
         </StatCard>
         <StatCard>
-          <StatHeader><Landmark size={16} /> Your Listings</StatHeader>
+          <StatHeader><Landmark size={16} /> {t('salesManager.yourListings')}</StatHeader>
           <StatValue>{loading ? <Skeleton width="60px" /> : stats.totalListings}</StatValue>
-          <StatSub>Land listed for sale</StatSub>
+          <StatSub>{t('salesManager.landListedForSale')}</StatSub>
         </StatCard>
         <StatCard>
-          <StatHeader><DollarSign size={16} /> Completed Sales</StatHeader>
+          <StatHeader><DollarSign size={16} /> {t('salesManager.completedSales')}</StatHeader>
           <StatValue>{loading ? <Skeleton width="60px" /> : stats.totalSales}</StatValue>
-          <StatSub>10% commission per sale</StatSub>
+          <StatSub>{t('salesManager.commissionPerSale')}</StatSub>
         </StatCard>
       </Grid>
 
       <QuickActions>
         <ActionBtn onClick={() => navigate('/sales-manager/sell')}>
-          <Landmark size={18} /> List Land for Sale
+          <Landmark size={18} /> {t('salesManager.listLandForSale')}
         </ActionBtn>
         <ActionBtn onClick={() => navigate('/sales-manager/buy-land')}>
-          <ShoppingBag size={18} /> Browse Land Market
+          <ShoppingBag size={18} /> {t('salesManager.browseLandMarket')}
         </ActionBtn>
         <ActionBtn onClick={() => navigate('/sales-manager/validation')}>
-          <FileCheck size={18} /> Request Validation Search
+          <FileCheck size={18} /> {t('salesManager.requestValidation')}
         </ActionBtn>
       </QuickActions>
 
       {alertTrends.length > 0 && (
         <>
-          <SectionTitle><TrendingUp size={20} /> Alert Trends</SectionTitle>
+          <SectionTitle><TrendingUp size={20} /> {t('salesManager.alertTrends')}</SectionTitle>
           <Card style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
             <AlertTrendChart data={alertTrends} />
           </Card>
         </>
       )}
 
-      <SectionTitle><MapPin size={20} /> All Parcels (Universal Access)</SectionTitle>
+      <SectionTitle><MapPin size={20} /> {t('salesManager.allParcels')}</SectionTitle>
 
       {loading ? (
         <ParcelGrid>
@@ -245,17 +247,17 @@ export default function SalesManagerDashboard() {
       ) : parcels.length === 0 ? (
         <EmptyState>
           <MapPin size={48} style={{ opacity: 0.3, marginBottom: 12 }} />
-          <div>No parcels found in the system yet.</div>
+          <div>{t('salesManager.noParcelsFound')}</div>
         </EmptyState>
       ) : (
         <ParcelGrid>
           {parcels.map((parcel) => (
             <ParcelCard key={parcel.id} onClick={() => navigate(`/sales-manager/parcels/${parcel.id}`)}>
-              <ParcelName>{parcel.name || 'Unnamed Parcel'}</ParcelName>
+              <ParcelName>{parcel.name || t('salesManager.unnamedParcel')}</ParcelName>
               <ParcelMeta>
-                <span><MapPin size={12} /> {parcel.region || 'Unknown region'}</span>
+                <span><MapPin size={12} /> {parcel.region || t('salesManager.unknownRegion')}</span>
                 <span>{formatArea(parcel.area_sqm)}</span>
-                {parcel.survey_date && <span>Surveyed {new Date(parcel.survey_date).toLocaleDateString()}</span>}
+                {parcel.survey_date && <span>{t('salesManager.surveyed', { date: new Date(parcel.survey_date).toLocaleDateString() })}</span>}
               </ParcelMeta>
               <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 <Badge tone="purple">Monitor</Badge>
