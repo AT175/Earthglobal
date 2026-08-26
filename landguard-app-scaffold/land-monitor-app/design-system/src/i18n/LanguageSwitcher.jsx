@@ -9,6 +9,9 @@ const LANGUAGES = [
   { value: 'pt', label: 'Português' },
   { value: 'sw', label: 'Kiswahili' },
   { value: 'ar', label: 'العربية' },
+  { value: 'de', label: 'Deutsch' },
+  { value: 'tw', label: 'Twi' },
+  { value: 'ee', label: 'Eʋegbe' },
 ];
 
 // Drop this into any layout/settings page to let a user switch language.
