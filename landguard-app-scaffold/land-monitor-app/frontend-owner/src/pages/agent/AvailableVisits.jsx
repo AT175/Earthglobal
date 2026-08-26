@@ -83,6 +83,7 @@ const fmtDate = (d) => d
 
 export default function AvailableVisits() {
   const { t } = useTranslation();
+  const { t: tCommon } = useTranslation('common');
   const navigate = useNavigate();
   const [visits, setVisits] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -161,7 +162,7 @@ export default function AvailableVisits() {
                   <CardHeader>
                     <VisitType>
                       <Icon size={20} style={{ color }} />
-                      {visit.type} visit — {visit.parcel_name}
+                      {tCommon(`visitType.${visit.type}`)} — {visit.parcel_name}
                     </VisitType>
                     <Badge tone="warning">Available</Badge>
                   </CardHeader>

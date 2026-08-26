@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import styled from 'styled-components';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import {
   ClipboardList, Camera, Video, Radio, MapPin, Phone, Calendar,
   User, ChevronDown, Check, AlertCircle, Loader2, UserCheck,
@@ -146,6 +147,7 @@ const fmtDate = (d) => d
   : '—';
 
 export default function VisitAssignments() {
+  const { t: tCommon } = useTranslation('common');
   const [visits, setVisits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [assigning, setAssigning] = useState(null);
@@ -237,7 +239,7 @@ export default function VisitAssignments() {
                   <VisitHeader>
                     <VisitType>
                       <Icon size={20} style={{ color }} />
-                      {visit.type} visit — {visit.parcel_name}
+                      {tCommon(`visitType.${visit.type}`)} — {visit.parcel_name}
                     </VisitType>
                     <Badge tone="warning">Pending</Badge>
                   </VisitHeader>

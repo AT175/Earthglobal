@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import styled from 'styled-components';
+import { useTranslation } from 'react-i18next';
 import {
   MapPin, Users, Building2, Camera, AlertTriangle, DollarSign,
   TrendingUp, Clock, CheckCircle2, ArrowRight, LogOut,
@@ -214,6 +215,7 @@ const statusColors = {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const { t: tCommon } = useTranslation('common');
   const [stats, setStats] = useState(null);
   const [activity, setActivity] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -319,7 +321,7 @@ export default function AdminDashboard() {
                   <ActivityIcon $bg="rgba(251,191,36,0.15)" $color="#fbbf24"><Camera size={16} /></ActivityIcon>
                   <ActivityInfo>
                     <ActivityTitle>{v.parcel_name || 'Unknown parcel'}</ActivityTitle>
-                    <ActivityMeta>{v.type} visit</ActivityMeta>
+                    <ActivityMeta>{tCommon(`visitType.${v.type}`)} visit</ActivityMeta>
                   </ActivityInfo>
                   <StatusBadge $bg={statusColors[v.status]?.bg} $color={statusColors[v.status]?.color}>
                     {v.status.replace(/_/g, ' ')}

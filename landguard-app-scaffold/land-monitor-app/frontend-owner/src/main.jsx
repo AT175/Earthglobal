@@ -7,6 +7,11 @@ import ownerResources from './i18n/resources';
 createI18n(ownerResources, {
   returnNull: false,
   returnEmptyString: false,
+  partialBundledLanguages: true,
+  react: {
+    useSuspense: false,
+    bindI18n: 'languageChanged loaded',
+  },
   parseMissingKeyHandler: (key) => {
     const parts = key.split('.');
     return parts[parts.length - 1];
