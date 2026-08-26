@@ -227,3 +227,61 @@ function formatParcel(row) {
     boundary_geojson: undefined,
   };
 }
+
+// GET /parcels/:id/media — list all field media across all visits for a parcel
+exports.listMedia = async (req, res, next) => {
+  try {
+    const parcelRes = await db.query('SELECT owner_id FROM parcels WHERE id = $1', [req.params.id]);
+    const parcel = parcelRes.rows[0];
+    if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
+
+    if (req.user.role === 'owner' && !req.user.isSalesManager && parcel.owner_id !== req.user.id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const result = await db.query(
+      `SELECT m.id, m.url, m.type, m.uploaded_at,
+              v.id AS visit_id, v.type AS visit_type, v.status AS visit_status,
+              a.name AS agent_name
+       FROM media m
+       JOIN visit_requests v ON m.visit_request_id = v.id
+       LEFT JOIN agents a ON v.agent_id = a.id
+       WHERE v.parcel_id = $1
+       ORDER BY m.uploaded_at DESC`,
+      [req.params.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /parcels/:id/alert-trends — per-parcel alert counts by month for last 12 months
+exports.alertTrends = async (req, res, next) => {
+  try {
+    const parcelRes = await db.query('SELECT owner_id FROM parcels WHERE id = $1', [req.params.id]);
+    const parcel = parcelRes.rows[0];
+    if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
+
+    if (req.user.role === 'owner' && !req.user.isSalesManager && parcel.owner_id !== req.user.id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const result = await db.query(
+      `SELECT
+         to_char(date_trunc('month', detected_at), 'YYYY-MM') AS month,
+         COUNT(*) FILTER (WHERE verified = true)  AS verified,
+         COUNT(*) FILTER (WHERE verified = false) AS unverified,
+         COUNT(*) AS total
+       FROM alerts
+       WHERE parcel_id = $1
+         AND detected_at >= now() - interval '12 months'
+       GROUP BY date_trunc('month', detected_at)
+       ORDER BY date_trunc('month', detected_at)`,
+      [req.params.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    next(err);
+  }
+};

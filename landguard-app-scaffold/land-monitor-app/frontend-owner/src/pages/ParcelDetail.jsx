@@ -335,6 +335,8 @@ export default function ParcelDetail() {
   const [images, setImages] = useState([]);
   const [loadingImages, setLoadingImages] = useState(false);
   const [capturing, setCapturing] = useState(false);
+  const [visitMedia, setVisitMedia] = useState([]);
+  const [alertTrends, setAlertTrends] = useState([]);
 
   // Monitoring states
   const [monitorData, setMonitorData] = useState({});
@@ -379,6 +381,16 @@ export default function ParcelDetail() {
       .then((res) => setImages(res.data || []))
       .catch(() => {})
       .finally(() => setLoadingImages(false));
+
+    // Fetch field visit media
+    api.get(`/parcels/${id}/media`)
+      .then((res) => setVisitMedia(res.data || []))
+      .catch(() => {});
+
+    // Fetch per-parcel alert trends
+    api.get(`/parcels/${id}/alert-trends`)
+      .then((res) => setAlertTrends(res.data || []))
+      .catch(() => {});
   }, [id]);
 
   const captureSatellite = async () => {
@@ -422,7 +434,7 @@ export default function ParcelDetail() {
   const downloadEvidence = async () => {
     try {
       const res = await api.get(`/parcels/${id}/evidence-package`);
-      const data = res.data;
+      const data = { ...res.data, visitMedia };
       const report = generateEvidenceReport(data);
       const blob = new Blob([report], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
@@ -468,6 +480,10 @@ ${data.satelliteImages.length > 0 ? '<table><tr><th>Date</th><th>NDVI</th><th>So
 ${data.alerts.length > 0 ? '<table><tr><th>Type</th><th>Detected</th><th>Verified</th></tr>' +
       data.alerts.map(a => `<tr><td>${a.alert_type}</td><td>${new Date(a.detected_at).toLocaleDateString()}</td><td>${a.verified ? 'Yes' : 'No'}</td></tr>`).join('') + '</table>'
       : '<p>No alerts recorded.</p>'}</div>
+<div class="section"><h2>Field Visit Media (${data.visitMedia.length})</h2>
+${data.visitMedia.length > 0 ? '<table><tr><th>Type</th><th>Visit</th><th>Agent</th><th>Date</th></tr>' +
+      data.visitMedia.map(m => `<tr><td>${m.type}</td><td>${m.visit_type}</td><td>${m.agent_name || 'N/A'}</td><td>${new Date(m.uploaded_at).toLocaleDateString()}</td></tr>`).join('') + '</table>'
+      : '<p>No field media uploaded.</p>'}</div>
 <div class="section"><h2>Summary</h2>
 <table><tr><th>Total Buildings</th><td>${data.summary.totalBuildings}</td></tr>
 <tr><th>Total Alerts</th><td>${data.summary.totalAlerts}</td></tr>
@@ -1227,6 +1243,67 @@ ${data.alerts.length > 0 ? '<table><tr><th>Type</th><th>Detected</th><th>Verifie
             </AlertRow>
           ))}
         </AlertList>
+      )}
+
+      {/* Alert Trends */}
+      {alertTrends.length > 0 && (
+        <>
+          <SectionTitle>
+            <Activity size={20} style={{ display: 'inline' }} /> Alert Trends (12 months)
+          </SectionTitle>
+          <Card>
+            <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end', height: 120, padding: '8px 0' }}>
+              {alertTrends.map((t) => {
+                const max = Math.max(...alertTrends.map((x) => parseInt(x.total, 10)), 1);
+                const vH = (parseInt(t.verified, 10) / max) * 100;
+                const uH = (parseInt(t.unverified, 10) / max) * 100;
+                return (
+                  <div key={t.month} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column-reverse', height: 100, width: '100%', alignItems: 'center' }}>
+                      <div style={{ width: '60%', background: '#22c55e', height: `${vH}%`, borderRadius: '3px 3px 0 0', minHeight: vH > 0 ? 2 : 0 }} title={`Verified: ${t.verified}`} />
+                      <div style={{ width: '60%', background: '#f59e0b', height: `${uH}%`, borderRadius: '3px 3px 0 0', minHeight: uH > 0 ? 2 : 0 }} title={`Unverified: ${t.unverified}`} />
+                    </div>
+                    <span style={{ fontSize: '0.65rem', color: '#aab7d4', whiteSpace: 'nowrap' }}>{t.month.slice(5)}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display: 'flex', gap: 16, fontSize: '0.75rem', color: '#aab7d4', marginTop: 8 }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, background: '#22c55e', borderRadius: 2 }} /> Verified</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, background: '#f59e0b', borderRadius: 2 }} /> Unverified</span>
+            </div>
+          </Card>
+        </>
+      )}
+
+      {/* Field Visit Media */}
+      {visitMedia.length > 0 && (
+        <>
+          <SectionTitle>
+            <Camera size={20} style={{ display: 'inline' }} /> Field Visit Photos & Videos
+          </SectionTitle>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
+            {visitMedia.map((m) => (
+              <Card key={m.id} style={{ padding: 0, overflow: 'hidden' }}>
+                {m.type === 'video' ? (
+                  <video src={m.url} controls style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: '8px 8px 0 0' }} />
+                ) : (
+                  <img src={m.url} alt={`Visit ${m.visit_type}`} style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: '8px 8px 0 0' }} />
+                )}
+                <div style={{ padding: '8px 10px', fontSize: '0.75rem', color: '#aab7d4' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>{m.visit_type} visit</span>
+                    <Badge tone={m.visit_status === 'completed' ? 'success' : 'warning'}>{m.visit_status}</Badge>
+                  </div>
+                  <div style={{ marginTop: 4 }}>
+                    {new Date(m.uploaded_at).toLocaleDateString()}
+                    {m.agent_name && ` • ${m.agent_name}`}
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </>
       )}
 
       {/* Visit history */}

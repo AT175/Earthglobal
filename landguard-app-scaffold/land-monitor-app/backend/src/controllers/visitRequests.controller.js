@@ -458,12 +458,18 @@ exports.updateStatus = async (req, res, next) => {
 exports.uploadMedia = async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-    const fakeUrl = `https://media.example.com/${req.params.id}/${req.file.originalname}`;
-    const type = req.file.mimetype.startsWith('video') ? 'video' : 'photo';
+
+    // Limit file size to 10MB
+    if (req.file.size > 10 * 1024 * 1024) {
+      return res.status(413).json({ error: 'File too large. Maximum size is 10MB.' });
+    }
+
+    const mediaType = req.file.mimetype.startsWith('video') ? 'video' : 'photo';
+    const base64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
 
     const result = await db.query(
       `INSERT INTO media (visit_request_id, url, type) VALUES ($1, $2, $3) RETURNING *`,
-      [req.params.id, fakeUrl, type]
+      [req.params.id, base64, mediaType]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
