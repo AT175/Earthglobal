@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   MapPin, FileUp, Navigation, Save, X, CheckCircle2, Loader,
-  AlertTriangle, Satellite, Clock, Plus, Check,
+  AlertTriangle, Satellite, Clock, Plus, Check, FileText,
 } from 'lucide-react';
 import AdminLayout from '../../components/AdminLayout';
 import api from '../../services/api';
@@ -332,6 +332,8 @@ const DimToggleBtn = styled.button`
 
 export default function ParcelOnboarding() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const requestId = searchParams.get('requestId');
   const [tab, setTab] = useState('manual');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
@@ -339,6 +341,7 @@ export default function ParcelOnboarding() {
   const [watching, setWatching] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [owners, setOwners] = useState([]);
+  const [request, setRequest] = useState(null);
 
   // GPS Survey state — station-based collection
   const [stations, setStations] = useState([]); // [{ readings: [], center: null, complete: bool }]
@@ -361,6 +364,17 @@ export default function ParcelOnboarding() {
     api.get('/parcels').then(() => {}).catch(() => {});
     api.get('/agents').catch(() => {});
   }, []);
+
+  // If onboarding from an owner-submitted request, load it and prefill the form
+  useEffect(() => {
+    if (!requestId) return;
+    api.get(`/parcel-onboarding-requests/${requestId}`)
+      .then((res) => {
+        setRequest(res.data);
+        setForm((prev) => ({ ...prev, name: res.data.name || prev.name, region: res.data.region || prev.region }));
+      })
+      .catch((err) => setError(err.response?.data?.error || 'Failed to load onboarding request'));
+  }, [requestId]);
 
   // Cleanup GPS watch on unmount
   useEffect(() => {
@@ -587,18 +601,28 @@ export default function ParcelOnboarding() {
 
       const boundary = { type: 'Polygon', coordinates: [coords] };
 
-      await api.post('/parcels', {
-        name: form.name,
-        owner_id: form.owner_id || undefined,
-        region: form.region,
-        boundary,
-        survey_date: form.survey_date || undefined,
-      });
+      if (requestId) {
+        await api.post(`/parcel-onboarding-requests/${requestId}/onboard`, {
+          name: form.name,
+          region: form.region,
+          boundary_geojson: boundary,
+          survey_date: form.survey_date || undefined,
+        });
+        setSuccess('Parcel onboarded successfully! The request has been marked as onboarded.');
+      } else {
+        await api.post('/parcels', {
+          name: form.name,
+          owner_id: form.owner_id || undefined,
+          region: form.region,
+          boundary,
+          survey_date: form.survey_date || undefined,
+        });
+        setSuccess('Parcel created successfully!');
+      }
 
-      setSuccess('Parcel created successfully!');
       setForm({ name: '', owner_id: '', region: '', boundary_coords: '', survey_date: '' });
       setStations([]);
-      setTimeout(() => navigate('/admin/parcels'), 1500);
+      setTimeout(() => navigate(requestId ? '/admin' : '/admin/parcels'), 1500);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to create parcel');
     } finally {
@@ -611,8 +635,33 @@ export default function ParcelOnboarding() {
       <Page>
         <Header>
           <PageTitle>Onboard New Parcel</PageTitle>
-          <PageSubtitle>Register a new land parcel using GPS survey, file import, or manual coordinates.</PageSubtitle>
+          <PageSubtitle>
+            {request
+              ? `Surveying a parcel requested by ${request.owner_name || 'a landowner'}. Once created, this parcel will be linked back to their request.`
+              : 'Register a new land parcel using GPS survey, file import, or manual coordinates.'}
+          </PageSubtitle>
         </Header>
+
+        {request && (
+          <GPSStatus style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <CheckCircle2 size={16} style={{ color: '#4ade80' }} />
+              <strong>Onboarding request from {request.owner_name || 'landowner'}</strong>
+            </div>
+            {request.notes && <div style={{ fontSize: '0.85rem', color: '#aab7d4' }}>Notes: {request.notes}</div>}
+            {request.site_plan_doc_url && (
+              <a
+                href={request.site_plan_doc_url}
+                target="_blank"
+                rel="noreferrer"
+                download={request.site_plan_doc_name || 'site-plan'}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#5ce1ff', fontSize: '0.85rem' }}
+              >
+                <FileText size={14} /> {request.site_plan_doc_name || 'View uploaded site plan / document'}
+              </a>
+            )}
+          </GPSStatus>
+        )}
 
         {success && <SuccessMsg><CheckCircle2 size={18} /> {success}</SuccessMsg>}
         {error && <ErrorMsg><X size={18} /> {error}</ErrorMsg>}

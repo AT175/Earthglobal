@@ -154,6 +154,7 @@ export default function Nav({ scrollTo }) {
           <NavLink onClick={() => handleNav('features')}>Features</NavLink>
           <NavLink onClick={() => handleNav('how')}>How It Works</NavLink>
           <NavLink onClick={() => navigate('/buy-land')}>Browse Land</NavLink>
+          <NavLink onClick={() => navigate('/signup')}>Sell Land</NavLink>
           <NavLink onClick={() => handleNav('pricing')}>Pricing</NavLink>
           <Button size="sm" onClick={() => navigate('/login')}>Sign In</Button>
         </NavLinks>
@@ -171,6 +172,7 @@ export default function Nav({ scrollTo }) {
             <MobileLink onClick={() => handleNav('features')}>Features</MobileLink>
             <MobileLink onClick={() => handleNav('how')}>How It Works</MobileLink>
             <MobileLink onClick={() => navigate('/buy-land')}>Browse Land</MobileLink>
+            <MobileLink onClick={() => navigate('/signup')}>Sell Land</MobileLink>
             <MobileLink onClick={() => handleNav('pricing')}>Pricing</MobileLink>
             <Button fullWidth onClick={() => navigate('/login')}>Sign In</Button>
           </MobileMenu>

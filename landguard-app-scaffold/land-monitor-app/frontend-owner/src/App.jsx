@@ -22,15 +22,19 @@ const Pricing = lazy(() => import('./pages/Pricing'));
 const MyVisits = lazy(() => import('./pages/owner/MyVisits'));
 const VisitDetailOwner = lazy(() => import('./pages/owner/VisitDetailOwner'));
 const SitePlans = lazy(() => import('./pages/SitePlans'));
+const RequestOnboarding = lazy(() => import('./pages/RequestOnboarding'));
 
 // Agent pages
 const VisitList = lazy(() => import('./pages/agent/VisitList'));
 const VisitDetail = lazy(() => import('./pages/agent/VisitDetail'));
 const AvailableVisits = lazy(() => import('./pages/agent/AvailableVisits'));
+const AgentParcels = lazy(() => import('./pages/agent/AgentParcels'));
+const AgentOnboardingTasks = lazy(() => import('./pages/agent/AgentOnboardingTasks'));
 
 // Admin pages
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const ParcelOnboarding = lazy(() => import('./pages/admin/ParcelOnboarding'));
+const OnboardingRequests = lazy(() => import('./pages/admin/OnboardingRequests'));
 const AgentManagement = lazy(() => import('./pages/admin/AgentManagement'));
 const ParcelsList = lazy(() => import('./pages/admin/ParcelsList'));
 const UserManagement = lazy(() => import('./pages/admin/UserManagement'));
@@ -112,6 +116,7 @@ export default function App() {
             <Route path="/sales-manager/sell" element={<RequireAuth><SellerDashboard /></RequireAuth>} />
             <Route path="/sales-manager/buy-land" element={<RequireAuth><BuyLand /></RequireAuth>} />
             <Route path="/sales-manager/site-plans" element={<RequireAuth><SitePlans /></RequireAuth>} />
+            <Route path="/sales-manager/request-onboarding" element={<RequireAuth><RequestOnboarding /></RequireAuth>} />
             <Route path="/sales-manager/visits" element={<RequireAuth><MyVisits /></RequireAuth>} />
             <Route path="/sales-manager/visits/:id" element={<RequireAuth><VisitDetailOwner /></RequireAuth>} />
             <Route path="/sales-manager/profile" element={<RequireAuth><Profile /></RequireAuth>} />
@@ -126,16 +131,21 @@ export default function App() {
             <Route path="/visits" element={<RequireAuth><MyVisits /></RequireAuth>} />
             <Route path="/visits/:id" element={<RequireAuth><VisitDetailOwner /></RequireAuth>} />
             <Route path="/site-plans" element={<RequireAuth><SitePlans /></RequireAuth>} />
+            <Route path="/request-onboarding" element={<RequireAuth><RequestOnboarding /></RequireAuth>} />
             <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
 
             {/* Agent routes */}
             <Route path="/agent" element={<RequireAuth><VisitList /></RequireAuth>} />
             <Route path="/agent/available" element={<RequireAuth><AvailableVisits /></RequireAuth>} />
             <Route path="/agent/visits/:id" element={<RequireAuth><VisitDetail /></RequireAuth>} />
+            <Route path="/agent/parcels" element={<RequireAuth><AgentParcels /></RequireAuth>} />
+            <Route path="/agent/parcels/:id" element={<RequireAuth><ParcelDetail /></RequireAuth>} />
+            <Route path="/agent/onboarding" element={<RequireAuth><AgentOnboardingTasks /></RequireAuth>} />
             <Route path="/agent/profile" element={<RequireAuth><Profile /></RequireAuth>} />
 
             {/* Admin routes */}
-            <Route path="/admin" element={<RequireAuth><ParcelOnboarding /></RequireAuth>} />
+            <Route path="/admin" element={<RequireAuth><OnboardingRequests /></RequireAuth>} />
+            <Route path="/admin/onboard" element={<RequireAuth><ParcelOnboarding /></RequireAuth>} />
             <Route path="/admin/dashboard" element={<RequireAuth><AdminDashboard /></RequireAuth>} />
             <Route path="/admin/agents" element={<RequireAuth><AgentManagement /></RequireAuth>} />
             <Route path="/admin/parcels" element={<RequireAuth><ParcelsList /></RequireAuth>} />

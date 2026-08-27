@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import styled, { keyframes } from 'styled-components';
 import {
-  Satellite, ArrowRight, MapPin, TrendingDown, Shield, Eye,
+  Satellite, ArrowRight, MapPin, TrendingDown, Shield, Eye, ShoppingBag, Landmark, CheckCircle2,
 } from 'lucide-react';
 import { Button } from '@earthglobal/design-system';
 
@@ -370,7 +370,7 @@ export default function Hero() {
             transition={{ delay: 0.1 }}
           >
             <Satellite size={14} aria-hidden="true" />
-            Satellite-Powered Land Monitoring
+            Monitor · Buy · Sell · Verify Land
           </HeroBadge>
 
           <HeroTitle
@@ -378,8 +378,8 @@ export default function Hero() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
           >
-            See it. Check it.<br />
-            <GradientText>Secure it.</GradientText>
+            Know your land is<br />
+            <GradientText>genuine, safe & tradeable.</GradientText>
           </HeroTitle>
 
           <HeroSubtitle
@@ -387,9 +387,10 @@ export default function Hero() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
           >
-            Monitor your land from anywhere. We check your property every two days
-            from space, alert you the moment something changes, and send verified
-            field agents to inspect on the ground.
+            Monitor your property from space, verify parcel genuineness before you buy,
+            and sell land with confidence. We check every parcel every two days from
+            satellite, send field agents to inspect on the ground, and back every
+            transaction with verified boundaries and documented evidence.
           </HeroSubtitle>
 
           <HeroCTAs
@@ -410,7 +411,15 @@ export default function Hero() {
               onClick={() => navigate('/buy-land')}
               style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
             >
-              Browse Land <MapPin size={18} aria-hidden="true" />
+              <ShoppingBag size={18} aria-hidden="true" /> Browse Land
+            </Button>
+            <Button
+              size="lg"
+              variant="secondary"
+              onClick={() => navigate('/signup')}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            >
+              <Landmark size={18} aria-hidden="true" /> Sell Your Land
             </Button>
           </HeroCTAs>
 
@@ -428,8 +437,8 @@ export default function Hero() {
               <StatLabel>Change detection</StatLabel>
             </Stat>
             <Stat>
-              <StatValue>15+</StatValue>
-              <StatLabel>Field agents</StatLabel>
+              <StatValue>100%</StatValue>
+              <StatLabel>Genuineness verified</StatLabel>
             </Stat>
           </HeroStats>
         </HeroLeft>

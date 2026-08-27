@@ -116,9 +116,9 @@ const StepDesc = styled.p`
 
 const STEPS = [
   { title: 'Create Account', desc: 'Sign up as a landowner in under 60 seconds. Free to start.' },
-  { title: 'Register Your Land', desc: 'Map your boundaries with GPS or import an existing survey file.' },
-  { title: 'We Watch Your Land', desc: 'Your property is checked from space every two days. You get alerted the moment anything changes.' },
-  { title: 'Act & Protect', desc: 'Send a field agent to inspect, build your evidence file, and secure your land for good.' },
+  { title: 'Onboard Your Parcel', desc: 'Request onboarding and upload your site plan. Our team surveys and registers your land with GPS-verified boundaries.' },
+  { title: 'We Monitor & Verify', desc: 'Your property is checked from space every 48 hours. We verify genuineness — boundaries, ownership, and encroachment status.' },
+  { title: 'Buy, Sell & Protect', desc: 'Trade verified land with confidence, get instant alerts on changes, and dispatch field agents when needed.' },
 ];
 
 export default function HowItWorks() {
@@ -127,9 +127,9 @@ export default function HowItWorks() {
       <Container>
         <SectionHeader>
           <SectionTag>How It Works</SectionTag>
-          <SectionTitle>Four steps to land security</SectionTitle>
+          <SectionTitle>From signup to secure land transactions</SectionTitle>
           <SectionDesc>
-            From signup to full protection in minutes. No technical expertise required.
+            Monitor, verify, buy, and sell land — all in one platform. No technical expertise required.
           </SectionDesc>
         </SectionHeader>
 

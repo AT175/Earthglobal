@@ -12,6 +12,7 @@ import { Card, Badge, Button, Skeleton, ParcelMap } from '@earthglobal/design-sy
 import api from '../services/api';
 import OwnerLayout from '../components/OwnerLayout';
 import SalesManagerLayout from '../components/SalesManagerLayout';
+import AgentLayout from '../components/AgentLayout';
 import { verifyBoundary, createBoundaryTracker } from '../utils/gpsUtils';
 
 const Header = styled.div`
@@ -334,7 +335,7 @@ export default function ParcelDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const routePrefix = location.pathname.startsWith('/sales-manager') ? '/sales-manager' : '';
+  const routePrefix = location.pathname.startsWith('/sales-manager') ? '/sales-manager' : location.pathname.startsWith('/agent') ? '/agent' : '';
   const [parcel, setParcel] = useState(null);
   const [alerts, setAlerts] = useState([]);
   const [visits, setVisits] = useState([]);
@@ -509,20 +510,22 @@ ${data.visitMedia.length > 0 ? '<table><tr><th>Type</th><th>Visit</th><th>Agent<
 </body></html>`;
   };
 
+  const LoadingLayout = routePrefix === '/sales-manager' ? SalesManagerLayout : routePrefix === '/agent' ? AgentLayout : OwnerLayout;
+
   if (loading) {
     return (
-      <OwnerLayout>
+      <LoadingLayout>
         <Skeleton $height="2rem" $width="40%" style={{ marginBottom: 24 }} />
         <Skeleton $height="500px" />
-      </OwnerLayout>
+      </LoadingLayout>
     );
   }
 
   if (!parcel) {
     return (
-      <OwnerLayout>
+      <LoadingLayout>
         <Card>{t('parcelDetail.notFound')}</Card>
-      </OwnerLayout>
+      </LoadingLayout>
     );
   }
 
@@ -583,23 +586,25 @@ ${data.visitMedia.length > 0 ? '<table><tr><th>Type</th><th>Visit</th><th>Agent<
     .slice(0, 12)
     .reverse();
 
-  const Layout = routePrefix ? SalesManagerLayout : OwnerLayout;
+  const Layout = routePrefix === '/sales-manager' ? SalesManagerLayout : routePrefix === '/agent' ? AgentLayout : OwnerLayout;
 
   return (
     <Layout>
       <Header>
         <Title>{parcel.name}</Title>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <Button onClick={() => navigate(`${routePrefix}/parcels/${id}/request-visit`)}>
-            {t('parcelDetail.requestVisit')}
-          </Button>
-          <Button variant="secondary" onClick={() => navigate(`${routePrefix}/sell`)}>
-            List for Sale
-          </Button>
-          <Button variant="secondary" onClick={() => navigate(`${routePrefix}/site-plans`)}>
-            <FileText size={16} style={{ display: 'inline' }} /> Site Plans
-          </Button>
-        </div>
+        {routePrefix !== '/agent' && (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button onClick={() => navigate(`${routePrefix}/parcels/${id}/request-visit`)}>
+              {t('parcelDetail.requestVisit')}
+            </Button>
+            <Button variant="secondary" onClick={() => navigate(`${routePrefix}/sell`)}>
+              List for Sale
+            </Button>
+            <Button variant="secondary" onClick={() => navigate(`${routePrefix}/site-plans`)}>
+              <FileText size={16} style={{ display: 'inline' }} /> Site Plans
+            </Button>
+          </div>
+        )}
       </Header>
 
       <StatsRow>

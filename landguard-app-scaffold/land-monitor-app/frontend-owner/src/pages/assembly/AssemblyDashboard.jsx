@@ -460,39 +460,39 @@ export default function AssemblyDashboard() {
 
   const createUser = async () => {
     if (!userForm.name || !userForm.email || !userForm.password) {
-      showToast('Name, email, and password are required', 'error'); return;
+      showToast(t('assemblyDashboard.toasts.nameEmailPasswordRequired'), 'error'); return;
     }
     setSavingUser(true);
     try {
       await api.post('/assembly/users', userForm);
-      showToast('User created');
+      showToast(t('assemblyDashboard.toasts.userCreated'));
       setUserForm({ name: '', email: '', phone: '', password: '', role: 'planning_officer' });
       setShowUserForm(false);
       const { data } = await api.get('/assembly/users');
       setOrgUsers(data);
     } catch (err) {
-      showToast(err.response?.data?.error || 'Failed to create user', 'error');
+      showToast(err.response?.data?.error || t('assemblyDashboard.toasts.failedToCreateUser'), 'error');
     } finally { setSavingUser(false); }
   };
 
   const toggleUserActive = async (u) => {
     try {
       await api.patch(`/assembly/users/${u.id}`, { active: !u.active });
-      showToast(`User ${u.active ? 'deactivated' : 'activated'}`);
+      showToast(u.active ? t('assemblyDashboard.toasts.userDeactivated') : t('assemblyDashboard.toasts.userActivated'));
       const { data } = await api.get('/assembly/users');
       setOrgUsers(data);
-    } catch { showToast('Failed to update user', 'error'); }
+    } catch { showToast(t('assemblyDashboard.toasts.failedToUpdateUser'), 'error'); }
   };
 
   const deleteUser = async (u) => {
-    if (!confirm(`Delete user "${u.name}"?`)) return;
+    if (!confirm(t('assemblyDashboard.userForm.deleteConfirm', { name: u.name }))) return;
     try {
       await api.delete(`/assembly/users/${u.id}`);
-      showToast('User deleted');
+      showToast(t('assemblyDashboard.toasts.userDeleted'));
       const { data } = await api.get('/assembly/users');
       setOrgUsers(data);
     } catch (err) {
-      showToast(err.response?.data?.error || 'Failed to delete user', 'error');
+      showToast(err.response?.data?.error || t('assemblyDashboard.toasts.failedToDeleteUser'), 'error');
     }
   };
 
@@ -517,29 +517,29 @@ export default function AssemblyDashboard() {
           )}
           {user?.assemblyRole === 'planning_officer' && (
             <LogoutBtn onClick={() => navigate('/assembly/planning')} style={{ borderColor: 'rgba(92,225,255,0.3)', color: '#5ce1ff' }}>
-              <Map size={16} /> Planning Map
+              <Map size={16} /> {t('assemblyDashboard.nav.planningMap')}
             </LogoutBtn>
           )}
           {(user?.assemblyRole === 'planning_officer' || user?.assemblyRole === 'assembly_admin') && (
             <LogoutBtn onClick={() => navigate('/assembly/planning/schemes')} style={{ borderColor: 'rgba(92,225,255,0.3)', color: '#5ce1ff' }}>
-              <FileText size={16} /> Scheme Management
+              <FileText size={16} /> {t('assemblyDashboard.nav.schemeManagement')}
             </LogoutBtn>
           )}
           {(user?.assemblyRole === 'planning_officer' || user?.assemblyRole === 'assembly_admin') && (
             <LogoutBtn onClick={() => navigate('/assembly/validation')} style={{ borderColor: 'rgba(92,225,255,0.3)', color: '#5ce1ff' }}>
-              <FileCheck size={16} /> Search Validation
+              <FileCheck size={16} /> {t('assemblyDashboard.nav.searchValidation')}
             </LogoutBtn>
           )}
           {(user?.assemblyRole === 'planning_officer' || user?.assemblyRole === 'assembly_admin') && (
             <LogoutBtn onClick={() => navigate('/assembly/marketplace')} style={{ borderColor: 'rgba(168,85,247,0.3)', color: '#c084fc' }}>
-              <Landmark size={16} /> Land Sale Approvals
+              <Landmark size={16} /> {t('assemblyDashboard.nav.landSaleApprovals')}
             </LogoutBtn>
           )}
           <LogoutBtn onClick={() => navigate('/assembly/profile')} style={{ borderColor: 'rgba(22,119,255,0.3)', color: '#3ba7ff' }}>
-            <User size={16} /> My Profile
+            <User size={16} /> {t('assemblyDashboard.nav.myProfile')}
           </LogoutBtn>
           <LogoutBtn onClick={handleLogout}>
-            <LogOut size={16} /> Logout
+            <LogOut size={16} /> {t('assemblyDashboard.nav.logout')}
           </LogoutBtn>
           <LanguageSwitcher />
         </UserInfo>
@@ -682,10 +682,10 @@ export default function AssemblyDashboard() {
                 <tbody>
                   {buildings.map(b => (
                     <tr key={b.id}>
-                      <td>{b.parcel_name || 'Unknown'}</td>
+                      <td>{b.parcel_name || t('assemblyDashboard.misc.unknown')}</td>
                       <td>{b.area_sqm ? Number(b.area_sqm).toFixed(1) : '—'}</td>
                       <td><StatusBadge $bg={statusColors[b.status]?.bg} $color={statusColors[b.status]?.color}>{b.status.replace(/_/g, ' ')}</StatusBadge></td>
-                      <td>{b.in_protected_area ? <span style={{ color: '#ef4444' }}>Yes</span> : 'No'}</td>
+                      <td>{b.in_protected_area ? <span style={{ color: '#ef4444' }}>{t('assemblyDashboard.misc.yes')}</span> : t('assemblyDashboard.misc.no')}</td>
                       <td>{fmtDate(b.detected_at)}</td>
                     </tr>
                   ))}
@@ -781,7 +781,7 @@ export default function AssemblyDashboard() {
                   <tbody>
                     {sitePlans.filter(p => !filter || p.status === filter).map(p => (
                       <tr key={p.id}>
-                        <td>{p.title || 'Untitled'}</td>
+                        <td>{p.title || t('assemblyDashboard.misc.untitled')}</td>
                         <td>{p.parcel_name || '—'}</td>
                         <td>{p.owner_name || '—'}</td>
                         <td style={{ textTransform: 'capitalize' }}>{p.generated_by_role}</td>
@@ -790,12 +790,12 @@ export default function AssemblyDashboard() {
                         <td>
                           {p.status === 'draft' && (
                             <div style={{ display: 'flex', gap: 6 }}>
-                              <button onClick={async () => { try { await api.patch(`/site-plans/${p.id}/certify`); showToast('Site plan certified'); fetchData('siteplans'); } catch { showToast('Failed to certify', 'error'); } }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(34,197,94,0.3)', background: 'rgba(34,197,94,0.1)', color: '#4ade80', cursor: 'pointer', fontSize: '0.8rem' }}><CheckCircle2 size={14} /> {t('assemblyDashboard.actions.certify')}</button>
-                              <button onClick={async () => { const reason = prompt('Rejection reason:'); if (reason === null) return; try { await api.patch(`/site-plans/${p.id}/reject`, { reason }); showToast('Site plan rejected'); fetchData('siteplans'); } catch { showToast('Failed to reject', 'error'); } }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.1)', color: '#f87171', cursor: 'pointer', fontSize: '0.8rem' }}><XCircle size={14} /> {t('assemblyDashboard.actions.reject')}</button>
+                              <button onClick={async () => { try { await api.patch(`/site-plans/${p.id}/certify`); showToast(t('assemblyDashboard.toasts.sitePlanCertified')); fetchData('siteplans'); } catch { showToast(t('assemblyDashboard.toasts.failedToCertify'), 'error'); } }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(34,197,94,0.3)', background: 'rgba(34,197,94,0.1)', color: '#4ade80', cursor: 'pointer', fontSize: '0.8rem' }}><CheckCircle2 size={14} /> {t('assemblyDashboard.actions.certify')}</button>
+                              <button onClick={async () => { const reason = prompt(t('assemblyDashboard.userForm.rejectionReasonPrompt')); if (reason === null) return; try { await api.patch(`/site-plans/${p.id}/reject`, { reason }); showToast(t('assemblyDashboard.toasts.sitePlanRejected')); fetchData('siteplans'); } catch { showToast(t('assemblyDashboard.toasts.failedToReject'), 'error'); } }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.1)', color: '#f87171', cursor: 'pointer', fontSize: '0.8rem' }}><XCircle size={14} /> {t('assemblyDashboard.actions.reject')}</button>
                             </div>
                           )}
-                          {p.status === 'certified' && <span style={{ color: '#4ade80', fontSize: '0.8rem' }}>Certified {fmtDate(p.certified_at)}</span>}
-                          {p.status === 'rejected' && <span style={{ color: '#f87171', fontSize: '0.8rem' }}>{p.rejection_reason || 'Rejected'}</span>}
+                          {p.status === 'certified' && <span style={{ color: '#4ade80', fontSize: '0.8rem' }}>{t('assemblyDashboard.misc.certifiedOn', { date: fmtDate(p.certified_at) })}</span>}
+                          {p.status === 'rejected' && <span style={{ color: '#f87171', fontSize: '0.8rem' }}>{p.rejection_reason || t('assemblyDashboard.misc.rejectedLabel')}</span>}
                         </td>
                       </tr>
                     ))}
@@ -821,10 +821,10 @@ export default function AssemblyDashboard() {
                         <td>{fmtDate(r.requested_at)}</td>
                         <td>
                           {r.status === 'pending' && (
-                            <button onClick={async () => { try { await api.patch(`/site-plans/requests/${r.id}`, { status: 'in_progress' }); showToast('Request accepted'); fetchData('siteplans'); } catch { showToast('Failed', 'error'); } }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(92,225,255,0.3)', background: 'rgba(92,225,255,0.1)', color: '#5ce1ff', cursor: 'pointer', fontSize: '0.8rem' }}>{t('assemblyDashboard.actions.start')}</button>
+                            <button onClick={async () => { try { await api.patch(`/site-plans/requests/${r.id}`, { status: 'in_progress' }); showToast(t('assemblyDashboard.toasts.requestAccepted')); fetchData('siteplans'); } catch { showToast(t('assemblyDashboard.toasts.failed'), 'error'); } }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(92,225,255,0.3)', background: 'rgba(92,225,255,0.1)', color: '#5ce1ff', cursor: 'pointer', fontSize: '0.8rem' }}>{t('assemblyDashboard.actions.start')}</button>
                           )}
                           {r.status === 'in_progress' && (
-                            <button onClick={async () => { try { await api.patch(`/site-plans/requests/${r.id}`, { status: 'completed' }); showToast('Request completed'); fetchData('siteplans'); } catch { showToast('Failed', 'error'); } }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(34,197,94,0.3)', background: 'rgba(34,197,94,0.1)', color: '#4ade80', cursor: 'pointer', fontSize: '0.8rem' }}><CheckCircle2 size={14} /> {t('assemblyDashboard.actions.complete')}</button>
+                            <button onClick={async () => { try { await api.patch(`/site-plans/requests/${r.id}`, { status: 'completed' }); showToast(t('assemblyDashboard.toasts.requestCompleted')); fetchData('siteplans'); } catch { showToast(t('assemblyDashboard.toasts.failed'), 'error'); } }} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(34,197,94,0.3)', background: 'rgba(34,197,94,0.1)', color: '#4ade80', cursor: 'pointer', fontSize: '0.8rem' }}><CheckCircle2 size={14} /> {t('assemblyDashboard.actions.complete')}</button>
                           )}
                         </td>
                       </tr>
@@ -944,14 +944,14 @@ export default function AssemblyDashboard() {
             <PanelHeader>
               <PanelTitle><UserCog size={18} /> {t('assemblyDashboard.panels.users')}</PanelTitle>
               <AddBtn onClick={() => setShowUserForm(!showUserForm)}>
-                <Plus size={16} /> Add User
+                <Plus size={16} /> {t('assemblyDashboard.userForm.addUser')}
               </AddBtn>
             </PanelHeader>
 
             {orgInfo && (
               <div style={{ padding: '0 24px 16px', borderBottom: '1px solid rgba(92,225,255,0.1)' }}>
                 <div style={{ fontSize: '0.85rem', color: '#aab7d4' }}>
-                  Organization: <span style={{ color: '#5ce1ff', fontWeight: 600 }}>{orgInfo.name}</span> — {orgInfo.region}
+                  {t('assemblyDashboard.userForm.organization')}: <span style={{ color: '#5ce1ff', fontWeight: 600 }}>{orgInfo.name}</span> — {orgInfo.region}
                 </div>
               </div>
             )}
@@ -960,55 +960,55 @@ export default function AssemblyDashboard() {
               <div style={{ padding: 24, background: 'rgba(13,23,51,0.5)', borderBottom: '1px solid rgba(92,225,255,0.1)' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 16 }}>
                   <div>
-                    <label style={{ fontSize: '0.85rem', color: '#aab7d4', display: 'block', marginBottom: 6 }}>Full Name *</label>
+                    <label style={{ fontSize: '0.85rem', color: '#aab7d4', display: 'block', marginBottom: 6 }}>{t('assemblyDashboard.userForm.fullName')}</label>
                     <input
                       style={{ width: '100%', padding: 10, background: '#080f24', border: '1px solid rgba(92,225,255,0.15)', borderRadius: 8, color: '#e6edf7', fontSize: '0.9rem', outline: 'none' }}
                       value={userForm.name}
                       onChange={(e) => setUserForm({ ...userForm, name: e.target.value })}
-                      placeholder="e.g. Planning Officer"
+                      placeholder={t('assemblyDashboard.userForm.fullNamePlaceholder')}
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.85rem', color: '#aab7d4', display: 'block', marginBottom: 6 }}>Email *</label>
+                    <label style={{ fontSize: '0.85rem', color: '#aab7d4', display: 'block', marginBottom: 6 }}>{t('assemblyDashboard.userForm.email')}</label>
                     <input
                       type="email"
                       style={{ width: '100%', padding: 10, background: '#080f24', border: '1px solid rgba(92,225,255,0.15)', borderRadius: 8, color: '#e6edf7', fontSize: '0.9rem', outline: 'none' }}
                       value={userForm.email}
                       onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
-                      placeholder="officer@assembly.gov.gh"
+                      placeholder={t('assemblyDashboard.userForm.emailPlaceholder')}
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.85rem', color: '#aab7d4', display: 'block', marginBottom: 6 }}>Phone</label>
+                    <label style={{ fontSize: '0.85rem', color: '#aab7d4', display: 'block', marginBottom: 6 }}>{t('assemblyDashboard.userForm.phone')}</label>
                     <input
                       style={{ width: '100%', padding: 10, background: '#080f24', border: '1px solid rgba(92,225,255,0.15)', borderRadius: 8, color: '#e6edf7', fontSize: '0.9rem', outline: 'none' }}
                       value={userForm.phone}
                       onChange={(e) => setUserForm({ ...userForm, phone: e.target.value })}
-                      placeholder="+233240000000"
+                      placeholder={t('assemblyDashboard.userForm.phonePlaceholder')}
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.85rem', color: '#aab7d4', display: 'block', marginBottom: 6 }}>Password *</label>
+                    <label style={{ fontSize: '0.85rem', color: '#aab7d4', display: 'block', marginBottom: 6 }}>{t('assemblyDashboard.userForm.password')}</label>
                     <input
                       type="password"
                       style={{ width: '100%', padding: 10, background: '#080f24', border: '1px solid rgba(92,225,255,0.15)', borderRadius: 8, color: '#e6edf7', fontSize: '0.9rem', outline: 'none' }}
                       value={userForm.password}
                       onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
-                      placeholder="Set login password"
+                      placeholder={t('assemblyDashboard.userForm.passwordPlaceholder')}
                     />
                   </div>
                 </div>
                 <div style={{ marginBottom: 16 }}>
-                  <label style={{ fontSize: '0.85rem', color: '#aab7d4', display: 'block', marginBottom: 6 }}>Role</label>
+                  <label style={{ fontSize: '0.85rem', color: '#aab7d4', display: 'block', marginBottom: 6 }}>{t('assemblyDashboard.userForm.role')}</label>
                   <select
                     style={{ padding: 10, background: '#080f24', border: '1px solid rgba(92,225,255,0.15)', borderRadius: 8, color: '#e6edf7', fontSize: '0.9rem', outline: 'none' }}
                     value={userForm.role}
                     onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}
                   >
-                    <option value="assembly_admin">Assembly Admin</option>
-                    <option value="planning_officer">Planning Officer</option>
-                    <option value="revenue_officer">Revenue Officer</option>
-                    <option value="inspector">Inspector</option>
+                    <option value="assembly_admin">{t('assemblyDashboard.userForm.roleAssemblyAdmin')}</option>
+                    <option value="planning_officer">{t('assemblyDashboard.userForm.rolePlanningOfficer')}</option>
+                    <option value="revenue_officer">{t('assemblyDashboard.userForm.roleRevenueOfficer')}</option>
+                    <option value="inspector">{t('assemblyDashboard.userForm.roleInspector')}</option>
                   </select>
                 </div>
                 <div style={{ display: 'flex', gap: 12 }}>
@@ -1018,13 +1018,13 @@ export default function AssemblyDashboard() {
                     style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', background: 'linear-gradient(135deg, #1677ff, #5ce1ff)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem', opacity: savingUser ? 0.5 : 1 }}
                   >
                     {savingUser ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
-                    {savingUser ? 'Creating...' : 'Create User'}
+                    {savingUser ? t('assemblyDashboard.userForm.creating') : t('assemblyDashboard.userForm.createUser')}
                   </button>
                   <button
                     onClick={() => setShowUserForm(false)}
                     style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', background: 'transparent', border: '1px solid rgba(92,225,255,0.15)', color: '#aab7d4', borderRadius: 8, cursor: 'pointer', fontSize: '0.9rem' }}
                   >
-                    Cancel
+                    {t('assemblyDashboard.userForm.cancel')}
                   </button>
                 </div>
               </div>
@@ -1044,7 +1044,7 @@ export default function AssemblyDashboard() {
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 500, fontSize: '0.9rem' }}>
                         {u.name}
-                        {u.id === user?.id && <span style={{ color: '#5ce1ff', fontSize: '0.75rem', marginLeft: 8 }}>(You)</span>}
+                        {u.id === user?.id && <span style={{ color: '#5ce1ff', fontSize: '0.75rem', marginLeft: 8 }}>{t('assemblyDashboard.userForm.you')}</span>}
                       </div>
                       <div style={{ fontSize: '0.8rem', color: '#aab7d4', display: 'flex', gap: 12, marginTop: 2, flexWrap: 'wrap' }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Mail size={11} /> {u.email}</span>
@@ -1053,11 +1053,11 @@ export default function AssemblyDashboard() {
                       <div style={{ fontSize: '0.75rem', color: '#5ce1ff', marginTop: 4 }}>{u.assembly_role?.replace(/_/g, ' ')}</div>
                     </div>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 999, fontSize: '0.7rem', fontWeight: 600, background: u.active ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)', color: u.active ? '#4ade80' : '#f87171' }}>
-                      {u.active ? 'Active' : 'Inactive'}
+                      {u.active ? t('assemblyDashboard.userForm.active') : t('assemblyDashboard.userForm.inactive')}
                     </span>
                     <button
                       onClick={() => toggleUserActive(u)}
-                      title={u.active ? 'Deactivate' : 'Activate'}
+                      title={u.active ? t('assemblyDashboard.userForm.deactivate') : t('assemblyDashboard.userForm.activate')}
                       disabled={u.id === user?.id}
                       style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(92,225,255,0.15)', background: 'transparent', color: '#aab7d4', cursor: u.id === user?.id ? 'not-allowed' : 'pointer', opacity: u.id === user?.id ? 0.4 : 1 }}
                     >
@@ -1065,7 +1065,7 @@ export default function AssemblyDashboard() {
                     </button>
                     <button
                       onClick={() => deleteUser(u)}
-                      title="Delete"
+                      title={t('assemblyDashboard.userForm.delete')}
                       disabled={u.id === user?.id}
                       style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(239,68,68,0.2)', background: 'transparent', color: '#f87171', cursor: u.id === user?.id ? 'not-allowed' : 'pointer', opacity: u.id === user?.id ? 0.4 : 1 }}
                     >

@@ -240,7 +240,7 @@ export default function ParcelsList() {
       <Page>
         <Header>
           <PageTitle>Parcels</PageTitle>
-          <AddBtn onClick={() => navigate('/admin')}><Plus size={18} /> Add Parcel</AddBtn>
+          <AddBtn onClick={() => navigate('/admin/onboard')}><Plus size={18} /> Add Parcel</AddBtn>
         </Header>
 
         <StatsRow>

@@ -26,6 +26,7 @@ const financeRoutes = require('./routes/finance.routes');
 const profileRoutes = require('./routes/profile.routes');
 const sitePlanRoutes = require('./routes/sitePlan.routes');
 const parcelMonitoringRoutes = require('./routes/parcelMonitoring.routes');
+const parcelOnboardingRoutes = require('./routes/parcelOnboarding.routes');
 const { createWebSocketServer } = require('./realtime/socketServer');
 const cron = require('node-cron');
 const { run: runNdviJob } = require('./jobs/ndviChangeDetection');
@@ -140,6 +141,7 @@ app.use('/finance', financeRoutes);
 app.use('/profile', profileRoutes);
 app.use('/site-plans', sitePlanRoutes);
 app.use('/parcels', parcelMonitoringRoutes); // mounts /parcels/:id/* monitoring endpoints
+app.use('/parcel-onboarding-requests', parcelOnboardingRoutes);
 
 app.use((err, _req, res, _next) => {
   logger.error('[API Error] %s', err.message);

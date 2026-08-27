@@ -1,5 +1,5 @@
 import styled from 'styled-components';
-import { Shield, Eye, Globe, Clock } from 'lucide-react';
+import { Shield, Eye, Globe, Clock, CheckCircle2, ShoppingBag } from 'lucide-react';
 
 const Bar = styled.section`
   border-top: 1px solid ${({ theme }) => theme.colors.borderDark};
@@ -35,8 +35,8 @@ const Item = styled.div`
 const TRUST_ITEMS = [
   { icon: Shield, label: 'Trusted by landowners across Ghana' },
   { icon: Clock, label: 'Monitored every 48 hours' },
-  { icon: Eye, label: 'Instant alerts on any change' },
-  { icon: Globe, label: 'Monitor from anywhere in the world' },
+  { icon: CheckCircle2, label: 'Every parcel genuineness-verified' },
+  { icon: ShoppingBag, label: 'Buy & sell verified land' },
 ];
 
 export default function TrustBar() {

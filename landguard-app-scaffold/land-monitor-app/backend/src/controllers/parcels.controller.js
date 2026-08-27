@@ -2,7 +2,7 @@ const db = require('../config/db');
 const turf = require('@turf/turf');
 const { computeParcelNdvi } = require('../jobs/ndviChangeDetection');
 
-// GET /parcels — list parcels belonging to the authenticated owner (sales managers see all)
+// GET /parcels — list parcels (role-scoped: owner sees own, sales manager sees all, agent sees assigned)
 exports.listForOwner = async (req, res, next) => {
   try {
     if (req.user.isSalesManager) {
@@ -10,6 +10,17 @@ exports.listForOwner = async (req, res, next) => {
         `SELECT id, name, region, survey_date, area_sqm, perimeter_m, owner_id,
                 ST_AsGeoJSON(boundary) AS boundary_geojson
          FROM parcels ORDER BY created_at DESC LIMIT 500`
+      );
+      res.json(result.rows.map(formatParcel));
+    } else if (req.user.role === 'agent') {
+      const result = await db.query(
+        `SELECT p.id, p.name, p.region, p.survey_date, p.area_sqm, p.perimeter_m, p.owner_id,
+                ST_AsGeoJSON(p.boundary) AS boundary_geojson
+         FROM parcels p
+         JOIN parcel_onboarding_requests r ON r.resulting_parcel_id = p.id
+         WHERE r.assigned_agent_id = $1
+         ORDER BY p.created_at DESC`,
+        [req.user.id]
       );
       res.json(result.rows.map(formatParcel));
     } else {

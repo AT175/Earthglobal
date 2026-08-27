@@ -364,7 +364,7 @@ export default function AdminDashboard() {
               <Link to="/admin" style={{ textDecoration: 'none' }}>
                 <ActivityItem>
                   <ActivityIcon $bg="rgba(22,119,255,0.15)" $color="#3ba7ff"><MapPin size={16} /></ActivityIcon>
-                  <ActivityInfo><ActivityTitle>{t('adminDashboard.onboardNewParcel')}</ActivityTitle><ActivityMeta>{t('adminDashboard.onboardNewParcelDesc')}</ActivityMeta></ActivityInfo>
+                  <ActivityInfo><ActivityTitle>{t('adminDashboard.onboardingRequests', { defaultValue: t('adminDashboard.onboardNewParcel') })}</ActivityTitle><ActivityMeta>{t('adminDashboard.onboardingRequestsDesc', { defaultValue: t('adminDashboard.onboardNewParcelDesc') })}</ActivityMeta></ActivityInfo>
                   <ArrowRight size={16} color="#aab7d4" />
                 </ActivityItem>
               </Link>

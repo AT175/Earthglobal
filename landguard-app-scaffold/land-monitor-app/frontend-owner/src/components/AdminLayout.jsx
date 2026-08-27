@@ -9,7 +9,7 @@ import { LanguageSwitcher } from '@earthglobal/design-system';
 
 const NAV_ITEMS = [
   { to: '/admin/dashboard', labelKey: 'nav.dashboard', fallbackLabel: 'Dashboard', icon: LayoutGrid },
-  { to: '/admin', labelKey: 'nav.parcelOnboarding', fallbackLabel: 'Onboard Parcel', icon: MapPinned },
+  { to: '/admin', labelKey: 'nav.parcelOnboarding', fallbackLabel: 'Onboarding Requests', icon: MapPinned },
   { to: '/admin/parcels', labelKey: 'nav.parcels', fallbackLabel: 'Parcels', icon: Home },
   { to: '/admin/agents', labelKey: 'nav.agents', fallbackLabel: 'Agents', icon: Users },
   { to: '/admin/visits', labelKey: 'nav.visitAssignments', fallbackLabel: 'Visit Assignments', icon: ClipboardList },

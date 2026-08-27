@@ -92,11 +92,10 @@ export default function CTA({ scrollTo }) {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
         >
-          <Title>Ready to protect your land?</Title>
+          <Title>Ready to secure your land?</Title>
           <Desc>
-            Join EarthGlobal today and monitor your property from space,
-            get instant alerts, and dispatch verified field agents —
-            from anywhere in the world.
+            Join EarthGlobal today — monitor your property from space, verify parcel genuineness,
+            and buy or sell land with confidence. Every transaction backed by satellite evidence.
           </Desc>
           <Buttons>
             <Button

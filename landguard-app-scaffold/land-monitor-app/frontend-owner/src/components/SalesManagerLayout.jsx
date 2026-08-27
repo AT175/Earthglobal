@@ -4,12 +4,13 @@ import { useTranslation } from 'react-i18next';
 import styled from 'styled-components';
 import {
   LayoutDashboard, FileCheck, Landmark, User, LogOut, MapPin,
-  ClipboardList, FileText, ShoppingBag, Briefcase,
+  ClipboardList, FileText, ShoppingBag, Briefcase, PlusSquare,
 } from 'lucide-react';
 import { LanguageSwitcher } from '@earthglobal/design-system';
 
 const NAV_ITEMS = [
   { to: '/sales-manager', labelKey: 'nav.dashboard', fallbackLabel: 'Dashboard', icon: LayoutDashboard },
+  { to: '/sales-manager/request-onboarding', labelKey: 'nav.requestOnboarding', fallbackLabel: 'Onboard a Parcel', icon: PlusSquare },
   { to: '/sales-manager/sell', labelKey: 'nav.sell', fallbackLabel: 'List Land for Sale', icon: Landmark },
   { to: '/sales-manager/buy-land', labelKey: 'nav.browseLand', fallbackLabel: 'Browse Land', icon: ShoppingBag },
   { to: '/sales-manager/validation', labelKey: 'nav.validation', fallbackLabel: 'Validation', icon: FileCheck },

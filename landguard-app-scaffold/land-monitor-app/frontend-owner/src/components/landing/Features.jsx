@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import styled from 'styled-components';
-import { Bell, Camera, Shield, Eye, MapPin, Leaf } from 'lucide-react';
+import { Bell, Camera, Shield, Eye, MapPin, Leaf, ShoppingBag, Landmark, CheckCircle2 } from 'lucide-react';
 
 const Section = styled.section`
   padding: ${({ theme }) => `${theme.spacing[20]} 0`};
@@ -136,9 +136,19 @@ const FEATURES = [
     desc: 'Get notified the moment a change is detected on your property. Alerts reach you via the app, email, and SMS — wherever you are, whatever time it is.',
   },
   {
-    icon: Camera,
-    title: 'Parcel Snapshots',
-    desc: 'Capture satellite images of your land on demand. Build a visual history over weeks, months, and years — invaluable evidence if a dispute arises.',
+    icon: CheckCircle2,
+    title: 'Parcel Genuineness',
+    desc: 'Before you buy, we verify the parcel is genuine — boundaries matched against satellite imagery, ownership documents checked, and field agents confirm on the ground. No more land disputes.',
+  },
+  {
+    icon: ShoppingBag,
+    title: 'Buy Verified Land',
+    desc: 'Browse land listings with confidence. Every parcel on our marketplace is monitored, boundary-verified, and backed by satellite evidence. You know exactly what you are buying.',
+  },
+  {
+    icon: Landmark,
+    title: 'Sell With Confidence',
+    desc: 'List your land for sale with verified boundaries and a monitoring history. Buyers trust parcels that come with satellite proof and documented genuineness — sell faster and at fair value.',
   },
   {
     icon: Shield,
@@ -155,6 +165,11 @@ const FEATURES = [
     title: 'Verified Field Visits',
     desc: 'When something looks wrong from space, send a trusted field agent to inspect. They document conditions on the ground with photos and a full report.',
   },
+  {
+    icon: Camera,
+    title: 'Parcel Snapshots',
+    desc: 'Capture satellite images of your land on demand. Build a visual history over weeks, months, and years — invaluable evidence if a dispute arises.',
+  },
 ];
 
 export default function Features() {
@@ -163,10 +178,10 @@ export default function Features() {
       <Container>
         <SectionHeader>
           <SectionTag>Features</SectionTag>
-          <SectionTitle>Everything you need to protect your land</SectionTitle>
+          <SectionTitle>Monitor, verify, buy and sell land with confidence</SectionTitle>
           <SectionDesc>
-            From satellite surveillance to on-the-ground verification —
-            a complete platform for remote land monitoring and protection.
+            From satellite surveillance to parcel genuineness verification and land trading —
+            a complete platform for secure land ownership and transactions.
           </SectionDesc>
         </SectionHeader>
 

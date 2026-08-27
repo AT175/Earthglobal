@@ -1244,6 +1244,39 @@ CREATE INDEX IF NOT EXISTS idx_site_plan_requests_org ON site_plan_requests (org
 CREATE INDEX IF NOT EXISTS idx_site_plan_requests_status ON site_plan_requests (status);
 
 -- =========================================================
+-- PARCEL ONBOARDING REQUESTS (owner asks admin to onboard a new parcel)
+-- =========================================================
+-- Landowners register an account first, then request that a parcel be
+-- onboarded (surveyed and added to the platform). They supply basic details
+-- and upload a supporting document (deed / site plan / sketch) as evidence.
+-- An admin reviews the request, performs the actual GPS survey / boundary
+-- capture, and onboards the parcel — linking it back to this request.
+DO $$ BEGIN
+    CREATE TYPE parcel_onboarding_status AS ENUM ('pending', 'in_review', 'onboarded', 'rejected');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS parcel_onboarding_requests (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    owner_id UUID NOT NULL REFERENCES owners(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    region VARCHAR(255),
+    notes TEXT,
+    site_plan_doc_url TEXT,           -- base64/data URL or hosted URL of the uploaded document
+    site_plan_doc_name VARCHAR(255),
+    status parcel_onboarding_status NOT NULL DEFAULT 'pending',
+    rejection_reason TEXT,
+    assigned_to UUID REFERENCES admins(id) ON DELETE SET NULL,
+    assigned_agent_id UUID REFERENCES agents(id) ON DELETE SET NULL,
+    resulting_parcel_id UUID REFERENCES parcels(id) ON DELETE SET NULL,
+    requested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    reviewed_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_parcel_onboarding_requests_owner ON parcel_onboarding_requests (owner_id);
+CREATE INDEX IF NOT EXISTS idx_parcel_onboarding_requests_status ON parcel_onboarding_requests (status);
+CREATE INDEX IF NOT EXISTS idx_parcel_onboarding_requests_agent ON parcel_onboarding_requests (assigned_agent_id);
+
+-- =========================================================
 -- SALES MANAGER ROLE
 -- =========================================================
 -- Sales managers are land professionals who list land for sale across
