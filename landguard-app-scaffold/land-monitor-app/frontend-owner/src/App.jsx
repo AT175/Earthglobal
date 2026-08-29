@@ -44,6 +44,7 @@ const VisitAssignments = lazy(() => import('./pages/admin/VisitAssignments'));
 // Assembly pages
 const AssemblyDashboard = lazy(() => import('./pages/assembly/AssemblyDashboard'));
 const PlanningDashboard = lazy(() => import('./pages/assembly/PlanningDashboard'));
+const BuildingsList = lazy(() => import('./pages/assembly/BuildingsList'));
 const SchemeManagement = lazy(() => import('./pages/assembly/SchemeManagement'));
 const ValidationPage = lazy(() => import('./pages/assembly/ValidationPage'));
 const MarketplaceApprovals = lazy(() => import('./pages/assembly/MarketplaceApprovals'));
@@ -157,6 +158,7 @@ export default function App() {
             {/* Assembly routes */}
             <Route path="/assembly" element={<RequireAuth><AssemblyDashboard /></RequireAuth>} />
             <Route path="/assembly/planning" element={<RequireAuth><PlanningDashboard /></RequireAuth>} />
+            <Route path="/assembly/planning/buildings" element={<RequireAuth><BuildingsList /></RequireAuth>} />
             <Route path="/assembly/planning/schemes" element={<RequireAuth><SchemeManagement /></RequireAuth>} />
             <Route path="/assembly/validation" element={<RequireAuth><ValidationPage /></RequireAuth>} />
             <Route path="/assembly/marketplace" element={<RequireAuth><MarketplaceApprovals /></RequireAuth>} />

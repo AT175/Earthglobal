@@ -1350,6 +1350,9 @@ export default function PlanningDashboard() {
               <NavItem as={Link} to="/assembly/planning" $active>
                 <MapIcon size={14} aria-hidden="true" /> Planning Map
               </NavItem>
+              <NavItem as={Link} to="/assembly/planning/buildings">
+                <Building2 size={14} aria-hidden="true" /> Buildings List
+              </NavItem>
               <NavItem as={Link} to="/assembly/planning/schemes">
                 <FileText size={14} aria-hidden="true" /> Schemes
               </NavItem>
@@ -1488,42 +1491,21 @@ export default function PlanningDashboard() {
             )}
           </TopBarRow>
 
-          {/* Row 3: Building list (horizontal scroll) */}
-          {filteredBuildings.length > 0 && (
-            <BuildingListHorizontal>
-              {filteredBuildings.map((b, i) => {
-                const props = b.properties;
-                const badge = statusBadgeColors[props.status] || statusBadgeColors.unverified;
-                return (
-                  <BuildingCard key={props.id || i} $selected={selectedBuilding === props.id} $accent={badge.color} onClick={() => onBuildingClick(b)}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.78rem', fontWeight: 500 }}>
-                      <Building2 size={12} color={badge.color} /> #{i + 1}
-                      <span style={{ marginLeft: 'auto', fontSize: '0.65rem', color: '#6b7280' }}>
-                        {props.centroid_lat ? `${props.centroid_lat.toFixed(3)}, ${props.centroid_lng.toFixed(3)}` : ''}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: '0.7rem', color: '#aab7d4', marginTop: 4, display: 'flex', gap: 8 }}>
-                      <span><Ruler size={9} /> {Math.round(props.area_sqm)}m²</span>
-                      {props.estimated_height_m != null && (
-                        <span style={{ color: '#5ce1ff' }}>H: {props.estimated_height_m}m</span>
-                      )}
-                    </div>
-                    <div style={{ marginTop: 4, display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                      <StatusBadge $bg={badge.bg} $color={badge.color}>{props.status?.replace(/_/g, ' ')}</StatusBadge>
-                      {props.in_protected_area && (
-                        <StatusBadge $bg="rgba(239,68,68,0.15)" $color="#f87171"><AlertTriangle size={8} /> Protected</StatusBadge>
-                      )}
-                    </div>
-                  </BuildingCard>
-                );
-              })}
-            </BuildingListHorizontal>
-          )}
-          {filteredBuildings.length === 0 && (
-            <div style={{ padding: '8px 16px', fontSize: '0.78rem', color: '#aab7d4' }}>
-              No buildings found. Run detection to find new buildings.
-            </div>
-          )}
+          {/* Row 3: Building list link (full list on separate page) */}
+          <TopBarRow>
+            <TopBarSectionLabel>Buildings:</TopBarSectionLabel>
+            <span style={{ fontSize: '0.78rem', color: '#aab7d4' }}>
+              {filteredBuildings.length} building{filteredBuildings.length !== 1 ? 's' : ''} loaded
+            </span>
+            <Link to="/assembly/planning/buildings" style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '4px 12px', background: 'rgba(22,119,255,0.1)',
+              border: '1px solid rgba(22,119,255,0.3)', borderRadius: 6,
+              color: '#5ce1ff', fontSize: '0.78rem', textDecoration: 'none', whiteSpace: 'nowrap',
+            }}>
+              <Building2 size={12} /> View All Buildings →
+            </Link>
+          </TopBarRow>
         </TopControlBar>
 
         {/* ── Map ── */}
