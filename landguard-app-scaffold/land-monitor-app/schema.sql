@@ -1454,12 +1454,14 @@ DO $$
 BEGIN
     IF EXISTS (
         SELECT 1 FROM information_schema.columns
-        WHERE table_name = 'environmental_hazards'
+        WHERE table_schema = 'earthglobal'
+          AND table_name = 'environmental_hazards'
           AND column_name = 'boundary'
           AND data_type = 'jsonb'
     ) THEN
-        ALTER TABLE environmental_hazards ALTER COLUMN boundary TYPE geometry(Geometry, 4326)
+        ALTER TABLE earthglobal.environmental_hazards ALTER COLUMN boundary TYPE geometry(Geometry, 4326)
             USING NULL;
+        CREATE INDEX IF NOT EXISTS idx_eh_boundary ON earthglobal.environmental_hazards USING GIST (boundary);
         RAISE NOTICE 'Converted environmental_hazards.boundary from JSONB to geometry';
     END IF;
 END $$;
