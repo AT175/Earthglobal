@@ -9,7 +9,8 @@ import {
   CheckCircle2, XCircle, Loader, Map as MapIcon, Building2, Globe,
   ChevronRight, X, Plus, Ruler, Menu,
 } from 'lucide-react';
-import shp from 'shpjs';
+// shpjs is loaded dynamically in parseSelectedFile() to avoid Buffer polyfill
+// issues at module load time (shpjs uses Buffer.from which is externalized in browser)
 import { kml } from '@tmcw/togeojson';
 import api from '../../services/api';
 import { NavList, NavItem } from '@earthglobal/design-system';
@@ -409,6 +410,8 @@ export default function SchemeManagement() {
   async function parseSelectedFile(file, format) {
     if (format === 'shapefile') {
       const buffer = await file.arrayBuffer();
+      const shpModule = await import('shpjs');
+      const shp = shpModule.default || shpModule;
       const result = await shp(buffer);
       // shpjs returns a single FeatureCollection, or an array of them
       // if the zip contains multiple layers — merge into one.
