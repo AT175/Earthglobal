@@ -39,10 +39,10 @@ function eeInfo(computedObject) {
       reject(new Error('Earth Engine request timed out after 30s'));
     }, 30000);
 
-    computedObject.getInfo((err, info) => {
+    computedObject.getInfo((data, err) => {
       clearTimeout(timer);
       if (err) reject(err);
-      else resolve(info);
+      else resolve(data);
     });
   });
 }
@@ -50,9 +50,7 @@ function eeInfo(computedObject) {
 // ── Helper: EE getMapId as promise ──
 function eeMapId(image, visParams) {
   return new Promise((resolve, reject) => {
-    image.getMapId(visParams, (errOrResult, map) => {
-      const result = map || errOrResult;
-      const err = map ? errOrResult : null;
+    image.getMapId(visParams, (result, err) => {
       if (err || !result || !result.mapid) reject(err || new Error('No mapid'));
       else resolve(result);
     });

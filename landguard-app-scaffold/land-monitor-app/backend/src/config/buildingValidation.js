@@ -55,12 +55,9 @@ async function fetchGoogleBuildingsNearby(lat, lng, radiusM = 100) {
       .filter(ee.Filter.gte('confidence', 0.5));
 
     const features = await new Promise((resolve, reject) => {
-      openBuildings.limit(20).toList(20).evaluate((resultOrErr, err) => {
-        const hasErr = err != null;
-        const result = hasErr ? null : resultOrErr;
-        const actualErr = hasErr ? err : (resultOrErr && resultOrErr.error ? resultOrErr : null);
-        if (actualErr && !result) reject(actualErr);
-        else resolve(result || resultOrErr || []);
+      openBuildings.limit(20).toList(20).evaluate((result, err) => {
+        if (err) reject(err);
+        else resolve(result || []);
       });
     });
 

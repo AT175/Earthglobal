@@ -51,10 +51,7 @@ exports.getSatelliteTiles = async (req, res, next) => {
     const visualized = composite.visualize(visParams);
 
     // Get the map ID + token for tile serving
-    visualized.getMapId({ min: 0, max: 255 }, (errOrResult, map) => {
-      // EE library versions differ: some call (err, map), others call (map)
-      const result = map || errOrResult;
-      const err = map ? errOrResult : null;
+    visualized.getMapId({ min: 0, max: 255 }, (result, err) => {
       if (err || !result || !result.mapid) {
         const errMsg = err ? (typeof err === 'object' ? JSON.stringify(err).substring(0, 200) : String(err)) : 'No mapid in result';
         console.error('Earth Engine getMapId failed:', errMsg);
@@ -118,9 +115,7 @@ exports.getNdviTiles = async (req, res, next) => {
 
     const visualized = ndvi.visualize(visParams);
 
-    visualized.getMapId({ min: 0, max: 255 }, (errOrResult, map) => {
-      const result = map || errOrResult;
-      const err = map ? errOrResult : null;
+    visualized.getMapId({ min: 0, max: 255 }, (result, err) => {
       if (err || !result || !result.mapid) {
         const errMsg = err ? (typeof err === 'object' ? JSON.stringify(err).substring(0, 200) : String(err)) : 'No mapid in result';
         console.error('Earth Engine NDVI getMapId failed:', errMsg);

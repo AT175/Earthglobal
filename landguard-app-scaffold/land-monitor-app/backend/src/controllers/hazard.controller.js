@@ -252,9 +252,7 @@ exports.detectHazards = async (req, res, next) => {
       min: 0, max: 1,
     });
 
-    hazardVis.getMapId({ min: 0, max: 255 }, (errOrResult, map) => {
-      const result = map || errOrResult;
-      const err = map ? errOrResult : null;
+    hazardVis.getMapId({ min: 0, max: 255 }, (result, err) => {
       if (err || !result || !result.mapid) {
         console.error('EE hazard detection getMapId failed:', err ? String(err).substring(0, 200) : 'no mapid');
         return res.status(500).json({ error: 'Hazard detection failed', detected: false });

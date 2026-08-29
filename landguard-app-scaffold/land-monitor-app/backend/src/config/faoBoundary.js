@@ -133,16 +133,13 @@ async function resolveFAOBoundary(org) {
  */
 async function getGeometryBbox(geometry) {
   return new Promise((resolve, reject) => {
-    geometry.bounds().getInfo((infoOrErr, info) => {
-      const hasErr = info != null;
-      const actualInfo = hasErr ? info : infoOrErr;
-      const err = hasErr ? infoOrErr : null;
+    geometry.bounds().getInfo((info, err) => {
       if (err) {
         reject(err);
         return;
       }
       // info.coordinates is a polygon (the bounding box)
-      const coords = actualInfo.coordinates?.[0] || [];
+      const coords = info?.coordinates?.[0] || [];
       if (coords.length === 0) {
         reject(new Error('Could not determine bbox from geometry'));
         return;
@@ -163,15 +160,12 @@ async function getGeometryBbox(geometry) {
 
 function evaluateFeatureCount(collection) {
   return new Promise((resolve) => {
-    collection.size().getInfo((countOrErr, count) => {
-      const hasErr = count != null;
-      const actualCount = hasErr ? count : countOrErr;
-      const err = hasErr ? countOrErr : null;
+    collection.size().getInfo((count, err) => {
       if (err) {
         console.error('[FAO] count error:', String(err).substring(0, 200));
         resolve(0);
       } else {
-        resolve(actualCount || 0);
+        resolve(count || 0);
       }
     });
   });
@@ -179,10 +173,7 @@ function evaluateFeatureCount(collection) {
 
 function evaluateFeatureList(collection, limit) {
   return new Promise((resolve) => {
-    collection.toList(limit).getInfo((featuresOrErr, features) => {
-      const hasErr = features != null;
-      const actualFeatures = hasErr ? features : featuresOrErr;
-      const err = hasErr ? featuresOrErr : null;
+    collection.toList(limit).getInfo((features, err) => {
       if (err) {
         console.error('[FAO] list error:', String(err).substring(0, 200));
         resolve([]);
@@ -308,14 +299,11 @@ async function getDistrictBoundaryByName(districtName) {
 async function featureToBoundary(feature, level) {
   const geom = ee.Feature(feature).geometry();
 
-  // Get GeoJSON
+  // Get GeoJSON — use evaluate() since geometry is computed (from EE filter)
   const geojson = await new Promise((resolve, reject) => {
-    geom.toGeoJSON((errOrData, data) => {
-      const hasErr = data != null;
-      const actualData = hasErr ? data : errOrData;
-      const err = hasErr ? errOrData : null;
+    geom.evaluate((data, err) => {
       if (err) reject(err);
-      else resolve(actualData);
+      else resolve(data);
     });
   });
 

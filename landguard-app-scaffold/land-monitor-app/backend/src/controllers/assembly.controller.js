@@ -771,9 +771,7 @@ exports.detectBuildings = async (req, res, next) => {
     const builtupVis = builtup.visualize({ palette: ['000000', 'ff0000'], min: 0, max: 1 });
 
     // 5. Get map ID for tile serving (so frontend can overlay the detection result)
-    builtupVis.getMapId({ min: 0, max: 255 }, (errOrResult, map) => {
-      const result = map || errOrResult;
-      const err = map ? errOrResult : null;
+    builtupVis.getMapId({ min: 0, max: 255 }, (result, err) => {
       if (err || !result || !result.mapid) {
         console.error('EE building detection getMapId failed:', err ? String(err).substring(0, 200) : 'no mapid');
         return res.status(500).json({ error: 'Building detection failed', detected: false });
@@ -999,7 +997,7 @@ exports.getSatelliteTiles = async (req, res, next) => {
     const composite = filtered.median();
     const visualized = composite.visualize({ bands: ['B4', 'B3', 'B2'], min: 0, max: 3000, gamma: 1.4 });
 
-    visualized.getMapId({ min: 0, max: 255 }).evaluate((err, result) => {
+    visualized.getMapId({ min: 0, max: 255 }, (result, err) => {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);

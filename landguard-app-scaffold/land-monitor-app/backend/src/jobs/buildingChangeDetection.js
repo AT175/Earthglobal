@@ -147,25 +147,19 @@ async function runBuildingChangeDetection(options) {
     // ── 8. Get tile URLs for all three layers ──
     const [beforeMap, afterMap, changeMap] = await Promise.all([
       new Promise((resolve, reject) => {
-        beforeVis.getMapId({ min: 0, max: 255 }, (errOrResult, map) => {
-          const result = map || errOrResult;
-          const err = map ? errOrResult : null;
+        beforeVis.getMapId({ min: 0, max: 255 }, (result, err) => {
           if (err || !result || !result.mapid) reject(err || new Error('getMapId returned no mapid'));
           else resolve(result);
         });
       }),
       new Promise((resolve, reject) => {
-        afterVis.getMapId({ min: 0, max: 255 }, (errOrResult, map) => {
-          const result = map || errOrResult;
-          const err = map ? errOrResult : null;
+        afterVis.getMapId({ min: 0, max: 255 }, (result, err) => {
           if (err || !result || !result.mapid) reject(err || new Error('getMapId returned no mapid'));
           else resolve(result);
         });
       }),
       new Promise((resolve, reject) => {
-        changeVis.getMapId({ min: 0, max: 255 }, (errOrResult, map) => {
-          const result = map || errOrResult;
-          const err = map ? errOrResult : null;
+        changeVis.getMapId({ min: 0, max: 255 }, (result, err) => {
           if (err || !result || !result.mapid) reject(err || new Error('getMapId returned no mapid'));
           else resolve(result);
         });
