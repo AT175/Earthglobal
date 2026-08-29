@@ -30,7 +30,8 @@ L.Icon.Default.mergeOptions({
 // Styled Components
 // ═══════════════════════════════════════════════════════════
 const Page = styled.div`
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background: ${({ theme }) => theme.colors.background};
   color: ${({ theme }) => theme.colors.text};
   font-family: ${({ theme }) => theme.fonts.body};
@@ -100,14 +101,14 @@ const LogoutBtn = styled.button`
   }
 `;
 
-const Content = styled.div`display: flex; flex-direction: column; flex: 1; overflow: hidden; position: relative;`;
+const Content = styled.div`display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; position: relative;`;
 
 // ── Top control bar (replaces the left sidebar) ──
 const TopControlBar = styled.div`
   background: ${({ theme }) => theme.colors.surface};
   border-bottom: 1px solid ${({ theme }) => theme.colors.borderDark};
   display: flex; flex-direction: column;
-  max-height: 45vh; overflow-y: auto;
+  max-height: 40vh; overflow-y: auto;
   flex-shrink: 0;
 `;
 
@@ -276,10 +277,10 @@ const StatusBadge = styled.span`
   background: ${({ $bg }) => $bg}; color: ${({ $color }) => $color};
 `;
 
-const MapArea = styled.div`flex: 1; position: relative; display: flex; flex-direction: column;`;
+const MapArea = styled.div`flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column;`;
 
 const MapWrapper = styled.div`
-  flex: 1; position: relative;
+  flex: 1; min-height: 0; position: relative;
   .leaflet-container { width: 100%; height: 100%; background: #080f24; }
   .leaflet-control-attribution {
     background: rgba(8,15,36,0.8) !important; color: #aab7d4 !important; font-size: 10px !important;
