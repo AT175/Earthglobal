@@ -100,11 +100,19 @@ const StyleButton = styled.button`
 `;
 
 // Free fallback tile layers — no API key required
-// Using multiple reliable providers with proper subdomains
+// Esri World Imagery provides sub-meter satellite imagery (Maxar/DigitalGlobe)
+// at zoom levels up to 19 — comparable to Google Maps satellite.
 const fallbackTiles = {
   satellite: {
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics',
+    maxZoom: 19,
+    maxNativeZoom: 19,
+  },
+  // High-res satellite with road/place labels overlay (turns on at zoom >= 12)
+  satelliteLabels: {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+    attribution: '',
     maxZoom: 19,
     maxNativeZoom: 19,
   },
@@ -202,6 +210,12 @@ function DynamicTileLayer({ layerType, eeTiles, path }) {
   return <TileLayer url={tile.url} attribution={tile.attribution} maxZoom={tile.maxZoom} maxNativeZoom={tile.maxNativeZoom} />;
 }
 
+// Labels overlay — renders road/place names on top of satellite imagery
+function SatelliteLabelsLayer() {
+  const labels = fallbackTiles.satelliteLabels;
+  return <TileLayer url={labels.url} attribution={labels.attribution} maxZoom={labels.maxZoom} maxNativeZoom={labels.maxNativeZoom} opacity={0.9} />;
+}
+
 /**
  * FreeParcelMap — a free map using Leaflet. When Earth Engine is configured on
  * the backend, satellite and NDVI layers use real Sentinel-2 satellite imagery
@@ -212,7 +226,7 @@ function DynamicTileLayer({ layerType, eeTiles, path }) {
  * @param {'active'|'draft'|'alert'} status - determines polygon coloring
  * @param {string} height - CSS height for the map container
  */
-export default function FreeParcelMap({ path = [], center, status = 'active', height }) {
+export default function FreeParcelMap({ path = [], center, status = 'active', height, children }) {
   const [layerType, setLayerType] = useState('satellite');
   const [eeTiles, setEeTiles] = useState({ satellite: null, ndvi: null });
   const resolvedCenter = center || path[0];
@@ -288,6 +302,8 @@ export default function FreeParcelMap({ path = [], center, status = 'active', he
         style={{ width: '100%', height: '100%' }}
       >
         <DynamicTileLayer layerType={layerType} eeTiles={eeTiles} path={path} />
+        {/* Show road/place labels on top of satellite imagery for context */}
+        {(layerType === 'satellite' || layerType === 'recent') && <SatelliteLabelsLayer />}
         {positions.length > 0 && (
           <Polygon
             positions={positions}
@@ -300,6 +316,7 @@ export default function FreeParcelMap({ path = [], center, status = 'active', he
           />
         )}
         <Recenter center={resolvedCenter} zoom={17} />
+        {children}
       </MapContainer>
     </MapWrapper>
   );
