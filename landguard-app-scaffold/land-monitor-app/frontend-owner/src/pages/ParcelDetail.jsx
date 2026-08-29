@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, Suspense, lazy } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import styled from 'styled-components';
 import {
@@ -11,6 +11,7 @@ import { Card, Badge, Button, Skeleton, ParcelMap } from '@earthglobal/design-sy
 import api from '../services/api';
 import OwnerLayout from '../components/OwnerLayout';
 import SalesManagerLayout from '../components/SalesManagerLayout';
+const SatelliteAIAnalyzer = lazy(() => import('../components/SatelliteAIAnalyzer'));
 import AgentLayout from '../components/AgentLayout';
 import { verifyBoundary, createBoundaryTracker } from '../utils/gpsUtils';
 import { STATUS_LABELS, VISIT_TYPE_LABELS } from '../lib/labels';
@@ -768,6 +769,16 @@ ${data.visitMedia.length > 0 ? '<table><tr><th>Type</th><th>Visit</th><th>Agent<
               })}
             </div>
           </Card>
+
+          {/* In-browser AI analysis of the most recent satellite image */}
+          {images[0]?.image_url && (
+            <Suspense fallback={<div style={{ padding: 16, fontSize: '0.82rem', color: '#aab7d4' }}>Loading AI analyzer...</div>}>
+              <SatelliteAIAnalyzer
+                imageUrl={images[0].image_url}
+                parcelName={parcel?.name}
+              />
+            </Suspense>
+          )}
         </>
       )}
 
