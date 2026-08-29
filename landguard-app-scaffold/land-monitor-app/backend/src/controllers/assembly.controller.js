@@ -6,6 +6,7 @@ const { ee, init: initEE, isReady: eeReady } = require('../config/earthEngine');
 const { resolveFAOBoundary, getGeometryBbox, listGhanaDistricts, listGhanaRegions, getDistrictBoundaryByName } = require('../config/faoBoundary');
 const { runBuildingChangeDetection } = require('../jobs/buildingChangeDetection');
 const { estimateBuildingHeight, compareNearbyBuildings } = require('../utils/buildingHeight');
+const { validateBuilding, validateBuildingsBatch } = require('../config/buildingValidation');
 
 // ── Helper: get org_id from authenticated assembly user ──
 function getOrgId(req) {
@@ -496,6 +497,9 @@ exports.getBuildingsGeoJSON = async (req, res, next) => {
               b.verified_at, b.notes, b.permit_id, b.parcel_id, b.metadata,
               b.centroid_lat, b.centroid_lng,
               b.estimated_height_m, b.estimated_floors, b.height_method, b.height_confidence,
+              b.validation_status, b.validated_at, b.google_confidence, b.google_match_distance_m,
+              b.osm_id, b.osm_match_distance_m, b.building_type, b.building_use, b.building_name,
+              b.owner_name, b.owner_contact, b.validation_sources,
               ST_AsGeoJSON(b.footprint) as geojson,
               (SELECT name FROM parcels WHERE id = b.parcel_id) as parcel_name
        FROM buildings b WHERE b.organization_id = $1 ORDER BY b.detected_at DESC`,
@@ -520,6 +524,19 @@ exports.getBuildingsGeoJSON = async (req, res, next) => {
         estimated_floors: row.estimated_floors || null,
         height_method: row.height_method || null,
         height_confidence: row.height_confidence ? parseFloat(row.height_confidence) : null,
+        // Validation & enrichment fields
+        validation_status: row.validation_status || 'pending',
+        validated_at: row.validated_at,
+        google_confidence: row.google_confidence ? parseFloat(row.google_confidence) : null,
+        google_match_distance_m: row.google_match_distance_m ? parseFloat(row.google_match_distance_m) : null,
+        osm_id: row.osm_id || null,
+        osm_match_distance_m: row.osm_match_distance_m ? parseFloat(row.osm_match_distance_m) : null,
+        building_type: row.building_type || null,
+        building_use: row.building_use || null,
+        building_name: row.building_name || null,
+        owner_name: row.owner_name || null,
+        owner_contact: row.owner_contact || null,
+        validation_sources: row.validation_sources || [],
         metadata: row.metadata || {},
       },
     }));
@@ -838,12 +855,28 @@ exports.detectBuildings = async (req, res, next) => {
                   // Comparison is best-effort
                 }
 
+                // ── Validate against Google Open Buildings + OSM ──
+                let validationData = {
+                  validation_status: 'pending',
+                  validation_sources: [],
+                  validation_detail: { error: 'skipped' },
+                };
+                try {
+                  validationData = await validateBuilding(geojson, { lat: centroidLat, lng: centroidLng }, { db, orgId });
+                } catch (e) {
+                  // Validation is best-effort — don't fail the save
+                }
+
                 // Compute area in sqm using ST_Area on geography
                 const insertResult = await db.query(
                   `INSERT INTO buildings (organization_id, footprint, area_sqm, status, in_protected_area, detected_at, centroid_lat, centroid_lng, metadata,
-                                           estimated_height_m, estimated_floors, height_method, height_confidence)
-                   VALUES ($1, ST_SetSRID(ST_GeomFromGeoJSON($2), 4326), ST_Area(ST_SetSRID(ST_GeomFromGeoJSON($2), 4326)::geography), 'unverified', false, now(), $3, $4, $5, $6, $7, $8, $9)
-                   RETURNING id, area_sqm, centroid_lat, centroid_lng, estimated_height_m, estimated_floors`,
+                                           estimated_height_m, estimated_floors, height_method, height_confidence,
+                                           validation_status, validated_at, google_confidence, google_match_distance_m,
+                                           osm_id, osm_match_distance_m, building_type, building_use, building_name,
+                                           owner_name, owner_contact, parcel_owner_id, validation_sources)
+                   VALUES ($1, ST_SetSRID(ST_GeomFromGeoJSON($2), 4326), ST_Area(ST_SetSRID(ST_GeomFromGeoJSON($2), 4326)::geography), 'unverified', false, now(), $3, $4, $5, $6, $7, $8, $9,
+                           $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+                   RETURNING id, area_sqm, centroid_lat, centroid_lng, estimated_height_m, estimated_floors, validation_status, building_type`,
                   [orgId, JSON.stringify(geojson), centroidLat, centroidLng, JSON.stringify({
                     detection_method: 'sentinel2_ndbi_ndvi_bsi',
                     detection_date: new Date().toISOString(),
@@ -853,7 +886,22 @@ exports.detectBuildings = async (req, res, next) => {
                     source: 'earth_engine',
                     height_estimation: heightData,
                     nearby_comparison: comparisonData,
-                  }), heightData.height_m, heightData.estimated_floors, heightData.method, heightData.confidence]
+                    validation: validationData.validation_detail,
+                  }), heightData.height_m, heightData.estimated_floors, heightData.method, heightData.confidence,
+                   validationData.validation_status,
+                   validationData.validated_at,
+                   validationData.google_confidence,
+                   validationData.google_match_distance_m,
+                   validationData.osm_id,
+                   validationData.osm_match_distance_m,
+                   validationData.building_type,
+                   validationData.building_use,
+                   validationData.building_name,
+                   validationData.owner_name,
+                   validationData.owner_contact,
+                   validationData.parcel_owner_id,
+                   validationData.validation_sources || [],
+                  ]
                 );
 
                 const saved = insertResult.rows[0];
@@ -866,6 +914,10 @@ exports.detectBuildings = async (req, res, next) => {
                   estimated_floors: saved.estimated_floors || null,
                   height_method: heightData.method,
                   nearby_comparison: comparisonData,
+                  validation_status: saved.validation_status,
+                  building_type: saved.building_type,
+                  google_confidence: validationData.google_confidence,
+                  osm_id: validationData.osm_id,
                 });
               } catch (e) {
                 // Skip individual building save errors
@@ -884,6 +936,8 @@ exports.detectBuildings = async (req, res, next) => {
               builtup_area_sqm: builtupAreaSqm,
               estimated_buildings: estimatedBuildings,
               vectorized_buildings: savedBuildings.length,
+              validated: savedBuildings.filter(b => b.validation_status === 'validated').length,
+              pending_validation: savedBuildings.filter(b => b.validation_status === 'pending').length,
             },
             saved_buildings: savedBuildings,
             method: 'Sentinel-2 NDBI + NDVI + BSI classification + vectorization via Google Earth Engine',
@@ -964,6 +1018,82 @@ exports.getSatelliteTiles = async (req, res, next) => {
     settled = true;
     clearTimeout(timeout);
     res.json({ url: null, provider: 'fallback' });
+  }
+};
+
+// POST /assembly/planning/validate-buildings — validate existing buildings against Google + OSM
+// Body: { buildingIds?: [uuid], limit?: number }
+// If no buildingIds provided, validates all 'pending' buildings up to limit (default 50)
+exports.validateBuildings = async (req, res, next) => {
+  try {
+    const orgId = getOrgId(req);
+    const { buildingIds, limit = 50 } = req.body;
+
+    let query, params;
+    if (buildingIds && Array.isArray(buildingIds) && buildingIds.length > 0) {
+      query = `SELECT id, ST_AsGeoJSON(footprint) as geojson, centroid_lat, centroid_lng, area_sqm
+               FROM buildings WHERE organization_id = $1 AND id = ANY($2::uuid[])`;
+      params = [orgId, buildingIds];
+    } else {
+      query = `SELECT id, ST_AsGeoJSON(footprint) as geojson, centroid_lat, centroid_lng, area_sqm
+               FROM buildings WHERE organization_id = $1 AND validation_status = 'pending'
+               ORDER BY detected_at DESC LIMIT $2`;
+      params = [orgId, limit];
+    }
+
+    const { rows } = await db.query(query, params);
+    if (rows.length === 0) {
+      return res.json({ validated: 0, results: [], message: 'No pending buildings to validate' });
+    }
+
+    const results = [];
+    // Process in small batches (concurrency=2 to avoid EE/Overpass rate limits)
+    for (let i = 0; i < rows.length; i += 2) {
+      const batch = rows.slice(i, i + 2);
+      const validations = await Promise.all(
+        batch.map(async (row) => {
+          const geojson = typeof row.geojson === 'string' ? JSON.parse(row.geojson) : row.geojson;
+          const validation = await validateBuilding(geojson, { lat: row.centroid_lat, lng: row.centroid_lng }, { db, orgId });
+          // Update the database
+          await db.query(
+            `UPDATE buildings SET
+               validation_status = $2, validated_at = now(),
+               google_confidence = $3, google_match_distance_m = $4,
+               osm_id = $5, osm_match_distance_m = $6,
+               building_type = $7, building_use = $8, building_name = $9,
+               owner_name = $10, owner_contact = $11, parcel_owner_id = $12,
+               validation_sources = $13,
+               metadata = metadata || '{}'::jsonb || $14::jsonb
+             WHERE id = $1`,
+            [row.id, validation.validation_status,
+             validation.google_confidence, validation.google_match_distance_m,
+             validation.osm_id, validation.osm_match_distance_m,
+             validation.building_type, validation.building_use, validation.building_name,
+             validation.owner_name, validation.owner_contact, validation.parcel_owner_id,
+             validation.validation_sources || [],
+             JSON.stringify({ validation: validation.validation_detail })]
+          );
+          return {
+            id: row.id,
+            validation_status: validation.validation_status,
+            building_type: validation.building_type,
+            google_confidence: validation.google_confidence,
+            osm_id: validation.osm_id,
+            owner_name: validation.owner_name,
+          };
+        })
+      );
+      results.push(...validations);
+    }
+
+    res.json({
+      validated: results.length,
+      validated_count: results.filter(r => r.validation_status === 'validated').length,
+      pending_count: results.filter(r => r.validation_status === 'pending').length,
+      results,
+    });
+  } catch (err) {
+    next(err);
   }
 };
 

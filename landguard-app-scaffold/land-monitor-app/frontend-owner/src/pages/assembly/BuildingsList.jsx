@@ -194,6 +194,13 @@ const statusColors = {
   demolished: { bg: 'rgba(107,112,128,0.15)', color: '#9ca3af' },
 };
 
+const validationColors = {
+  validated: { bg: 'rgba(34,197,94,0.15)', color: '#4ade80' },
+  pending: { bg: 'rgba(251,191,36,0.15)', color: '#fbbf24' },
+  conflict: { bg: 'rgba(239,68,68,0.15)', color: '#f87171' },
+  rejected: { bg: 'rgba(107,112,128,0.15)', color: '#9ca3af' },
+};
+
 const PAGE_SIZE = 50;
 
 export default function BuildingsList() {
@@ -203,6 +210,8 @@ export default function BuildingsList() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [validationFilter, setValidationFilter] = useState('');
+  const [validating, setValidating] = useState(false);
   const [sortBy, setSortBy] = useState('detected_at');
   const [sortDir, setSortDir] = useState('desc');
   const [page, setPage] = useState(0);
@@ -226,6 +235,19 @@ export default function BuildingsList() {
     }
   };
 
+  const runValidation = async () => {
+    setValidating(true);
+    try {
+      const { data } = await api.post('/assembly/planning/validate-buildings', { limit: 50 });
+      // Reload buildings to show updated validation status
+      await loadBuildings();
+    } catch (err) {
+      console.error('Validation failed:', err);
+    } finally {
+      setValidating(false);
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -239,9 +261,13 @@ export default function BuildingsList() {
     const matchesSearch = !s ||
       (p.status || '').toLowerCase().includes(s) ||
       (p.parcel_name || '').toLowerCase().includes(s) ||
+      (p.building_type || '').toLowerCase().includes(s) ||
+      (p.owner_name || '').toLowerCase().includes(s) ||
+      (p.building_name || '').toLowerCase().includes(s) ||
       (p.centroid_lat && `${p.centroid_lat.toFixed(4)}, ${p.centroid_lng?.toFixed(4)}`.includes(s));
     const matchesStatus = !statusFilter || p.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesValidation = !validationFilter || p.validation_status === validationFilter;
+    return matchesSearch && matchesStatus && matchesValidation;
   });
 
   filtered.sort((a, b) => {
@@ -283,12 +309,15 @@ export default function BuildingsList() {
   };
 
   const exportCSV = () => {
-    const headers = ['ID', 'Status', 'Area (m²)', 'Height (m)', 'Floors', 'Parcel', 'Lat', 'Lng', 'Detected At'];
+    const headers = ['ID', 'Status', 'Validation', 'Area (m²)', 'Type', 'Height (m)', 'Floors', 'Owner', 'Building Name', 'Parcel', 'Google Conf.', 'OSM ID', 'Lat', 'Lng', 'Detected At', 'Validated At'];
     const rows = filtered.map(b => {
       const p = b.properties || {};
-      return [p.id, p.status, Math.round(p.area_sqm || 0), p.estimated_height_m || '', p.estimated_floors || '',
-        p.parcel_name || '', p.centroid_lat?.toFixed(6) || '', p.centroid_lng?.toFixed(6) || '',
-        p.detected_at ? new Date(p.detected_at).toISOString() : ''];
+      return [p.id, p.status, p.validation_status, Math.round(p.area_sqm || 0), p.building_type || '',
+        p.estimated_height_m || '', p.estimated_floors || '', p.owner_name || '', p.building_name || '',
+        p.parcel_name || '', p.google_confidence ? (p.google_confidence * 100).toFixed(0) + '%' : '',
+        p.osm_id || '', p.centroid_lat?.toFixed(6) || '', p.centroid_lng?.toFixed(6) || '',
+        p.detected_at ? new Date(p.detected_at).toISOString() : '',
+        p.validated_at ? new Date(p.validated_at).toISOString() : ''];
     });
     const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${c}"`).join(','))].join('\n');
     const url = window.URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
@@ -357,16 +386,26 @@ export default function BuildingsList() {
               {(() => {
                 const p = selectedBuilding.properties || {};
                 const badge = statusColors[p.status] || statusColors.unverified;
+                const valBadge = validationColors[p.validation_status] || validationColors.pending;
                 return (
                   <div style={{ fontSize: '0.85rem', lineHeight: 1.8 }}>
                     <div><strong>ID:</strong> <span style={{ color: '#aab7d4' }}>{p.id?.substring(0, 8)}…</span></div>
                     <div><strong>Status:</strong> <StatusBadge $bg={badge.bg} $color={badge.color}>{p.status?.replace(/_/g, ' ')}</StatusBadge></div>
+                    <div><strong>Validation:</strong> <StatusBadge $bg={valBadge.bg} $color={valBadge.color}>{p.validation_status || 'pending'}</StatusBadge></div>
                     <div><strong>Area:</strong> {Math.round(p.area_sqm)} m²</div>
+                    {p.building_type && <div><strong>Type:</strong> {p.building_type}</div>}
+                    {p.building_name && <div><strong>Name:</strong> {p.building_name}</div>}
                     {p.estimated_height_m != null && <div><strong>Height:</strong> {p.estimated_height_m}m ({p.estimated_floors || '?'} floors)</div>}
+                    {p.owner_name && <div><strong>Owner:</strong> {p.owner_name}</div>}
+                    {p.owner_contact && <div><strong>Contact:</strong> {p.owner_contact}</div>}
                     {p.parcel_name && <div><strong>Parcel:</strong> {p.parcel_name}</div>}
                     {p.centroid_lat && <div><strong>Centroid:</strong> {p.centroid_lat.toFixed(4)}, {p.centroid_lng.toFixed(4)}</div>}
+                    {p.google_confidence != null && <div><strong>Google Conf.:</strong> {(p.google_confidence * 100).toFixed(0)}% ({p.google_match_distance_m ? Math.round(p.google_match_distance_m) : '?'}m)</div>}
+                    {p.osm_id && <div><strong>OSM ID:</strong> {p.osm_id} ({p.osm_match_distance_m ? Math.round(p.osm_match_distance_m) : '?'}m)</div>}
+                    {p.validation_sources?.length > 0 && <div><strong>Sources:</strong> {p.validation_sources.join(', ')}</div>}
                     {p.in_protected_area && <div style={{ color: '#f87171' }}><AlertTriangle size={12} /> In protected area</div>}
                     {p.detected_at && <div><strong>Detected:</strong> {new Date(p.detected_at).toLocaleDateString()}</div>}
+                    {p.validated_at && <div><strong>Validated:</strong> {new Date(p.validated_at).toLocaleDateString()}</div>}
                     {p.metadata && Object.keys(p.metadata).length > 0 && (
                       <div style={{ marginTop: 8 }}>
                         <strong>Metadata:</strong>
@@ -404,6 +443,20 @@ export default function BuildingsList() {
               <option value="under_investigation">Under Investigation</option>
               <option value="demolished">Demolished</option>
             </FilterSelect>
+            <FilterSelect value={validationFilter} onChange={(e) => { setValidationFilter(e.target.value); setPage(0); }}>
+              <option value="">All Validation</option>
+              <option value="validated">Validated</option>
+              <option value="pending">Pending</option>
+              <option value="conflict">Conflict</option>
+              <option value="rejected">Rejected</option>
+            </FilterSelect>
+            <button onClick={runValidation} disabled={validating} style={{
+              display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px',
+              background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.3)',
+              borderRadius: 8, color: '#c084fc', fontSize: '0.85rem', cursor: 'pointer',
+            }}>
+              {validating ? <Loader size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} Validate
+            </button>
             <button onClick={exportCSV} style={{
               display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px',
               background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)',
@@ -448,8 +501,11 @@ export default function BuildingsList() {
                   <tr>
                     <Th>#</Th>
                     <Th $sortable onClick={() => toggleSort('status')}>Status {sortBy === 'status' && (sortDir === 'asc' ? '↑' : '↓')}</Th>
+                    <Th>Validation</Th>
                     <Th $sortable onClick={() => toggleSort('area_sqm')}>Area (m²) {sortBy === 'area_sqm' && (sortDir === 'asc' ? '↑' : '↓')}</Th>
+                    <Th>Type</Th>
                     <Th $sortable onClick={() => toggleSort('height')}>Height {sortBy === 'height' && (sortDir === 'asc' ? '↑' : '↓')}</Th>
+                    <Th>Owner</Th>
                     <Th $sortable onClick={() => toggleSort('parcel_name')}>Parcel {sortBy === 'parcel_name' && (sortDir === 'asc' ? '↑' : '↓')}</Th>
                     <Th>Centroid</Th>
                     <Th>Protected</Th>
@@ -460,6 +516,7 @@ export default function BuildingsList() {
                   {pageData.map((b, i) => {
                     const p = b.properties || {};
                     const badge = statusColors[p.status] || statusColors.unverified;
+                    const valBadge = validationColors[p.validation_status] || validationColors.pending;
                     return (
                       <Tr
                         key={p.id || i}
@@ -469,8 +526,11 @@ export default function BuildingsList() {
                       >
                         <Td style={{ color: '#6b7280' }}>{page * PAGE_SIZE + i + 1}</Td>
                         <Td><StatusBadge $bg={badge.bg} $color={badge.color}>{p.status?.replace(/_/g, ' ')}</StatusBadge></Td>
+                        <Td><StatusBadge $bg={valBadge.bg} $color={valBadge.color}>{p.validation_status || 'pending'}</StatusBadge></Td>
                         <Td><Ruler size={11} style={{ marginRight: 4, display: 'inline' }} />{Math.round(p.area_sqm || 0)}</Td>
+                        <Td style={{ fontSize: '0.78rem' }}>{p.building_type || '—'}</Td>
                         <Td>{p.estimated_height_m != null ? `${p.estimated_height_m}m` : '—'}</Td>
+                        <Td style={{ fontSize: '0.78rem', color: '#aab7d4' }}>{p.owner_name || '—'}</Td>
                         <Td>{p.parcel_name || '—'}</Td>
                         <Td style={{ color: '#aab7d4', fontSize: '0.78rem' }}>
                           {p.centroid_lat ? `${p.centroid_lat.toFixed(4)}, ${p.centroid_lng.toFixed(4)}` : '—'}

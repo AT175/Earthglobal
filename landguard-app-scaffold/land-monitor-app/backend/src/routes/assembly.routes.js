@@ -65,6 +65,7 @@ router.get('/planning/fao-districts', requireAssemblyRole('assembly_admin', 'pla
 router.get('/planning/fao-district-boundary', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.getFAODistrictBoundary);
 router.get('/planning/satellite-tiles', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.getSatelliteTiles);
 router.post('/planning/detect-buildings', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.detectBuildings);
+router.post('/planning/validate-buildings', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.validateBuildings);
 router.post('/planning/buildings', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.createBuilding);
 router.patch('/planning/buildings/:id', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.updateBuilding);
 

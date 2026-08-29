@@ -600,8 +600,43 @@ CREATE TABLE IF NOT EXISTS buildings (
     estimated_floors INTEGER,
     height_method VARCHAR(20),
     height_confidence DOUBLE PRECISION,
+    -- ── Validation & enrichment fields (cross-referenced with Google/OSM) ──
+    validation_status VARCHAR(20) NOT NULL DEFAULT 'pending',  -- pending, validated, conflict, rejected
+    validated_at TIMESTAMPTZ,
+    google_confidence DOUBLE PRECISION,           -- confidence score from Google Open Buildings (0-1)
+    google_match_distance_m DOUBLE PRECISION,     -- distance to nearest Google building (meters)
+    osm_id BIGINT,                                -- OSM element ID if matched
+    osm_match_distance_m DOUBLE PRECISION,        -- distance to nearest OSM building (meters)
+    building_type VARCHAR(50),                    -- residential, commercial, industrial, etc.
+    building_use VARCHAR(100),                    -- specific use (e.g. shop, amenity, office)
+    building_name VARCHAR(255),                   -- name from OSM (if available)
+    owner_name VARCHAR(255),                      -- owner name (from parcel records or OSM)
+    owner_contact VARCHAR(255),                   -- owner contact info (from parcel records)
+    parcel_owner_id UUID,                         -- link to parcel owner for ownership info
+    validation_sources TEXT[],                   -- list of sources used for validation (e.g. ['google','osm'])
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Add validation columns to existing buildings table (idempotent)
+DO $$ BEGIN
+    ALTER TABLE buildings ADD COLUMN IF NOT EXISTS validation_status VARCHAR(20) NOT NULL DEFAULT 'pending';
+    ALTER TABLE buildings ADD COLUMN IF NOT EXISTS validated_at TIMESTAMPTZ;
+    ALTER TABLE buildings ADD COLUMN IF NOT EXISTS google_confidence DOUBLE PRECISION;
+    ALTER TABLE buildings ADD COLUMN IF NOT EXISTS google_match_distance_m DOUBLE PRECISION;
+    ALTER TABLE buildings ADD COLUMN IF NOT EXISTS osm_id BIGINT;
+    ALTER TABLE buildings ADD COLUMN IF NOT EXISTS osm_match_distance_m DOUBLE PRECISION;
+    ALTER TABLE buildings ADD COLUMN IF NOT EXISTS building_type VARCHAR(50);
+    ALTER TABLE buildings ADD COLUMN IF NOT EXISTS building_use VARCHAR(100);
+    ALTER TABLE buildings ADD COLUMN IF NOT EXISTS building_name VARCHAR(255);
+    ALTER TABLE buildings ADD COLUMN IF NOT EXISTS owner_name VARCHAR(255);
+    ALTER TABLE buildings ADD COLUMN IF NOT EXISTS owner_contact VARCHAR(255);
+    ALTER TABLE buildings ADD COLUMN IF NOT EXISTS parcel_owner_id UUID;
+    ALTER TABLE buildings ADD COLUMN IF NOT EXISTS validation_sources TEXT[];
+EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+CREATE INDEX IF NOT EXISTS idx_buildings_validation ON buildings (validation_status);
+CREATE INDEX IF NOT EXISTS idx_buildings_type ON buildings (building_type);
+CREATE INDEX IF NOT EXISTS idx_buildings_osm_id ON buildings (osm_id);
 
 CREATE INDEX IF NOT EXISTS idx_buildings_org ON buildings (organization_id);
 CREATE INDEX IF NOT EXISTS idx_buildings_parcel ON buildings (parcel_id);
