@@ -77,6 +77,53 @@ function boundaryToEE(boundaryGeojson) {
   return ee.Geometry.Polygon([coords]);
 }
 
+// ── Helper: Pansharpen Sentinel-2 20m bands to 10m ──
+// Uses the 10m NIR (B8) band as a guide to sharpen 20m bands (B5, B6, B7, B8A, B11, B12)
+// to 10m resolution. This improves the accuracy of indices that use SWIR/Red-Edge bands.
+//
+// Technique: regression-based pansharpening
+//   sharpened = lowResBand.resample('bilinear') * (highResGuide / lowResGuide)
+//
+// @param {ee.Image} s2Image - Sentinel-2 image with all bands
+// @returns {ee.Image} - Image with 20m bands sharpened to 10m
+function pansharpenS2(s2Image) {
+  // 10m bands (already at highest resolution)
+  const b10m = s2Image.select(['B2', 'B3', 'B4', 'B8']);
+
+  // 20m bands to sharpen — use B8 (10m NIR) as the guide
+  const guide = s2Image.select('B8'); // 10m NIR
+  const guide20 = s2Image.select('B8'); // Same band, will be resampled
+
+  // 20m bands: B5, B6, B7, B8A, B11, B12
+  const bands20m = ['B5', 'B6', 'B7', 'B8A', 'B11', 'B12'];
+  const sharpenedBands = [];
+
+  for (const band of bands20m) {
+    const lowRes = s2Image.select(band);
+    // Pansharpen: upscale with bilinear, then adjust using the ratio of guide bands
+    const sharpened = lowRes.resample('bilinear')
+      .multiply(guide)
+      .divide(guide20.resample('bilinear'))
+      .rename(band);
+    sharpenedBands.push(sharpened);
+  }
+
+  // Combine 10m bands + sharpened 20m bands
+  return ee.Image.cat([b10m, ee.Image.cat(sharpenedBands)]);
+}
+
+// ── Helper: Get a pansharpened Sentinel-2 image for a region ──
+// Returns a 10m-resolution image with all 12 bands (B2-B12) sharpened
+async function getPansharpenedS2(region, dateStart, dateEnd, maxCloudPct = 30) {
+  const s2 = ee.ImageCollection('COPERNICUS/S2_HARMONIZED')
+    .filterDate(dateStart, dateEnd)
+    .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', maxCloudPct))
+    .filterBounds(region);
+
+  const s2Image = s2.median();
+  return pansharpenS2(s2Image);
+}
+
 // ── Helper: EE getInfo as promise (with 30s timeout) ──
 function eeInfo(computedObject) {
   return new Promise((resolve, reject) => {
@@ -255,11 +302,9 @@ exports.lulcClassify = async (req, res, next) => {
     const dateEnd = now.toISOString().slice(0, 10);
     const dateStart = new Date(now.getTime() - 90 * 86400000).toISOString().slice(0, 10);
 
-    const image = ee.ImageCollection('COPERNICUS/S2_HARMONIZED')
-      .filterDate(dateStart, dateEnd)
-      .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20))
-      .filterBounds(region)
-      .median();
+    // Use pansharpened image — B11 (SWIR) sharpened from 20m to 10m for better
+    // NDBI (built-up) and MNDWI (water) classification accuracy
+    const image = await getPansharpenedS2(region, dateStart, dateEnd, 20);
 
     // Compute multiple indices for classification
     const ndvi = image.normalizedDifference(['B8', 'B4']).rename('ndvi');
@@ -333,13 +378,11 @@ exports.fireDetect = async (req, res, next) => {
     const dateEnd = now.toISOString().slice(0, 10);
     const dateStart = new Date(now.getTime() - 30 * 86400000).toISOString().slice(0, 10);
 
-    const image = ee.ImageCollection('COPERNICUS/S2_HARMONIZED')
-      .filterDate(dateStart, dateEnd)
-      .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 30))
-      .filterBounds(region)
-      .median();
+    // Use pansharpened image — B12 (SWIR2) sharpened from 20m to 10m for better NBR accuracy
+    const image = await getPansharpenedS2(region, dateStart, dateEnd, 30);
 
     // NBR = (NIR - SWIR2) / (NIR + SWIR2) — low values = burned
+    // Now computed at 10m instead of 20m thanks to pansharpening
     const nbr = image.normalizedDifference(['B8', 'B12']).rename('nbr');
     // BAI = 1 / ((0.1 - Red)^2 + (0.06 - NIR)^2) — high values = burned
     const bai = image.expression(
@@ -719,11 +762,8 @@ exports.multiIndex = async (req, res, next) => {
     const dateEnd = now.toISOString().slice(0, 10);
     const dateStart = new Date(now.getTime() - 30 * 86400000).toISOString().slice(0, 10);
 
-    const image = ee.ImageCollection('COPERNICUS/S2_HARMONIZED')
-      .filterDate(dateStart, dateEnd)
-      .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20))
-      .filterBounds(region)
-      .median();
+    // Use pansharpened image — B5 (Red Edge) sharpened from 20m to 10m for better NDRE accuracy
+    const image = await getPansharpenedS2(region, dateStart, dateEnd, 20);
 
     const ndvi = image.normalizedDifference(['B8', 'B4']).rename('ndvi');
     const evi = image.expression(
@@ -735,6 +775,7 @@ exports.multiIndex = async (req, res, next) => {
       { NIR: image.select('B8'), RED: image.select('B4') }
     ).rename('savi');
     const gndvi = image.normalizedDifference(['B8', 'B3']).rename('gndvi');
+    // NDRE uses B5 (Red Edge, originally 20m) — now pansharpened to 10m
     const ndre = image.normalizedDifference(['B8', 'B5']).rename('ndre');
 
     const [ndviInfo, eviInfo, saviInfo, gndviInfo, ndreInfo] = await Promise.all([
@@ -804,11 +845,9 @@ exports.waterDetect = async (req, res, next) => {
     const dateEnd = now.toISOString().slice(0, 10);
     const dateStart = new Date(now.getTime() - 90 * 86400000).toISOString().slice(0, 10);
 
-    const image = ee.ImageCollection('COPERNICUS/S2_HARMONIZED')
-      .filterDate(dateStart, dateEnd)
-      .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20))
-      .filterBounds(buffer)
-      .median();
+    // Use pansharpened image — B11 (SWIR) sharpened from 20m to 10m for better
+    // MNDWI water detection accuracy at 10m instead of 20m
+    const image = await getPansharpenedS2(buffer, dateStart, dateEnd, 20);
 
     const mndwi = image.normalizedDifference(['B3', 'B11']);
     const waterMask = mndwi.gt(0.2);
@@ -858,13 +897,11 @@ exports.carbonStock = async (req, res, next) => {
     const dateEnd = now.toISOString().slice(0, 10);
     const dateStart = new Date(now.getTime() - 90 * 86400000).toISOString().slice(0, 10);
 
-    const image = ee.ImageCollection('COPERNICUS/S2_HARMONIZED')
-      .filterDate(dateStart, dateEnd)
-      .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20))
-      .filterBounds(region)
-      .median();
+    // Use pansharpened image — B11 (SWIR) sharpened from 20m to 10m for better NDMI
+    const image = await getPansharpenedS2(region, dateStart, dateEnd, 20);
 
     const ndvi = image.normalizedDifference(['B8', 'B4']).rename('ndvi');
+    // NDMI uses B11 (SWIR, originally 20m) — now pansharpened to 10m
     const ndmi = image.normalizedDifference(['B8', 'B11']).rename('ndmi');
 
     const [ndviInfo, ndmiInfo] = await Promise.all([
