@@ -23,6 +23,7 @@ const MyVisits = lazy(() => import('./pages/owner/MyVisits'));
 const VisitDetailOwner = lazy(() => import('./pages/owner/VisitDetailOwner'));
 const SitePlans = lazy(() => import('./pages/SitePlans'));
 const RequestOnboarding = lazy(() => import('./pages/RequestOnboarding'));
+const MonitoringLog = lazy(() => import('./pages/MonitoringLog'));
 
 // Agent pages
 const VisitList = lazy(() => import('./pages/agent/VisitList'));
@@ -132,6 +133,7 @@ export default function App() {
             <Route path="/visits" element={<RequireAuth><MyVisits /></RequireAuth>} />
             <Route path="/visits/:id" element={<RequireAuth><VisitDetailOwner /></RequireAuth>} />
             <Route path="/site-plans" element={<RequireAuth><SitePlans /></RequireAuth>} />
+            <Route path="/monitoring-log" element={<RequireAuth><MonitoringLog /></RequireAuth>} />
             <Route path="/request-onboarding" element={<RequireAuth><RequestOnboarding /></RequireAuth>} />
             <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
 

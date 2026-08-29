@@ -26,4 +26,10 @@ router.get('/:id/carbon-stock', requireAuth, monitoring.carbonStock);
 router.get('/:id/valuation', requireAuth, monitoring.valuation);
 router.get('/:id/evidence-package', requireAuth, monitoring.evidencePackage);
 
+// Monitoring log — historical record of all monitoring runs
+// NOTE: /monitoring-log/all must come BEFORE /:id/monitoring-log to avoid
+// Express matching "monitoring-log" as the :id parameter
+router.get('/monitoring-log/all', requireAuth, monitoring.listAllMonitoringLogs);
+router.get('/:id/monitoring-log', requireAuth, monitoring.monitoringLog);
+
 module.exports = router;

@@ -721,6 +721,56 @@ ${data.visitMedia.length > 0 ? '<table><tr><th>Type</th><th>Visit</th><th>Agent<
         </>
       )}
 
+      {/* ── Satellite Image Gallery ── */}
+      {images.length > 0 && (
+        <>
+          <SectionTitle>
+            <Camera size={20} style={{ display: 'inline' }} /> Satellite Image Gallery ({images.length})
+          </SectionTitle>
+          <Card style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8 }}>
+              {images.map((img) => {
+                const c = img.ndvi_value != null ? classifyNdvi(Number(img.ndvi_value)) : null;
+                return (
+                  <div key={img.id} style={{ minWidth: 200, flexShrink: 0 }}>
+                    <div style={{
+                      width: 200, height: 200, borderRadius: 8, overflow: 'hidden',
+                      border: '1px solid rgba(255,255,255,0.1)', position: 'relative',
+                      background: '#0a0e1a',
+                    }}>
+                      {img.image_url ? (
+                        <img src={img.image_url} alt="Satellite" style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                             onError={(e) => { e.target.style.display = 'none'; }} />
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#5ce1ff' }}>
+                          <Satellite size={32} />
+                        </div>
+                      )}
+                      {c && (
+                        <div style={{
+                          position: 'absolute', bottom: 0, left: 0, right: 0,
+                          background: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
+                          padding: '16px 8px 6px', fontSize: '0.7rem',
+                        }}>
+                          <div style={{ color: c.color, fontWeight: 600 }}>NDVI {Number(img.ndvi_value).toFixed(2)}</div>
+                          <div style={{ color: '#aab7d4' }}>{c.label}</div>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: '#aab7d4', marginTop: 4, textAlign: 'center' }}>
+                      {new Date(img.captured_at).toLocaleDateString()}
+                    </div>
+                    <div style={{ fontSize: '0.6rem', color: '#5ce1ff', textAlign: 'center', textTransform: 'capitalize' }}>
+                      {img.source}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        </>
+      )}
+
       {/* ── Detected Structures ── */}
       <SectionTitle>
         <Building2 size={20} style={{ display: 'inline' }} /> Detected Structures

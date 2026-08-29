@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import {
-  LayoutDashboard, FileCheck, Landmark, CreditCard, User, LogOut, MapPin, Shield, ClipboardList, FileText, PlusSquare,
+  LayoutDashboard, FileCheck, Landmark, CreditCard, User, LogOut, MapPin, Shield, ClipboardList, FileText, PlusSquare, Activity,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
   { to: '/dashboard', labelKey: 'nav.dashboard', fallbackLabel: 'Dashboard', icon: LayoutDashboard },
   { to: '/request-onboarding', labelKey: 'nav.requestOnboarding', fallbackLabel: 'Onboard a Parcel', icon: PlusSquare },
   { to: '/visits', labelKey: 'nav.myVisits', fallbackLabel: 'My Visits', icon: ClipboardList },
+  { to: '/monitoring-log', labelKey: 'nav.monitoringLog', fallbackLabel: 'Monitoring Log', icon: Activity },
   { to: '/sell', labelKey: 'nav.sell', fallbackLabel: 'Sell Land', icon: Landmark },
   { to: '/pricing', labelKey: 'nav.pricing', fallbackLabel: 'Subscribe', icon: CreditCard },
   { to: '/validation', labelKey: 'nav.validation', fallbackLabel: 'Validation', icon: FileCheck },

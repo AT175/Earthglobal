@@ -10,6 +10,52 @@ const db = require('../config/db');
 const { ee, init } = require('../config/earthEngine');
 const logger = require('../config/logger');
 
+// ── Helper: save a monitoring result to the monitoring_logs table ──
+async function saveMonitoringLog(parcelId, indicator, result, summary) {
+  try {
+    await db.query(
+      `INSERT INTO monitoring_logs (parcel_id, indicator, result, summary)
+       VALUES ($1, $2, $3, $4)`,
+      [parcelId, indicator, JSON.stringify(result), summary || null]
+    );
+  } catch (e) {
+    // Don't fail the monitoring request if logging fails
+    console.error('[Monitoring] Failed to save log:', e.message);
+  }
+}
+
+// ── Helper: generate a short summary from a monitoring result ──
+function summarizeResult(indicator, data) {
+  switch (indicator) {
+    case 'flood':
+      return data.floodDetected ? 'Flood detected' : 'No flooding';
+    case 'encroachment':
+      return `${data.count || 0} structure(s) near boundary`;
+    case 'lulc':
+      return (data.classes || []).map(c => `${c.name} ${c.area_pct}%`).join(', ') || 'No data';
+    case 'fire':
+      return data.burnDetected ? 'Burn detected' : 'No burns';
+    case 'soil_moisture':
+      return `Soil: ${data.moistureLevel || 'unknown'}`;
+    case 'rainfall':
+      return `${data.rainfall30mm ?? '?'}mm (30d)${data.belowNormal ? ' — below normal' : data.aboveNormal ? ' — above normal' : ''}`;
+    case 'tree_cover_loss':
+      return data.hasRecentLoss ? 'Recent tree loss detected' : `Tree cover 2000: ${((data.treeCover2000_sqm || 0) / 10000).toFixed(2)}ha`;
+    case 'land_surface_temp':
+      return data.lstCelsius != null ? `${data.lstCelsius}°C` : 'No data';
+    case 'multi_index':
+      return `${(data.indices || []).length} indices computed`;
+    case 'water':
+      return data.hasWaterOnParcel ? 'Water on parcel' : data.hasWaterNearby ? 'Water nearby' : 'No water';
+    case 'carbon_stock':
+      return `${data.carbonStock_t?.toFixed(1) || 0} t C (~$${data.estimatedCarbonCreditValue_USD || 0}/yr)`;
+    case 'valuation':
+      return `GHS ${data.estimatedValue_GHS?.toLocaleString() || '?'}`;
+    default:
+      return 'Monitoring completed';
+  }
+}
+
 // ── Helper: get parcel boundary as EE geometry ──
 async function getParcel(parcelId, userId, userRole, isSalesManager = false) {
   const result = await db.query(
@@ -122,7 +168,7 @@ exports.floodMonitor = async (req, res, next) => {
 
     const floodDetected = (vv != null && vv < -18) || (waterIndex != null && waterIndex > 0.2);
 
-    res.json({
+    const response = {
       floodDetected,
       sarBackscatter: vv,
       mndwi: waterIndex,
@@ -130,7 +176,9 @@ exports.floodMonitor = async (req, res, next) => {
       interpretation: floodDetected
         ? 'Potential flooding detected on or near your parcel. SAR backscatter and/or water index suggest standing water. Check the area immediately.'
         : 'No flooding detected in the last 14 days. The parcel appears dry based on satellite radar and optical imagery.',
-    });
+    };
+    saveMonitoringLog(parcel.id, 'flood', response, summarizeResult('flood', response));
+    res.json(response);
   } catch (err) {
     logger.error('[Monitoring] %s', err.message);
     next(err);
@@ -175,14 +223,16 @@ exports.encroachmentCheck = async (req, res, next) => {
       centroid_geojson: undefined,
     }));
 
-    res.json({
+    const response = {
       encroachments,
       count: encroachments.length,
       hasEncroachment: encroachments.length > 0,
       interpretation: encroachments.length > 0
         ? `${encroachments.length} structure(s) detected within 15m of your boundary. These may indicate encroachment by adjacent landowners. Consider a field visit to verify.`
         : 'No structures detected near your boundary. Your parcel borders appear clear of encroachment.',
-    });
+    };
+    saveMonitoringLog(parcel.id, 'encroachment', response, summarizeResult('encroachment', response));
+    res.json(response);
   } catch (err) {
     logger.error('[Monitoring] %s', err.message);
     next(err);
@@ -252,13 +302,15 @@ exports.lulcClassify = async (req, res, next) => {
       area_pct: parcel.area_sqm > 0 ? ((g.sum || 0) / parcel.area_sqm * 100).toFixed(1) : '0',
     })).filter(c => c.area_sqm > 0).sort((a, b) => b.area_sqm - a.area_sqm);
 
-    res.json({
+    const response = {
       classes,
       dateRange: { start: dateStart, end: dateEnd },
       interpretation: classes.length > 0
         ? `Your parcel is composed of: ${classes.map(c => `${c.name} (${c.area_pct}%)`).join(', ')}.`
         : 'Unable to classify land cover for this parcel.',
-    });
+    };
+    saveMonitoringLog(parcel.id, 'lulc', response, summarizeResult('lulc', response));
+    res.json(response);
   } catch (err) {
     logger.error('[Monitoring] %s', err.message);
     next(err);
@@ -304,7 +356,7 @@ exports.fireDetect = async (req, res, next) => {
     const baiMean = baiInfo.bai;
     const burnDetected = (nbrMean != null && nbrMean < -0.1) || (baiMean != null && baiMean > 50);
 
-    res.json({
+    const response = {
       burnDetected,
       nbr: nbrMean != null ? Number(nbrMean.toFixed(3)) : null,
       bai: baiMean != null ? Number(baiMean.toFixed(2)) : null,
@@ -312,7 +364,9 @@ exports.fireDetect = async (req, res, next) => {
       interpretation: burnDetected
         ? 'Burn scar detected on your parcel. This may indicate wildfire, agricultural burning, or slash-and-burn activity. Check the area and report any unauthorized burning.'
         : 'No burn scars detected in the last 30 days. Your parcel appears free of fire damage.',
-    });
+    };
+    saveMonitoringLog(parcel.id, 'fire', response, summarizeResult('fire', response));
+    res.json(response);
   } catch (err) {
     logger.error('[Monitoring] %s', err.message);
     next(err);
@@ -363,7 +417,7 @@ exports.soilMoisture = async (req, res, next) => {
       else moistureLevel = 'wet';
     }
 
-    res.json({
+    const response = {
       vvBackscatter: vvVal != null ? Number(vvVal.toFixed(2)) : null,
       vhBackscatter: vhVal != null ? Number(vhVal.toFixed(2)) : null,
       vvVhRatio: ratio != null ? Number(ratio.toFixed(2)) : null,
@@ -376,7 +430,9 @@ exports.soilMoisture = async (req, res, next) => {
         moistureLevel === 'wet' ? 'Soil is saturated. Ensure drainage to prevent waterlogging.' :
         'Unable to determine soil moisture from available data.'
       }`,
-    });
+    };
+    saveMonitoringLog(parcel.id, 'soil_moisture', response, summarizeResult('soil_moisture', response));
+    res.json(response);
   } catch (err) {
     logger.error('[Monitoring] %s', err.message);
     next(err);
@@ -433,7 +489,7 @@ exports.rainfall = async (req, res, next) => {
     const belowNormal = histAvg != null && rainfall30 != null && rainfall30 < histAvg * 0.7;
     const aboveNormal = histAvg != null && rainfall30 != null && rainfall30 > histAvg * 1.3;
 
-    res.json({
+    const response = {
       rainfall30mm: rainfall30,
       rainfall90mm: rainfall90,
       rainfall365mm: rainfall365,
@@ -445,7 +501,9 @@ exports.rainfall = async (req, res, next) => {
         : aboveNormal
         ? `Rainfall this month (${rainfall30}mm) is above the historical average (${histAvg}mm). Vegetation should be thriving. Watch for waterlogging in low-lying areas.`
         : `Rainfall this month (${rainfall30}mm) is near the historical average (${histAvg != null ? histAvg + 'mm' : 'unknown'}). Conditions are normal for this season.`,
-    });
+    };
+    saveMonitoringLog(parcel.id, 'rainfall', response, summarizeResult('rainfall', response));
+    res.json(response);
   } catch (err) {
     logger.error('[Monitoring] %s', err.message);
     next(err);
@@ -495,12 +553,14 @@ exports.historicalImagery = async (req, res, next) => {
       } catch (e) { /* skip failed snapshots */ }
     }
 
-    res.json({
+    const response = {
       snapshots,
       interpretation: snapshots.length > 1
         ? `${snapshots.length} historical snapshots available. Compare them to see how your land has changed over time.`
         : 'Limited historical imagery available for this location.',
-    });
+    };
+    saveMonitoringLog(parcel.id, 'historical_imagery', response, `${snapshots.length} snapshots`);
+    res.json(response);
   } catch (err) {
     logger.error('[Monitoring] %s', err.message);
     next(err);
@@ -557,7 +617,7 @@ exports.treeCoverLoss = async (req, res, next) => {
 
     const recentLoss = Object.entries(lossByYear).filter(([y]) => parseInt(y) >= new Date().getFullYear() - 3);
 
-    res.json({
+    const response = {
       treeCover2000_sqm,
       totalLoss_sqm: lossArea_sqm,
       lossByYear,
@@ -568,7 +628,9 @@ exports.treeCoverLoss = async (req, res, next) => {
         : treeCover2000_sqm > 0
         ? `Your parcel had ${(treeCover2000_sqm / 10000).toFixed(2)}ha of tree cover in 2000. Total loss: ${(lossArea_sqm / 10000).toFixed(2)}ha. No recent loss detected.`
         : 'Your parcel did not have significant tree cover (>=30% canopy) in 2000. Tree cover loss monitoring is most relevant for forested areas.',
-    });
+    };
+    saveMonitoringLog(parcel.id, 'tree_cover_loss', response, summarizeResult('tree_cover_loss', response));
+    res.json(response);
   } catch (err) {
     logger.error('[Monitoring] %s', err.message);
     next(err);
@@ -618,7 +680,7 @@ exports.landSurfaceTemp = async (req, res, next) => {
 
     const heatIsland = tempC != null && bufferTempC != null ? Number((tempC - bufferTempC).toFixed(1)) : null;
 
-    res.json({
+    const response = {
       lstCelsius: tempC,
       surroundingLstCelsius: bufferTempC,
       heatIslandEffect: heatIsland,
@@ -632,7 +694,9 @@ exports.landSurfaceTemp = async (req, res, next) => {
             : 'Temperature is similar to the surrounding area.'
           }`
         : 'Unable to compute land surface temperature from available Landsat imagery.',
-    });
+    };
+    saveMonitoringLog(parcel.id, 'land_surface_temp', response, summarizeResult('land_surface_temp', response));
+    res.json(response);
   } catch (err) {
     logger.error('[Monitoring] %s', err.message);
     next(err);
@@ -709,11 +773,13 @@ exports.multiIndex = async (req, res, next) => {
       },
     ];
 
-    res.json({
+    const response = {
       indices: indices.filter(i => i.value != null),
       dateRange: { start: dateStart, end: dateEnd },
       interpretation: `${indices.filter(i => i.value != null).length} vegetation indices computed. Cross-reference them: if NDVI is moderate but NDRE is low, nitrogen fertilizer may help. If EVI is lower than NDVI, vegetation may be sparse or young.`,
-    });
+    };
+    saveMonitoringLog(parcel.id, 'multi_index', response, summarizeResult('multi_index', response));
+    res.json(response);
   } catch (err) {
     logger.error('[Monitoring] %s', err.message);
     next(err);
@@ -757,7 +823,7 @@ exports.waterDetect = async (req, res, next) => {
     const bufferWaterInfo = await eeInfo(waterInBuffer.reduceRegion({ reducer: ee.Reducer.sum(), geometry: buffer, scale: 10, maxPixels: 1e9 }));
     const waterAreaInBuffer = bufferWaterInfo.sum ? Math.round(bufferWaterInfo.sum) : 0;
 
-    res.json({
+    const response = {
       waterInParcel_sqm: waterAreaInParcel,
       waterWithin500m_sqm: waterAreaInBuffer,
       hasWaterOnParcel: waterAreaInParcel > 100,
@@ -767,7 +833,9 @@ exports.waterDetect = async (req, res, next) => {
         : waterAreaInBuffer > 500
         ? `Water body detected within 500m of your parcel (~${(waterAreaInBuffer / 10000).toFixed(2)}ha). You have nearby water access for irrigation or livestock.`
         : 'No significant water bodies detected on or near your parcel. Consider rainwater harvesting or well installation for water supply.',
-    });
+    };
+    saveMonitoringLog(parcel.id, 'water', response, summarizeResult('water', response));
+    res.json(response);
   } catch (err) {
     logger.error('[Monitoring] %s', err.message);
     next(err);
@@ -818,7 +886,7 @@ exports.carbonStock = async (req, res, next) => {
     // Rough carbon credit value at $5/tonne CO2e
     const carbonCreditValue = co2e_t * 5;
 
-    res.json({
+    const response = {
       ndvi: Number(ndviMean.toFixed(3)),
       ndmi: Number(ndmiMean.toFixed(3)),
       aboveGroundBiomass_t_ha: Number(agb_t_ha.toFixed(1)),
@@ -831,7 +899,9 @@ exports.carbonStock = async (req, res, next) => {
         : carbonStock_t > 2
         ? `Estimated carbon stock: ${carbonStock_t.toFixed(1)} tonnes C. Moderate carbon value. Planting trees could increase this to a marketable level.`
         : `Estimated carbon stock: ${carbonStock_t.toFixed(1)} tonnes C. Low carbon value — the parcel has limited vegetation. Tree planting could generate future carbon credit income.`,
-    });
+    };
+    saveMonitoringLog(parcel.id, 'carbon_stock', response, summarizeResult('carbon_stock', response));
+    res.json(response);
   } catch (err) {
     logger.error('[Monitoring] %s', err.message);
     next(err);
@@ -932,7 +1002,7 @@ exports.valuation = async (req, res, next) => {
     const highEstimate = Math.round(landValue * 1.2);
     const confidence = buildingCount > 0 && ndvi != null ? 'medium' : 'low';
 
-    res.json({
+    const response = {
       estimatedValue_GHS: Math.round(landValue),
       lowEstimate_GHS: lowEstimate,
       highEstimate_GHS: highEstimate,
@@ -943,7 +1013,9 @@ exports.valuation = async (req, res, next) => {
       basePricePerHa,
       interpretation: `Estimated value: GHS ${lowEstimate.toLocaleString()} – ${highEstimate.toLocaleString()} (confidence: ${confidence}). This is a rough estimate based on regional land prices, parcel size, structures, vegetation health, and risk factors. For an official valuation, consult a licensed land valuer.`,
       disclaimer: 'This estimate is for informational purposes only and is not a formal appraisal. Market prices vary significantly. Consult a licensed valuer for official valuation.',
-    });
+    };
+    saveMonitoringLog(parcel.id, 'valuation', response, summarizeResult('valuation', response));
+    res.json(response);
   } catch (err) {
     logger.error('[Monitoring] %s', err.message);
     next(err);
@@ -1065,6 +1137,89 @@ exports.monitoringSummary = async (req, res, next) => {
     };
 
     res.json(summary);
+  } catch (err) {
+    logger.error('[Monitoring] %s', err.message);
+    next(err);
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// 16. MONITORING LOG — historical record of all monitoring runs
+// ═══════════════════════════════════════════════════════════
+exports.monitoringLog = async (req, res, next) => {
+  try {
+    const parcel = await getParcel(req.params.id, req.user.id, req.user.role, req.user.isSalesManager);
+    if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
+
+    const indicator = req.query.indicator;
+    const limit = Math.min(parseInt(req.query.limit) || 100, 500);
+
+    let query = `SELECT id, indicator, result, summary, detected_at
+                 FROM monitoring_logs WHERE parcel_id = $1`;
+    const params = [req.params.id];
+
+    if (indicator) {
+      query += ` AND indicator = $2`;
+      params.push(indicator);
+    }
+    query += ` ORDER BY detected_at DESC LIMIT $${params.length + 1}`;
+    params.push(limit);
+
+    const result = await db.query(query, params);
+    res.json({
+      parcelId: parcel.id,
+      parcelName: parcel.name,
+      logs: result.rows.map(r => ({
+        ...r,
+        result: typeof r.result === 'string' ? JSON.parse(r.result) : r.result,
+      })),
+    });
+  } catch (err) {
+    logger.error('[Monitoring] %s', err.message);
+    next(err);
+  }
+};
+
+// GET /parcels/:id/monitoring-log — list all monitoring logs for the owner
+// (also supports ?indicator=flood to filter)
+exports.listAllMonitoringLogs = async (req, res, next) => {
+  try {
+    // Get all parcels owned by the user
+    const parcelRes = await db.query(
+      `SELECT id, name FROM parcels WHERE owner_id = $1 ORDER BY name`,
+      [req.user.id]
+    );
+    const parcelIds = parcelRes.rows.map(r => r.id);
+
+    if (parcelIds.length === 0) {
+      return res.json({ logs: [], parcels: [] });
+    }
+
+    const indicator = req.query.indicator;
+    const limit = Math.min(parseInt(req.query.limit) || 200, 1000);
+
+    let query = `SELECT ml.id, ml.parcel_id, ml.indicator, ml.result, ml.summary, ml.detected_at,
+                        p.name AS parcel_name
+                 FROM monitoring_logs ml
+                 JOIN parcels p ON ml.parcel_id = p.id
+                 WHERE ml.parcel_id = ANY($1)`;
+    const params = [parcelIds];
+
+    if (indicator) {
+      query += ` AND ml.indicator = $2`;
+      params.push(indicator);
+    }
+    query += ` ORDER BY ml.detected_at DESC LIMIT $${params.length + 1}`;
+    params.push(limit);
+
+    const result = await db.query(query, params);
+    res.json({
+      logs: result.rows.map(r => ({
+        ...r,
+        result: typeof r.result === 'string' ? JSON.parse(r.result) : r.result,
+      })),
+      parcels: parcelRes.rows,
+    });
   } catch (err) {
     logger.error('[Monitoring] %s', err.message);
     next(err);

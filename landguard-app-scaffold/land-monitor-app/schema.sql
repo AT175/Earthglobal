@@ -375,6 +375,23 @@ CREATE INDEX IF NOT EXISTS idx_parcel_images_parcel ON parcel_images (parcel_id)
 CREATE INDEX IF NOT EXISTS idx_parcel_images_date ON parcel_images (captured_at DESC);
 
 -- =========================================================
+-- MONITORING LOGS — stores results of each monitoring run
+-- so owners can review historical indicator readings over time
+-- =========================================================
+CREATE TABLE IF NOT EXISTS monitoring_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    parcel_id UUID NOT NULL REFERENCES parcels(id) ON DELETE CASCADE,
+    indicator VARCHAR(50) NOT NULL,          -- flood | encroachment | lulc | fire | soil_moisture | rainfall | tree_cover_loss | land_surface_temp | multi_index | water | carbon_stock | valuation
+    result JSONB NOT NULL,                    -- full JSON response from the monitoring endpoint
+    summary TEXT,                             -- human-readable one-line summary
+    detected_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_monitoring_logs_parcel ON monitoring_logs (parcel_id);
+CREATE INDEX IF NOT EXISTS idx_monitoring_logs_indicator ON monitoring_logs (indicator);
+CREATE INDEX IF NOT EXISTS idx_monitoring_logs_date ON monitoring_logs (detected_at DESC);
+
+-- =========================================================
 -- PAYMENTS
 -- =========================================================
 DO $$ BEGIN
