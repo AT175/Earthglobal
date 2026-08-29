@@ -1302,6 +1302,178 @@ CREATE INDEX IF NOT EXISTS idx_sma_manager ON sales_manager_activity(sales_manag
 CREATE INDEX IF NOT EXISTS idx_sma_org ON sales_manager_activity(organization_id);
 CREATE INDEX IF NOT EXISTS idx_sma_type ON sales_manager_activity(activity_type);
 
+-- =========================================================
+-- PARCEL VALIDATION (search validation) TABLES
+-- =========================================================
+
+CREATE TABLE IF NOT EXISTS parcel_validation_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+
+    -- Requester info (can be an owner in the system or an external customer)
+    requester_type VARCHAR(20) NOT NULL DEFAULT 'owner',
+    requester_id UUID REFERENCES owners(id) ON DELETE SET NULL,
+    requester_name VARCHAR(255) NOT NULL,
+    requester_email VARCHAR(255),
+    requester_phone VARCHAR(50),
+
+    -- Search parameters provided by the requester
+    search_parcel_name VARCHAR(255),
+    search_region VARCHAR(255),
+    search_coordinates JSONB,
+    search_description TEXT,
+    search_document_ref VARCHAR(255),
+
+    -- Validation result (filled by planner)
+    status VARCHAR(50) NOT NULL DEFAULT 'pending',
+    validated_parcel_id UUID REFERENCES parcels(id) ON DELETE SET NULL,
+    parcel_exists BOOLEAN,
+    parcel_found_name VARCHAR(255),
+    parcel_found_owner VARCHAR(255),
+    parcel_found_region VARCHAR(255),
+    parcel_found_area_sqm DOUBLE PRECISION,
+    parcel_found_coordinates JSONB,
+    parcel_found_centroid_lat DOUBLE PRECISION,
+    parcel_found_centroid_lng DOUBLE PRECISION,
+    planner_notes TEXT,
+    planner_id UUID REFERENCES assembly_users(id) ON DELETE SET NULL,
+    planner_name VARCHAR(255),
+    validated_at TIMESTAMPTZ,
+    certified_at TIMESTAMPTZ,
+
+    -- Nearby hazards (JSONB array of hazard summaries)
+    nearby_hazards JSONB DEFAULT '[]'::jsonb,
+
+    -- Report
+    report_url TEXT,
+    report_generated_at TIMESTAMPTZ,
+    kml_url TEXT,
+    google_maps_link TEXT,
+
+    -- Stamp + signature
+    stamp_image_url TEXT,
+    signature_image_url TEXT,
+
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_pvr_org ON parcel_validation_requests(organization_id);
+CREATE INDEX IF NOT EXISTS idx_pvr_status ON parcel_validation_requests(status);
+CREATE INDEX IF NOT EXISTS idx_pvr_requester ON parcel_validation_requests(requester_id);
+
+CREATE TABLE IF NOT EXISTS planner_stamps (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    planner_id UUID NOT NULL REFERENCES assembly_users(id) ON DELETE CASCADE,
+    planner_name VARCHAR(255) NOT NULL,
+    stamp_image BYTEA,
+    stamp_image_type VARCHAR(100),
+    signature_image BYTEA,
+    signature_image_type VARCHAR(100),
+    title VARCHAR(255),
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(organization_id, planner_id)
+);
+
+-- =========================================================
+-- ENVIRONMENTAL HAZARD TABLES
+-- =========================================================
+
+CREATE TABLE IF NOT EXISTS environmental_hazards (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+
+    -- Hazard classification
+    hazard_type VARCHAR(50) NOT NULL,
+    -- Types: 'water_pollution', 'flood_prone', 'illegal_mining', 'open_dump',
+    --        'deforestation', 'air_quality', 'urban_heat', 'wetland_loss'
+
+    -- Location
+    centroid_lat DOUBLE PRECISION NOT NULL,
+    centroid_lng DOUBLE PRECISION NOT NULL,
+    boundary JSONB,
+    bbox JSONB,
+    region VARCHAR(255),
+    area_sqm DOUBLE PRECISION,
+
+    -- Detection details
+    severity VARCHAR(20) NOT NULL DEFAULT 'moderate',
+    -- Severity: 'low', 'moderate', 'high', 'critical'
+
+    confidence DOUBLE PRECISION,
+    -- 0.0 to 1.0 — ML confidence score
+
+    -- Detection source
+    detection_method VARCHAR(50) NOT NULL DEFAULT 'earth_engine',
+    -- 'earth_engine', 'manual', 'report', 'satellite'
+
+    -- Spectral indices / measurements
+    indices JSONB,
+
+    -- Description + evidence
+    description TEXT,
+    evidence_images JSONB,
+
+    -- EE tile URL for map overlay
+    tile_url TEXT,
+
+    -- Status
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    -- 'active', 'verified', 'resolved', 'false_positive'
+
+    -- Temporal
+    detected_at TIMESTAMPTZ DEFAULT now(),
+    last_checked_at TIMESTAMPTZ DEFAULT now(),
+    resolved_at TIMESTAMPTZ,
+
+    -- Who detected/verified
+    detected_by VARCHAR(100),
+    verified_by UUID REFERENCES assembly_users(id) ON DELETE SET NULL,
+    verifier_name VARCHAR(255),
+
+    -- Metadata for flexible extra data
+    metadata JSONB,
+
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_eh_org ON environmental_hazards(organization_id);
+CREATE INDEX IF NOT EXISTS idx_eh_type ON environmental_hazards(hazard_type);
+CREATE INDEX IF NOT EXISTS idx_eh_status ON environmental_hazards(status);
+CREATE INDEX IF NOT EXISTS idx_eh_severity ON environmental_hazards(severity);
+CREATE INDEX IF NOT EXISTS idx_eh_location ON environmental_hazards USING GIST (ST_SetSRID(ST_MakePoint(centroid_lng, centroid_lat), 4326));
+CREATE INDEX IF NOT EXISTS idx_eh_detected ON environmental_hazards(detected_at DESC);
+
+CREATE TABLE IF NOT EXISTS hazard_alerts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+    hazard_id UUID NOT NULL REFERENCES environmental_hazards(id) ON DELETE CASCADE,
+
+    -- Alert target
+    target_type VARCHAR(20) NOT NULL DEFAULT 'planner',
+    -- 'planner', 'owner', 'public'
+    target_user_id UUID,
+    -- NULL = broadcast to all planners in org
+
+    -- Alert content
+    alert_type VARCHAR(50) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    message TEXT,
+
+    -- Notification status
+    delivery_status VARCHAR(20) DEFAULT 'sent',
+    -- 'sent', 'delivered', 'read', 'failed'
+    read_at TIMESTAMPTZ,
+
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ha_org ON hazard_alerts(organization_id);
+CREATE INDEX IF NOT EXISTS idx_ha_hazard ON hazard_alerts(hazard_id);
+
 -- Reset search_path to the app default (pooled connections reuse this session)
 SET search_path TO earthglobal, public, extensions;
 
