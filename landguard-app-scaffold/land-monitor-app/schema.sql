@@ -1393,7 +1393,7 @@ CREATE TABLE IF NOT EXISTS environmental_hazards (
     -- Location
     centroid_lat DOUBLE PRECISION NOT NULL,
     centroid_lng DOUBLE PRECISION NOT NULL,
-    boundary JSONB,
+    boundary geometry(Geometry, 4326),
     bbox JSONB,
     region VARCHAR(255),
     area_sqm DOUBLE PRECISION,
@@ -1446,6 +1446,23 @@ CREATE INDEX IF NOT EXISTS idx_eh_status ON environmental_hazards(status);
 CREATE INDEX IF NOT EXISTS idx_eh_severity ON environmental_hazards(severity);
 CREATE INDEX IF NOT EXISTS idx_eh_location ON environmental_hazards USING GIST (ST_SetSRID(ST_MakePoint(centroid_lng, centroid_lat), 4326));
 CREATE INDEX IF NOT EXISTS idx_eh_detected ON environmental_hazards(detected_at DESC);
+CREATE INDEX IF NOT EXISTS idx_eh_boundary ON environmental_hazards USING GIST (boundary);
+
+-- Fix boundary column type if it was previously created as JSONB
+-- (ST_AsGeoJSON and ST_GeomFromGeoJSON require a PostGIS geometry type)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'environmental_hazards'
+          AND column_name = 'boundary'
+          AND data_type = 'jsonb'
+    ) THEN
+        ALTER TABLE environmental_hazards ALTER COLUMN boundary TYPE geometry(Geometry, 4326)
+            USING NULL;
+        RAISE NOTICE 'Converted environmental_hazards.boundary from JSONB to geometry';
+    END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS hazard_alerts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
