@@ -5,7 +5,7 @@ import {
   AlertTriangle, CheckCircle2, Ruler, ArrowLeftRight, Camera, Video, Radio,
   ChevronRight, Film, ClipboardList, FileText, Building2, Maximize, TrendingUp,
   Leaf, Satellite, Activity, Droplets, Flame, MapPin, TreePine, Thermometer,
-  Beaker, Waves, DollarSign, ShieldCheck, Navigation, Download, Layers, ZapOff,
+  Beaker, Waves, DollarSign, ShieldCheck, Navigation, Download, Layers, ZapOff, Globe,
 } from 'lucide-react';
 import { Card, Badge, Button, Skeleton, ParcelMap } from '@earthglobal/design-system';
 import api from '../services/api';
@@ -902,6 +902,8 @@ ${data.visitMedia.length > 0 ? '<table><tr><th>Type</th><th>Visit</th><th>Agent<
               fetchMonitor('water', 'water');
               fetchMonitor('carbon', 'carbon-stock');
               fetchMonitor('valuation', 'valuation');
+              fetchMonitor('openBuildings', 'open-buildings');
+              fetchMonitor('dynamicWorld', 'dynamic-world');
             }}>
               <Activity size={16} style={{ display: 'inline' }} /> Run All Monitoring
             </Button>
@@ -1242,7 +1244,91 @@ ${data.visitMedia.length > 0 ? '<table><tr><th>Type</th><th>Visit</th><th>Agent<
             <span style={{ color: '#aab7d4', fontSize: '0.85rem' }}>Rough value estimate based on region, size, and structures.</span>
           )}
         </MonitorCard>
+
+        {/* Google OpenBuildings — AI building footprints */}
+        <MonitorCard>
+          <MonitorHeader><Building2 size={18} color="#22d3ee" /> AI Building Detection (Google)</MonitorHeader>
+          {monitorLoading.openBuildings ? <span style={{ color: '#aab7d4', fontSize: '0.85rem' }}>Scanning with Google AI...</span> :
+           monitorData.openBuildings?.error ? <><MonitorError>{monitorData.openBuildings.error}</MonitorError><Button variant="secondary" style={{ marginTop: 4 }} onClick={() => fetchMonitor('openBuildings', 'open-buildings')}>Retry</Button></> :
+           monitorData.openBuildings ? (
+            <>
+              <MonitorValue $color={monitorData.openBuildings.count > 0 ? '#22d3ee' : '#22c55e'}>
+                {monitorData.openBuildings.count} AI-detected building(s)
+              </MonitorValue>
+              <MonitorStat><span>On parcel</span><strong>{monitorData.openBuildings.onParcel}</strong></MonitorStat>
+              <MonitorStat><span>Total area</span><strong>{monitorData.openBuildings.totalArea_sqm?.toLocaleString()} m²</strong></MonitorStat>
+              <MonitorInterp $color="#22d3ee" $bg="rgba(34,211,238,0.08)">
+                {monitorData.openBuildings.interpretation}
+              </MonitorInterp>
+              <div style={{ fontSize: '0.7rem', color: '#999', marginTop: 4 }}>Source: {monitorData.openBuildings.source}</div>
+              <Button variant="secondary" style={{ marginTop: 4 }} onClick={() => fetchMonitor('openBuildings', 'open-buildings')}>Refresh</Button>
+            </>
+          ) : (
+            <span style={{ color: '#aab7d4', fontSize: '0.85rem' }}>Google's AI building footprints — detects structures using machine learning.</span>
+          )}
+        </MonitorCard>
+
+        {/* Dynamic World — AI land cover */}
+        <MonitorCard>
+          <MonitorHeader><Globe size={18} color="#84cc16" /> AI Land Cover (Dynamic World)</MonitorHeader>
+          {monitorLoading.dynamicWorld ? <span style={{ color: '#aab7d4', fontSize: '0.85rem' }}>Running Google AI classification...</span> :
+           monitorData.dynamicWorld?.error ? <><MonitorError>{monitorData.dynamicWorld.error}</MonitorError><Button variant="secondary" style={{ marginTop: 4 }} onClick={() => fetchMonitor('dynamicWorld', 'dynamic-world')}>Retry</Button></> :
+           monitorData.dynamicWorld && monitorData.dynamicWorld.classes?.length > 0 ? (
+            <>
+              <MonitorValue $color="#84cc16">{monitorData.dynamicWorld.dominantClass}</MonitorValue>
+              {monitorData.dynamicWorld.classes.slice(0, 5).map((c, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, fontSize: '0.8rem' }}>
+                  <div style={{ width: 10, height: 10, borderRadius: 2, background: c.color }} />
+                  <span style={{ flex: 1 }}>{c.name}</span>
+                  <strong>{c.area_pct}%</strong>
+                </div>
+              ))}
+              <MonitorInterp>{monitorData.dynamicWorld.interpretation}</MonitorInterp>
+              <div style={{ fontSize: '0.7rem', color: '#999', marginTop: 4 }}>{monitorData.dynamicWorld.source}</div>
+              <Button variant="secondary" style={{ marginTop: 4 }} onClick={() => fetchMonitor('dynamicWorld', 'dynamic-world')}>Refresh</Button>
+            </>
+          ) : monitorData.dynamicWorld ? (
+            <span style={{ color: '#aab7d4', fontSize: '0.85rem' }}>{monitorData.dynamicWorld.message || 'No data'}</span>
+          ) : (
+            <span style={{ color: '#aab7d4', fontSize: '0.85rem' }}>Google's near-real-time AI land cover, updated every 5 days.</span>
+          )}
+        </MonitorCard>
       </MonitorGrid>
+
+      {/* ── AI Monitoring Report ── */}
+      <SectionTitle>
+        <Activity size={20} style={{ display: 'inline' }} /> AI Monitoring Report
+      </SectionTitle>
+      <Card style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+          <span style={{ fontSize: '0.85rem', color: '#aab7d4' }}>
+            AI-generated report summarizing all monitoring data for your parcel.
+          </span>
+          <Button variant="secondary" onClick={() => fetchMonitor('aiReport', 'ai-report')} disabled={monitorLoading.aiReport}>
+            {monitorLoading.aiReport ? 'Generating...' : <><Activity size={16} style={{ display: 'inline' }} /> Generate AI Report</>}
+          </Button>
+        </div>
+        {monitorData.aiReport?.error ? (
+          <MonitorError>{monitorData.aiReport.error}</MonitorError>
+        ) : monitorData.aiReport?.report ? (
+          <>
+            <div style={{
+              background: 'rgba(59,167,255,0.05)', border: '1px solid rgba(59,167,255,0.15)',
+              borderRadius: 8, padding: 16, whiteSpace: 'pre-wrap', fontSize: '0.85rem',
+              lineHeight: 1.6, color: '#e0e7ff',
+            }}>
+              {monitorData.aiReport.report}
+            </div>
+            <div style={{ fontSize: '0.7rem', color: '#999', marginTop: 8 }}>
+              Source: {monitorData.aiReport.source} • {monitorData.aiReport.dataPoints || 0} data points • {monitorData.aiReport.ndviReadings || 0} NDVI readings
+            </div>
+          </>
+        ) : (
+          <span style={{ color: '#aab7d4', fontSize: '0.85rem' }}>
+            Run monitoring tools first, then generate an AI report to get an intelligent summary of your land's condition.
+          </span>
+        )}
+      </Card>
 
       {/* ── GPS Boundary Verification ── */}
       <SectionTitle>

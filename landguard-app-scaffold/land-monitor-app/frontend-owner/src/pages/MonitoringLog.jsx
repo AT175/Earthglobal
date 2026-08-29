@@ -4,7 +4,7 @@ import styled from 'styled-components';
 import {
   Activity, Droplets, Flame, TreePine, Thermometer, Beaker, Waves,
   DollarSign, Layers, MapPin, Satellite, Building2, CloudRain, Leaf,
-  Filter, ChevronRight,
+  Filter, ChevronRight, Globe,
 } from 'lucide-react';
 import { Card, Badge, Button, Skeleton } from '@earthglobal/design-system';
 import api from '../services/api';
@@ -156,6 +156,9 @@ const INDICATOR_META = {
   carbon_stock: { label: 'Carbon Stock', icon: Activity, color: '#10b981', bg: 'rgba(16,185,129,0.1)' },
   valuation: { label: 'Valuation', icon: DollarSign, color: '#eab308', bg: 'rgba(234,179,8,0.1)' },
   historical_imagery: { label: 'Historical Imagery', icon: Satellite, color: '#a855f7', bg: 'rgba(168,85,247,0.1)' },
+  open_buildings: { label: 'AI Buildings (Google)', icon: Building2, color: '#22d3ee', bg: 'rgba(34,211,238,0.1)' },
+  dynamic_world: { label: 'AI Land Cover', icon: Globe, color: '#84cc16', bg: 'rgba(132,204,22,0.1)' },
+  ai_report: { label: 'AI Report', icon: Activity, color: '#3ba7ff', bg: 'rgba(59,167,255,0.1)' },
 };
 
 export default function MonitoringLog() {

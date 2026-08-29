@@ -32,4 +32,9 @@ router.get('/:id/evidence-package', requireAuth, monitoring.evidencePackage);
 router.get('/monitoring-log/all', requireAuth, monitoring.listAllMonitoringLogs);
 router.get('/:id/monitoring-log', requireAuth, monitoring.monitoringLog);
 
+// AI-powered monitoring (free via Earth Engine + Groq)
+router.get('/:id/open-buildings', requireAuth, monitoring.openBuildings);
+router.get('/:id/dynamic-world', requireAuth, monitoring.dynamicWorld);
+router.get('/:id/ai-report', requireAuth, monitoring.aiReport);
+
 module.exports = router;
