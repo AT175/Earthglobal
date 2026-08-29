@@ -909,10 +909,24 @@ exports.detectBuildings = async (req, res, next) => {
 
 // GET /assembly/planning/satellite-tiles — get EE satellite tile URL for the org area
 exports.getSatelliteTiles = async (req, res, next) => {
+  // Hard timeout — if EE doesn't respond in 20s, return fallback so the
+  // client gets a proper CORS-compliant response instead of a hung request.
+  let settled = false;
+  const timeout = setTimeout(() => {
+    if (settled) return;
+    settled = true;
+    res.json({ url: null, provider: 'fallback', reason: 'timeout' });
+  }, 20000);
+
   try {
     const { bbox } = req.query;
     const ready = await initEE();
-    if (!ready) return res.json({ url: null, provider: 'fallback' });
+    if (!ready) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      return res.json({ url: null, provider: 'fallback' });
+    }
 
     const collection = ee.ImageCollection('COPERNICUS/S2_HARMONIZED')
       .filterDate('2024-01-01', '2025-12-31')
@@ -920,18 +934,24 @@ exports.getSatelliteTiles = async (req, res, next) => {
 
     let filtered = collection;
     if (bbox) {
-      const [minLng, minLat, maxLng, maxLat] = bbox.split(',').map(parseFloat);
-      const region = ee.Geometry.Rectangle([minLng, minLat, maxLng, maxLat], 'EPSG:4326', false);
-      filtered = collection.filterBounds(region);
+      const parts = bbox.split(',').map(parseFloat);
+      if (parts.length === 4 && !parts.some(isNaN)) {
+        const [minLng, minLat, maxLng, maxLat] = parts;
+        const region = ee.Geometry.Rectangle([minLng, minLat, maxLng, maxLat], 'EPSG:4326', false);
+        filtered = collection.filterBounds(region);
+      }
     }
 
     const composite = filtered.median();
     const visualized = composite.visualize({ bands: ['B4', 'B3', 'B2'], min: 0, max: 3000, gamma: 1.4 });
 
-    visualized.getMapId({ min: 0, max: 255 }, (errOrResult, map) => {
-      const result = map || errOrResult;
-      const err = map ? errOrResult : null;
-      if (err || !result || !result.mapid) return res.json({ url: null, provider: 'fallback' });
+    visualized.getMapId({ min: 0, max: 255 }).evaluate((err, result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      if (err || !result || !result.mapid) {
+        return res.json({ url: null, provider: 'fallback' });
+      }
       res.json({
         url: result.urlFormat || `https://earthengine.googleapis.com/v1/${result.mapid}/tiles/{z}/{x}/{y}`,
         token: result.token,
@@ -940,6 +960,9 @@ exports.getSatelliteTiles = async (req, res, next) => {
       });
     });
   } catch (err) {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timeout);
     res.json({ url: null, provider: 'fallback' });
   }
 };
