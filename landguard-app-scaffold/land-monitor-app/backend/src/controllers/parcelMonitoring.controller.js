@@ -28,8 +28,7 @@ async function getParcel(parcelId, userId, userRole, isSalesManager = false) {
 
 function boundaryToEE(boundaryGeojson) {
   const coords = boundaryGeojson.coordinates[0];
-  const ring = ee.Geometry.LinearRing(coords);
-  return ee.Geometry.Polygon([ring]);
+  return ee.Geometry.Polygon([coords]);
 }
 
 // ── Helper: EE getInfo as promise (with 30s timeout) ──
@@ -91,33 +90,42 @@ exports.floodMonitor = async (req, res, next) => {
       maxPixels: 1e9,
     });
 
-    // Also check MNDWI from Sentinel-2
-    const s2 = ee.ImageCollection('COPERNICUS/S2_HARMONIZED')
-      .filterDate(dateStart, dateEnd)
-      .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 30))
-      .filterBounds(buffer);
-    const s2Image = s2.median();
-    const mndwi = s2Image.normalizedDifference(['B3', 'B11']).rename('mndwi');
-    const mndwiVal = mndwi.reduceRegion({
-      reducer: ee.Reducer.mean(),
-      geometry: region,
-      scale: 10,
-      maxPixels: 1e9,
-    });
+    // Also check MNDWI from Sentinel-2 (may fail if no cloud-free imagery)
+    let waterIndex = null;
+    try {
+      const s2 = ee.ImageCollection('COPERNICUS/S2_HARMONIZED')
+        .filterDate(dateStart, dateEnd)
+        .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 30))
+        .filterBounds(buffer);
+      const s2Image = s2.median();
+      const mndwi = s2Image.normalizedDifference(['B3', 'B11']).rename('mndwi');
+      const mndwiVal = mndwi.reduceRegion({
+        reducer: ee.Reducer.mean(),
+        geometry: region,
+        scale: 10,
+        maxPixels: 1e9,
+      });
+      const mndwiInfo = await eeInfo(mndwiVal);
+      waterIndex = mndwiInfo.mndwi != null ? Number(mndwiInfo.mndwi.toFixed(3)) : null;
+    } catch (e) {
+      console.error('[Monitoring] MNDWI computation failed (no S2 imagery?):', e.message);
+    }
 
-    const [backscatterInfo, mndwiInfo] = await Promise.all([
-      eeInfo(backscatter),
-      eeInfo(mndwiVal),
-    ]);
+    // SAR backscatter (may fail if no S1 imagery in date range)
+    let vv = null;
+    try {
+      const backscatterInfo = await eeInfo(backscatter);
+      vv = backscatterInfo.VV != null ? Number(backscatterInfo.VV.toFixed(2)) : null;
+    } catch (e) {
+      console.error('[Monitoring] SAR backscatter failed (no S1 imagery?):', e.message);
+    }
 
-    const vv = backscatterInfo.VV;
-    const waterIndex = mndwiInfo.mndwi;
     const floodDetected = (vv != null && vv < -18) || (waterIndex != null && waterIndex > 0.2);
 
     res.json({
       floodDetected,
-      sarBackscatter: vv != null ? Number(vv.toFixed(2)) : null,
-      mndwi: waterIndex != null ? Number(waterIndex.toFixed(3)) : null,
+      sarBackscatter: vv,
+      mndwi: waterIndex,
       dateRange: { start: dateStart, end: dateEnd },
       interpretation: floodDetected
         ? 'Potential flooding detected on or near your parcel. SAR backscatter and/or water index suggest standing water. Check the area immediately.'
@@ -331,6 +339,8 @@ exports.soilMoisture = async (req, res, next) => {
       .filterDate(dateStart, dateEnd)
       .filterBounds(region)
       .filter(ee.Filter.eq('instrumentMode', 'IW'))
+      .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV'))
+      .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VH'))
       .select(['VV', 'VH']);
 
     const s1Image = s1.mean();
@@ -526,13 +536,22 @@ exports.treeCoverLoss = async (req, res, next) => {
     const lossInfo = await eeInfo(lossArea.reduceRegion({ reducer: ee.Reducer.sum(), geometry: region, scale: 30, maxPixels: 1e9 }));
     const lossArea_sqm = lossInfo.sum ? Math.round(lossInfo.sum) : 0;
 
-    // Loss by year
+    // Loss by year — single EE call with all 23 year-bands at once
+    // (previously 23 sequential calls that timed out on Render's 60s limit)
+    const yearBands = [];
+    for (let y = 1; y <= 23; y++) {
+      yearBands.push(lossYear.eq(y).multiply(ee.Image.pixelArea()).rename(`y${y}`));
+    }
+    const allYears = ee.Image.cat(yearBands);
+    const allYearsInfo = await eeInfo(
+      allYears.reduceRegion({ reducer: ee.Reducer.sum(), geometry: region, scale: 30, maxPixels: 1e9 })
+    );
     const lossByYear = {};
     for (let y = 1; y <= 23; y++) {
-      const yearLoss = lossYear.eq(y).multiply(ee.Image.pixelArea());
-      const yearInfo = await eeInfo(yearLoss.reduceRegion({ reducer: ee.Reducer.sum(), geometry: region, scale: 30, maxPixels: 1e9 }));
-      if (yearInfo.sum && yearInfo.sum > 0) {
-        lossByYear[2000 + y] = Math.round(yearInfo.sum);
+      const key = `y${y}`;
+      const val = allYearsInfo[key];
+      if (val && val > 0) {
+        lossByYear[2000 + y] = Math.round(val);
       }
     }
 
@@ -586,15 +605,16 @@ exports.landSurfaceTemp = async (req, res, next) => {
     const image = landsat.sort('CLOUD_COVER', true).first();
 
     // Compute LST from thermal band (ST_B10)
-    const lst = image.select('ST_B10').multiply(0.00341802).add(149.0).subtract(273.15);
+    // Scale factor 0.00341802 + offset 149.0 gives Kelvin; subtract 273.15 for Celsius
+    const lst = image.select('ST_B10').multiply(0.00341802).add(149.0).subtract(273.15).rename('lst_c');
     const lstVal = await eeInfo(lst.reduceRegion({ reducer: ee.Reducer.mean(), geometry: region, scale: 100, maxPixels: 1e9 }));
 
-    const tempC = lstVal.ST_B10 != null ? Number(lstVal.ST_B10.toFixed(1)) : null;
+    const tempC = lstVal.lst_c != null ? Number(lstVal.lst_c.toFixed(1)) : null;
 
     // Also compute for surrounding area (1km buffer) for comparison
     const bufferRegion = region.buffer(1000);
     const bufferLst = await eeInfo(lst.reduceRegion({ reducer: ee.Reducer.mean(), geometry: bufferRegion, scale: 100, maxPixels: 1e9 }));
-    const bufferTempC = bufferLst.ST_B10 != null ? Number(bufferLst.ST_B10.toFixed(1)) : null;
+    const bufferTempC = bufferLst.lst_c != null ? Number(bufferLst.lst_c.toFixed(1)) : null;
 
     const heatIsland = tempC != null && bufferTempC != null ? Number((tempC - bufferTempC).toFixed(1)) : null;
 
