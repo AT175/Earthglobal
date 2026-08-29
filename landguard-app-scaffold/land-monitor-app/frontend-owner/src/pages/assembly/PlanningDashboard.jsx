@@ -611,6 +611,14 @@ export default function PlanningDashboard() {
   const [detectionBox, setDetectionBox] = useState(null);       // { geojson, bbox }
   const [drawDetectionMode, setDrawDetectionMode] = useState(false);
 
+  // FAO GAUL 2015 district selector
+  const [faoDistricts, setFAODistricts] = useState([]);          // [{ name, level }]
+  const [faoRegions, setFAORegions] = useState([]);              // [{ name, level }]
+  const [selectedDistrict, setSelectedDistrict] = useState('');  // name string
+  const [selectedDistrictBoundary, setSelectedDistrictBoundary] = useState(null); // { geojson, bbox, level }
+  const [loadingDistricts, setLoadingDistricts] = useState(false);
+  const [loadingDistrictBoundary, setLoadingDistrictBoundary] = useState(false);
+
   // Selected building
   const [selectedBuilding, setSelectedBuilding] = useState(null);
   const [editForm, setEditForm] = useState({ status: '', notes: '', in_protected_area: false });
@@ -763,21 +771,28 @@ export default function PlanningDashboard() {
   };
 
   // ── Run building detection + vectorize ──
+  // If a district is selected from the dropdown, uses that district's FAO boundary.
   // If useFAOBoundary is true, no bbox is sent — the backend uses the
   // FAO GAUL 2015 boundary for the organization's district/region.
-  // If a detection box has been drawn, use that instead of the map viewport.
+  // If a detection box has been drawn, uses that instead of the map viewport.
   const runDetection = async (useFAOBoundary = false) => {
-    if (!useFAOBoundary && !detectionBox && !mapBounds) { showToast('Map not loaded yet', 'error'); return; }
+    if (!useFAOBoundary && !selectedDistrict && !detectionBox && !mapBounds) { showToast('Map not loaded yet', 'error'); return; }
 
     setDetecting(true);
     setActivePanel(null);
     try {
-      const payload = useFAOBoundary
-        ? { useFAOBoundary: true }
-        : { bbox: detectionBox ? detectionBox.bbox : {
+      let payload;
+      if (selectedDistrict) {
+        // Selected district from dropdown takes priority
+        payload = { districtName: selectedDistrict };
+      } else if (useFAOBoundary) {
+        payload = { useFAOBoundary: true };
+      } else {
+        payload = { bbox: detectionBox ? detectionBox.bbox : {
             minLng: mapBounds.minLng, minLat: mapBounds.minLat,
             maxLng: mapBounds.maxLng, maxLat: mapBounds.maxLat,
           } };
+      }
       const { data } = await api.post('/assembly/planning/detect-buildings', payload);
 
       if (data.detected) {
@@ -1131,6 +1146,45 @@ export default function PlanningDashboard() {
     showToast('Detection area cleared — will use map viewport');
   };
 
+  // ── Load FAO GAUL 2015 districts + regions list ──
+  const loadFAODistricts = async () => {
+    setLoadingDistricts(true);
+    try {
+      const { data } = await api.get('/assembly/planning/fao-districts');
+      setFAODistricts(data.districts || []);
+      setFAORegions(data.regions || []);
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Failed to load district list', 'error');
+    } finally {
+      setLoadingDistricts(false);
+    }
+  };
+
+  // ── Select a district from the dropdown — fetch its boundary ──
+  const onSelectDistrict = async (name) => {
+    setSelectedDistrict(name);
+    if (!name) {
+      setSelectedDistrictBoundary(null);
+      return;
+    }
+    setLoadingDistrictBoundary(true);
+    try {
+      const { data } = await api.get(`/assembly/planning/fao-district-boundary?name=${encodeURIComponent(name)}`);
+      setSelectedDistrictBoundary({ geojson: data.boundary, bbox: data.bbox, level: data.level, name });
+      // Fit map to the district boundary
+      if (data.bbox) {
+        const { minLng, minLat, maxLng, maxLat } = data.bbox;
+        setMapBounds([[minLat, minLng], [maxLat, maxLng]]);
+      }
+      showToast(`${data.level === 'region' ? 'Region' : 'District'} "${name}" boundary loaded`);
+    } catch (err) {
+      setSelectedDistrictBoundary(null);
+      showToast(err.response?.data?.error || 'Failed to load district boundary', 'error');
+    } finally {
+      setLoadingDistrictBoundary(false);
+    }
+  };
+
   // ── Save parcel ──
   const saveParcel = async () => {
     if (!drawnBoundary) { showToast('Draw a boundary first', 'error'); return; }
@@ -1302,6 +1356,64 @@ export default function PlanningDashboard() {
               </div>
             </SidebarSection>
           )}
+
+          {/* ── FAO District Selector ── */}
+          <SidebarSection>
+            <SectionTitle><Globe size={14} /> FAO District Boundary</SectionTitle>
+            <div style={{ fontSize: '0.75rem', color: '#aab7d4', marginBottom: 8 }}>
+              Select a Ghana district/region to load its boundary on the map and use it for detection.
+            </div>
+            {faoDistricts.length === 0 && !loadingDistricts && (
+              <ActionBtn onClick={loadFAODistricts} style={{ width: '100%', justifyContent: 'center' }}>
+                <Globe size={12} /> Load District List
+              </ActionBtn>
+            )}
+            {loadingDistricts && (
+              <div style={{ fontSize: '0.8rem', color: '#aab7d4', padding: '8px 0' }}>
+                <Loader size={12} className="animate-spin" style={{ marginRight: 6 }} /> Loading districts…
+              </div>
+            )}
+            {faoDistricts.length > 0 && (
+              <>
+                <Select
+                  value={selectedDistrict}
+                  onChange={(e) => onSelectDistrict(e.target.value)}
+                  disabled={loadingDistrictBoundary}
+                  style={{ width: '100%' }}
+                >
+                  <option value="">— Select district/region —</option>
+                  {faoRegions.length > 0 && (
+                    <optgroup label="Regions (Level 1)">
+                      {faoRegions.map(r => (
+                        <option key={r.name} value={r.name}>{r.name}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                  <optgroup label={`Districts (Level 2) — ${faoDistricts.length}`}>
+                    {faoDistricts.map(d => (
+                      <option key={d.name} value={d.name}>{d.name}</option>
+                    ))}
+                  </optgroup>
+                </Select>
+                {loadingDistrictBoundary && (
+                  <div style={{ fontSize: '0.75rem', color: '#5ce1ff', marginTop: 6 }}>
+                    <Loader size={10} className="animate-spin" style={{ marginRight: 4 }} /> Loading boundary…
+                  </div>
+                )}
+                {selectedDistrictBoundary && (
+                  <div style={{ fontSize: '0.75rem', color: '#4ade80', marginTop: 6, padding: '6px 8px', background: 'rgba(34,197,94,0.1)', borderRadius: 6 }}>
+                    ✓ {selectedDistrictBoundary.level === 'region' ? 'Region' : 'District'}: {selectedDistrictBoundary.name}
+                    <div style={{ color: '#aab7d4', marginTop: 2 }}>
+                      Detection will use this boundary
+                    </div>
+                  </div>
+                )}
+                <ActionBtn onClick={loadFAODistricts} style={{ marginTop: 6, fontSize: '0.7rem' }}>
+                  <RefreshCw size={10} /> Refresh list
+                </ActionBtn>
+              </>
+            )}
+          </SidebarSection>
 
           <SidebarSection>
             <SectionTitle><Layers size={14} /> Map Layers</SectionTitle>
@@ -1635,6 +1747,17 @@ export default function PlanningDashboard() {
                 />
               )}
 
+              {/* Selected FAO district boundary */}
+              {selectedDistrictBoundary && (
+                <GeoJSON
+                  key={selectedDistrictBoundary.name}
+                  data={{ type: 'Feature', geometry: selectedDistrictBoundary.geojson, properties: { name: selectedDistrictBoundary.name } }}
+                  style={() => ({
+                    color: '#22c55e', fillColor: '#22c55e', fillOpacity: 0.08, weight: 3,
+                  })}
+                />
+              )}
+
               {/* Drawing tools — polygon for parcels, rectangle for detection area */}
               <DrawControl active={drawMode} onDrawn={onDrawn} shape="polygon" />
               <DrawControl active={drawDetectionMode} onDrawn={onDetectionBoxDrawn} shape="rectangle" />
@@ -1647,7 +1770,7 @@ export default function PlanningDashboard() {
               <MapButton onClick={() => runDetection(true)} disabled={detecting}
                 style={{ borderColor: 'rgba(34,197,94,0.4)', color: '#4ade80' }}>
                 {detecting ? <Loader size={16} className="animate-spin" /> : <Globe size={16} />}
-                {detecting ? 'Detecting...' : 'Detect Buildings (FAO Boundary)'}
+                {detecting ? 'Detecting...' : selectedDistrict ? `Detect (${selectedDistrict})` : 'Detect Buildings (FAO Boundary)'}
               </MapButton>
               <MapButton onClick={() => runDetection(false)} disabled={detecting}>
                 {detecting ? <Loader size={16} className="animate-spin" /> : <Satellite size={16} />}

@@ -3,7 +3,7 @@ const bcrypt = require('bcrypt');
 const bus = require('../realtime/eventBus');
 const { notifyOwnerOfAlert } = require('../services/notificationService');
 const { ee, init: initEE, isReady: eeReady } = require('../config/earthEngine');
-const { resolveFAOBoundary, getGeometryBbox } = require('../config/faoBoundary');
+const { resolveFAOBoundary, getGeometryBbox, listGhanaDistricts, listGhanaRegions, getDistrictBoundaryByName } = require('../config/faoBoundary');
 const { runBuildingChangeDetection } = require('../jobs/buildingChangeDetection');
 const { estimateBuildingHeight, compareNearbyBuildings } = require('../utils/buildingHeight');
 
@@ -582,15 +582,67 @@ exports.getDistrictBoundary = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// GET /assembly/planning/fao-districts — list all Ghana districts + regions from FAO GAUL 2015
+exports.listFAODistricts = async (req, res, next) => {
+  try {
+    const ready = await initEE();
+    if (!ready) {
+      return res.status(503).json({
+        error: 'Earth Engine is not configured. Set EE_SERVICE_ACCOUNT_JSON to enable FAO boundary lookup.',
+        districts: [],
+        regions: [],
+      });
+    }
+
+    const [districts, regions] = await Promise.all([
+      listGhanaDistricts(),
+      listGhanaRegions(),
+    ]);
+
+    res.json({ districts, regions });
+  } catch (err) { next(err); }
+};
+
+// GET /assembly/planning/fao-district-boundary?name=...&level=district|region
+// Returns the GeoJSON boundary + bbox for a specific Ghana district/region
+exports.getFAODistrictBoundary = async (req, res, next) => {
+  try {
+    const { name } = req.query;
+    if (!name) {
+      return res.status(400).json({ error: 'Missing "name" query parameter' });
+    }
+
+    const ready = await initEE();
+    if (!ready) {
+      return res.status(503).json({
+        error: 'Earth Engine is not configured. Set EE_SERVICE_ACCOUNT_JSON to enable FAO boundary lookup.',
+      });
+    }
+
+    const boundary = await getDistrictBoundaryByName(name);
+    if (!boundary) {
+      return res.status(404).json({ error: `District/region "${name}" not found in FAO GAUL 2015` });
+    }
+
+    res.json({
+      name,
+      level: boundary.level,
+      boundary: boundary.geojson,
+      bbox: boundary.bbox,
+    });
+  } catch (err) { next(err); }
+};
+
 // POST /assembly/planning/detect-buildings — run EE building detection over an area
 // Uses Google Earth Engine to detect buildings via ML.
 // If no bbox is provided, uses the FAO GAUL 2015 boundary for the organization's
 // district/region as the default area for initial building extraction.
+// If districtName is provided, uses that specific district's FAO boundary.
 // Vectorizes detected built-up clusters into polygons, saves to DB with centroid + metadata.
 exports.detectBuildings = async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
-    const { bbox, useFAOBoundary } = req.body;
+    const { bbox, useFAOBoundary, districtName } = req.body;
 
     const ready = await initEE();
     if (!ready) {
@@ -602,14 +654,29 @@ exports.detectBuildings = async (req, res, next) => {
 
     // ── Resolve the region geometry ──
     // Priority:
-    //   1. Explicit bbox from the request (map viewport)
-    //   2. FAO GAUL 2015 boundary (default for initial extraction)
-    //   3. Organization's stored boundary
+    //   1. Explicit districtName from the request (FAO boundary for selected district)
+    //   2. Explicit bbox from the request (map viewport / drawn box)
+    //   3. FAO GAUL 2015 boundary (default for initial extraction)
+    //   4. Organization's stored boundary
     let region;
     let resolvedBbox = bbox;
     let boundarySource = 'bbox';
 
-    if (bbox) {
+    if (districtName) {
+      // Use the selected district's FAO boundary
+      boundarySource = 'fao_gaul_2015_level2';
+      const boundary = await getDistrictBoundaryByName(districtName);
+      if (!boundary) {
+        return res.status(404).json({
+          error: `District "${districtName}" not found in FAO GAUL 2015`,
+          detected: false,
+        });
+      }
+      region = ee.Geometry(boundary.geojson);
+      resolvedBbox = boundary.bbox;
+      boundarySource = boundary.level === 'region' ? 'fao_gaul_2015_level1' : 'fao_gaul_2015_level2';
+      console.log(`[detectBuildings] Using selected FAO boundary (${boundarySource}): ${districtName}`);
+    } else if (bbox) {
       const [minLng, minLat, maxLng, maxLat] = [bbox.minLng, bbox.minLat, bbox.maxLng, bbox.maxLat];
       region = ee.Geometry.Rectangle([minLng, minLat, maxLng, maxLat], 'EPSG:4326', false);
       boundarySource = 'map_bbox';

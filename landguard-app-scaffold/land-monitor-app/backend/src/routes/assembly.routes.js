@@ -61,6 +61,8 @@ router.get('/planning/parcels-geojson', requireAssemblyRole('assembly_admin', 'p
 router.get('/planning/buildings-geojson', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.getBuildingsGeoJSON);
 router.get('/planning/protected-areas-geojson', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.getProtectedAreasGeoJSON);
 router.get('/planning/district-boundary', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.getDistrictBoundary);
+router.get('/planning/fao-districts', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.listFAODistricts);
+router.get('/planning/fao-district-boundary', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.getFAODistrictBoundary);
 router.get('/planning/satellite-tiles', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.getSatelliteTiles);
 router.post('/planning/detect-buildings', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.detectBuildings);
 router.post('/planning/buildings', requireAssemblyRole('assembly_admin', 'planning_officer'), ctrl.createBuilding);

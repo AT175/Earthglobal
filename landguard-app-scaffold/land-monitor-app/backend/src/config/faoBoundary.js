@@ -193,10 +193,150 @@ function evaluateFeatureList(collection, limit) {
   });
 }
 
+/**
+ * List all Ghana districts (GAUL 2015 level2) with names.
+ * Returns array of { name, level } sorted alphabetically.
+ */
+async function listGhanaDistricts() {
+  try {
+    const level2 = ee.FeatureCollection(GAUL_LEVEL2);
+    const ghanaLevel2 = level2.filter(ee.Filter.eq('ADM0_NAME', 'Ghana'));
+    const features = await evaluateFeatureList(ghanaLevel2, 300);
+    const districts = features
+      .map(f => ({
+        name: f.properties?.NAME2 || '',
+        level: 'district',
+      }))
+      .filter(d => d.name)
+      .sort((a, b) => a.name.localeCompare(b.name));
+    return districts;
+  } catch (e) {
+    console.error('[FAO] listGhanaDistricts failed:', e.message);
+    return [];
+  }
+}
+
+/**
+ * List all Ghana regions (GAUL 2015 level1) with names.
+ * Returns array of { name, level } sorted alphabetically.
+ */
+async function listGhanaRegions() {
+  try {
+    const level1 = ee.FeatureCollection(GAUL_LEVEL1);
+    const ghanaLevel1 = level1.filter(ee.Filter.eq('ADM0_NAME', 'Ghana'));
+    const features = await evaluateFeatureList(ghanaLevel1, 50);
+    const regions = features
+      .map(f => ({
+        name: f.properties?.NAME1 || '',
+        level: 'region',
+      }))
+      .filter(d => d.name)
+      .sort((a, b) => a.name.localeCompare(b.name));
+    return regions;
+  } catch (e) {
+    console.error('[FAO] listGhanaRegions failed:', e.message);
+    return [];
+  }
+}
+
+/**
+ * Get the GeoJSON geometry of a specific Ghana district by name.
+ * Returns { geojson, bbox, level } or null if not found.
+ */
+async function getDistrictBoundaryByName(districtName) {
+  if (!districtName) return null;
+  const normalized = normalizeName(districtName);
+
+  // Try level2 (district) first
+  try {
+    const level2 = ee.FeatureCollection(GAUL_LEVEL2);
+    const ghanaLevel2 = level2.filter(ee.Filter.eq('ADM0_NAME', 'Ghana'));
+
+    // Exact match first
+    let matched = ghanaLevel2.filter(ee.Filter.eq('NAME2', districtName));
+    let count = await evaluateFeatureCount(matched);
+
+    if (count === 0) {
+      // Case-insensitive / normalized match
+      const allDistricts = await evaluateFeatureList(ghanaLevel2, 300);
+      const found = allDistricts.find(f => {
+        const name2 = f.properties?.NAME2 || '';
+        return normalizeName(name2) === normalized;
+      });
+      if (found) {
+        return await featureToBoundary(found, 'district');
+      }
+    } else {
+      const feature = await evaluateFeatureList(matched, 1);
+      if (feature[0]) return await featureToBoundary(feature[0], 'district');
+    }
+  } catch (e) {
+    console.error('[FAO] getDistrictBoundaryByName level2 failed:', e.message);
+  }
+
+  // Try level1 (region) as fallback
+  try {
+    const level1 = ee.FeatureCollection(GAUL_LEVEL1);
+    const ghanaLevel1 = level1.filter(ee.Filter.eq('ADM0_NAME', 'Ghana'));
+
+    let matched = ghanaLevel1.filter(ee.Filter.eq('NAME1', districtName));
+    let count = await evaluateFeatureCount(matched);
+
+    if (count === 0) {
+      const allRegions = await evaluateFeatureList(ghanaLevel1, 50);
+      const found = allRegions.find(f => {
+        const name1 = f.properties?.NAME1 || '';
+        return normalizeName(name1) === normalized;
+      });
+      if (found) {
+        return await featureToBoundary(found, 'region');
+      }
+    } else {
+      const feature = await evaluateFeatureList(matched, 1);
+      if (feature[0]) return await featureToBoundary(feature[0], 'region');
+    }
+  } catch (e) {
+    console.error('[FAO] getDistrictBoundaryByName level1 failed:', e.message);
+  }
+
+  return null;
+}
+
+/**
+ * Convert an EE feature to { geojson, bbox, level }.
+ */
+async function featureToBoundary(feature, level) {
+  const geom = ee.Feature(feature).geometry();
+
+  // Get GeoJSON
+  const geojson = await new Promise((resolve, reject) => {
+    geom.toGeoJSON((errOrData, data) => {
+      const hasErr = data != null;
+      const actualData = hasErr ? data : errOrData;
+      const err = hasErr ? errOrData : null;
+      if (err) reject(err);
+      else resolve(actualData);
+    });
+  });
+
+  // Get bbox
+  let bbox = null;
+  try {
+    bbox = await getGeometryBbox(geom);
+  } catch (e) {
+    console.error('[FAO] bbox failed:', e.message);
+  }
+
+  return { geojson, bbox, level };
+}
+
 module.exports = {
   resolveFAOBoundary,
   getGeometryBbox,
   normalizeName,
+  listGhanaDistricts,
+  listGhanaRegions,
+  getDistrictBoundaryByName,
   GAUL_LEVEL0,
   GAUL_LEVEL1,
   GAUL_LEVEL2,
