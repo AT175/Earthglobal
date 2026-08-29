@@ -17,7 +17,7 @@ async function test() {
         reducer: ee.Reducer.mean(),
         geometry: ee.Geometry.Point([-2.3589, 7.3731]),
         scale: 10,
-      }).getInfo((err, info) => {
+      }).getInfo((info, err) => {
         if (err) {
           console.log('EE computation error:', err.message);
         } else {
