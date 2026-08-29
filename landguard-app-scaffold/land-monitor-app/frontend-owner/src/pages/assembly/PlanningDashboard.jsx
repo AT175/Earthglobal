@@ -435,7 +435,8 @@ function MapBoundsTracker({ onBoundsChange }) {
 }
 
 // ── Helper: Draw control wrapper ──
-function DrawControl({ active, onDrawn }) {
+// Supports drawing polygons (for parcels) or rectangles (for detection area)
+function DrawControl({ active, onDrawn, shape = 'polygon' }) {
   const map = useMap();
   const drawnLayerRef = useRef(null);
 
@@ -461,26 +462,52 @@ function DrawControl({ active, onDrawn }) {
       map.addLayer(drawnLayerRef.current);
     }
 
-    const drawHandler = new L.Draw.Polygon(map, {
+    const drawOptions = {
       allowIntersection: false,
       showArea: true,
       shapeOptions: {
         color: '#5ce1ff', fillColor: '#1677ff', fillOpacity: 0.2, weight: 2,
       },
-    });
+    };
+
+    const drawHandler = shape === 'rectangle'
+      ? new L.Draw.Rectangle(map, drawOptions)
+      : new L.Draw.Polygon(map, drawOptions);
     drawHandler.enable();
     map._drawHandler = drawHandler;
 
     const onDrawCreated = (e) => {
       const layer = e.layer;
-      const latlngs = layer.getLatLngs()[0];
-      const coordinates = latlngs.map(ll => [ll.lng, ll.lat]);
-      // Close the ring
-      if (coordinates.length > 0) {
-        coordinates.push([coordinates[0][0], coordinates[0][1]]);
+
+      if (shape === 'rectangle') {
+        // Rectangle — extract bounds as GeoJSON polygon
+        const bounds = layer.getBounds();
+        const ne = bounds.getNorthEast();
+        const sw = bounds.getSouthWest();
+        const coordinates = [
+          [sw.lng, sw.lat],
+          [ne.lng, sw.lat],
+          [ne.lng, ne.lat],
+          [sw.lng, ne.lat],
+          [sw.lng, sw.lat], // close the ring
+        ];
+        const geojson = { type: 'Polygon', coordinates: [coordinates] };
+        onDrawn(geojson, {
+          minLng: sw.lng, minLat: sw.lat,
+          maxLng: ne.lng, maxLat: ne.lat,
+        });
+      } else {
+        // Polygon — extract latlngs
+        const latlngs = layer.getLatLngs()[0];
+        const coordinates = latlngs.map(ll => [ll.lng, ll.lat]);
+        // Close the ring
+        if (coordinates.length > 0) {
+          coordinates.push([coordinates[0][0], coordinates[0][1]]);
+        }
+        const geojson = { type: 'Polygon', coordinates: [coordinates] };
+        onDrawn(geojson);
       }
-      const geojson = { type: 'Polygon', coordinates: [coordinates] };
-      onDrawn(geojson);
+
       drawHandler.disable();
       map._drawHandler = null;
       // Remove the drawn layer (we'll add it via GeoJSON)
@@ -496,7 +523,7 @@ function DrawControl({ active, onDrawn }) {
         map._drawHandler = null;
       }
     };
-  }, [map, active, onDrawn]);
+  }, [map, active, onDrawn, shape]);
 
   return null;
 }
@@ -579,6 +606,10 @@ export default function PlanningDashboard() {
   const [activePanel, setActivePanel] = useState(null);
   const [drawMode, setDrawMode] = useState(false);
   const [drawnBoundary, setDrawnBoundary] = useState(null);
+
+  // Detection area box (editable rectangle for building/hazard detection)
+  const [detectionBox, setDetectionBox] = useState(null);       // { geojson, bbox }
+  const [drawDetectionMode, setDrawDetectionMode] = useState(false);
 
   // Selected building
   const [selectedBuilding, setSelectedBuilding] = useState(null);
@@ -734,15 +765,19 @@ export default function PlanningDashboard() {
   // ── Run building detection + vectorize ──
   // If useFAOBoundary is true, no bbox is sent — the backend uses the
   // FAO GAUL 2015 boundary for the organization's district/region.
+  // If a detection box has been drawn, use that instead of the map viewport.
   const runDetection = async (useFAOBoundary = false) => {
-    if (!useFAOBoundary && !mapBounds) { showToast('Map not loaded yet', 'error'); return; }
+    if (!useFAOBoundary && !detectionBox && !mapBounds) { showToast('Map not loaded yet', 'error'); return; }
 
     setDetecting(true);
     setActivePanel(null);
     try {
       const payload = useFAOBoundary
         ? { useFAOBoundary: true }
-        : { bbox: { minLng: mapBounds.minLng, minLat: mapBounds.minLat, maxLng: mapBounds.maxLng, maxLat: mapBounds.maxLat } };
+        : { bbox: detectionBox ? detectionBox.bbox : {
+            minLng: mapBounds.minLng, minLat: mapBounds.minLat,
+            maxLng: mapBounds.maxLng, maxLat: mapBounds.maxLat,
+          } };
       const { data } = await api.post('/assembly/planning/detect-buildings', payload);
 
       if (data.detected) {
@@ -792,7 +827,7 @@ export default function PlanningDashboard() {
 
   // ── Run building change detection (ML time-series comparison) ──
   const runChangeDetection = async () => {
-    if (!mapBounds) { showToast('Map not loaded yet', 'error'); return; }
+    if (!detectionBox && !mapBounds) { showToast('Map not loaded yet', 'error'); return; }
 
     setChangeDetecting(true);
     setShowChangePanel(true);
@@ -800,7 +835,7 @@ export default function PlanningDashboard() {
     setChangeResult(null);
 
     try {
-      const bbox = {
+      const bbox = detectionBox ? detectionBox.bbox : {
         minLng: mapBounds.minLng, minLat: mapBounds.minLat,
         maxLng: mapBounds.maxLng, maxLat: mapBounds.maxLat,
       };
@@ -911,7 +946,7 @@ export default function PlanningDashboard() {
 
   // ── Run environmental hazard detection via EE ──
   const runHazardDetection = async () => {
-    if (!mapBounds) { showToast('Map not loaded yet', 'error'); return; }
+    if (!detectionBox && !mapBounds) { showToast('Map not loaded yet', 'error'); return; }
 
     setDetectingHazards(true);
     setShowHazardPanel(true);
@@ -919,7 +954,7 @@ export default function PlanningDashboard() {
     setHazardResult(null);
 
     try {
-      const bbox = {
+      const bbox = detectionBox ? detectionBox.bbox : {
         minLng: mapBounds.minLng, minLat: mapBounds.minLat,
         maxLng: mapBounds.maxLng, maxLat: mapBounds.maxLat,
       };
@@ -1081,6 +1116,19 @@ export default function PlanningDashboard() {
     setDrawnBoundary(geojson);
     setDrawMode(false);
     showToast('Boundary captured — fill in details and save');
+  };
+
+  // ── On detection box drawn ──
+  const onDetectionBoxDrawn = (geojson, bbox) => {
+    setDetectionBox({ geojson, bbox });
+    setDrawDetectionMode(false);
+    showToast('Detection area set — run detection to scan this area');
+  };
+
+  // ── Clear detection box ──
+  const clearDetectionBox = () => {
+    setDetectionBox(null);
+    showToast('Detection area cleared — will use map viewport');
   };
 
   // ── Save parcel ──
@@ -1576,8 +1624,20 @@ export default function PlanningDashboard() {
                 <GeoJSON data={{ type: 'Feature', geometry: drawnBoundary, properties: {} }} style={drawnParcelStyle} />
               )}
 
-              {/* Drawing tools */}
-              <DrawControl active={drawMode} onDrawn={onDrawn} />
+              {/* Detection area box (editable rectangle for detection) */}
+              {detectionBox && (
+                <GeoJSON
+                  data={{ type: 'Feature', geometry: detectionBox.geojson, properties: {} }}
+                  style={() => ({
+                    color: '#fbbf24', fillColor: '#fbbf24', fillOpacity: 0.1, weight: 3,
+                    dashArray: '8,4',
+                  })}
+                />
+              )}
+
+              {/* Drawing tools — polygon for parcels, rectangle for detection area */}
+              <DrawControl active={drawMode} onDrawn={onDrawn} shape="polygon" />
+              <DrawControl active={drawDetectionMode} onDrawn={onDetectionBoxDrawn} shape="rectangle" />
               <FitBounds bounds={mapBounds} />
               <MapBoundsTracker onBoundsChange={setMapBounds} />
             </MapContainer>
@@ -1591,8 +1651,18 @@ export default function PlanningDashboard() {
               </MapButton>
               <MapButton onClick={() => runDetection(false)} disabled={detecting}>
                 {detecting ? <Loader size={16} className="animate-spin" /> : <Satellite size={16} />}
-                {detecting ? 'Detecting...' : 'Detect (Map Viewport)'}
+                {detecting ? 'Detecting...' : detectionBox ? 'Detect (Drawn Area)' : 'Detect (Map Viewport)'}
               </MapButton>
+              <MapButton
+                onClick={() => drawDetectionMode ? setDrawDetectionMode(false) : setDrawDetectionMode(true)}
+                style={{ borderColor: drawDetectionMode ? 'rgba(251,191,36,0.6)' : 'rgba(251,191,36,0.3)', color: '#fbbf24' }}>
+                <Edit3 size={16} /> {drawDetectionMode ? 'Drawing… Click & drag on map' : 'Draw Detection Area'}
+              </MapButton>
+              {detectionBox && (
+                <MapButton onClick={clearDetectionBox} style={{ borderColor: 'rgba(239,68,68,0.3)', color: '#f87171' }}>
+                  <X size={16} /> Clear Detection Area
+                </MapButton>
+              )}
               <MapButton onClick={runChangeDetection} disabled={changeDetecting}
                 style={{ borderColor: 'rgba(239,68,68,0.4)', color: '#f87171' }}>
                 {changeDetecting ? <Loader size={16} className="animate-spin" /> : <Activity size={16} />}
@@ -1617,6 +1687,11 @@ export default function PlanningDashboard() {
               {drawMode && (
                 <MapButton onClick={() => setDrawMode(false)} style={{ borderColor: 'rgba(251,191,36,0.4)', color: '#fbbf24' }}>
                   <X size={16} /> Cancel Drawing
+                </MapButton>
+              )}
+              {drawDetectionMode && (
+                <MapButton onClick={() => setDrawDetectionMode(false)} style={{ borderColor: 'rgba(251,191,36,0.4)', color: '#fbbf24' }}>
+                  <X size={16} /> Cancel Detection Drawing
                 </MapButton>
               )}
             </MapOverlay>
