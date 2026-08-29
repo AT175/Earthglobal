@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import styled from 'styled-components';
 import {
   MapContainer, TileLayer, GeoJSON, useMap, useMapEvents,
@@ -12,7 +12,7 @@ import {
   XCircle, AlertTriangle, LogOut, Landmark, Search, Save, X, Layers,
   Ruler, Download, Upload, UserPlus, Trash2, Edit3, Plus, FileText,
   ChevronRight, Map as MapIcon, Navigation, Clock, Zap, Activity, Globe,
-  Menu,
+  Menu, LayoutDashboard, ShieldCheck, ShoppingBag,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
@@ -571,6 +571,8 @@ const DEFAULT_CENTER = [6.20, -1.85];
 
 export default function PlanningDashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const currentPath = location.pathname;
   const [user, setUser] = useState(null);
   const [orgInfo, setOrgInfo] = useState(null);
   const [parcelsFC, setParcelsFC] = useState(null);
@@ -1347,14 +1349,23 @@ export default function PlanningDashboard() {
           {/* Row 1: Nav + Org info + FAO District + Search + Tools */}
           <TopBarRow>
             <TopBarGroup>
-              <NavItem as={Link} to="/assembly/planning" $active>
+              <NavItem as={Link} to="/assembly" $active={currentPath === '/assembly'}>
+                <LayoutDashboard size={14} aria-hidden="true" /> Dashboard
+              </NavItem>
+              <NavItem as={Link} to="/assembly/planning" $active={currentPath === '/assembly/planning'}>
                 <MapIcon size={14} aria-hidden="true" /> Planning Map
               </NavItem>
-              <NavItem as={Link} to="/assembly/planning/buildings">
+              <NavItem as={Link} to="/assembly/planning/buildings" $active={currentPath === '/assembly/planning/buildings'}>
                 <Building2 size={14} aria-hidden="true" /> Buildings List
               </NavItem>
-              <NavItem as={Link} to="/assembly/planning/schemes">
+              <NavItem as={Link} to="/assembly/planning/schemes" $active={currentPath === '/assembly/planning/schemes'}>
                 <FileText size={14} aria-hidden="true" /> Schemes
+              </NavItem>
+              <NavItem as={Link} to="/assembly/validation" $active={currentPath === '/assembly/validation'}>
+                <ShieldCheck size={14} aria-hidden="true" /> Validation
+              </NavItem>
+              <NavItem as={Link} to="/assembly/marketplace" $active={currentPath === '/assembly/marketplace'}>
+                <ShoppingBag size={14} aria-hidden="true" /> Marketplace
               </NavItem>
             </TopBarGroup>
 
