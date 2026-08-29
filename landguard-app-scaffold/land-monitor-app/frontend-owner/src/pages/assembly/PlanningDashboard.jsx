@@ -1511,35 +1511,35 @@ export default function PlanningDashboard() {
         {/* ── Map ── */}
         <MapArea>
           <MapWrapper>
-            <MapContainer center={DEFAULT_CENTER} zoom={14} scrollWheelZoom maxZoom={19} minZoom={2} style={{ width: '100%', height: '100%' }}>
+            <MapContainer center={DEFAULT_CENTER} zoom={14} scrollWheelZoom maxZoom={21} minZoom={2} style={{ width: '100%', height: '100%' }}>
               {/* Base layer */}
               {baseLayer === 'satellite' && (
-                <TileLayer url={fallbackSatellite} attribution="Tiles &copy; Esri" maxZoom={19} maxNativeZoom={19} />
+                <TileLayer url={fallbackSatellite} attribution="Tiles &copy; Esri" maxZoom={21} maxNativeZoom={19} />
               )}
               {baseLayer === 'recent' && (
-                <TileLayer url={satelliteTiles?.url || fallbackSatellite} attribution={satelliteTiles?.attribution || '&copy; Copernicus Sentinel-2 via EE'} maxZoom={18} maxNativeZoom={16} />
+                <TileLayer url={satelliteTiles?.url || fallbackSatellite} attribution={satelliteTiles?.attribution || '&copy; Copernicus Sentinel-2 via EE'} maxZoom={21} maxNativeZoom={16} />
               )}
               {baseLayer === 'street' && (
-                <TileLayer url={fallbackStreet} attribution="&copy; OpenStreetMap, &copy; CARTO" maxZoom={19} maxNativeZoom={19} />
+                <TileLayer url={fallbackStreet} attribution="&copy; OpenStreetMap, &copy; CARTO" maxZoom={21} maxNativeZoom={19} />
               )}
               {baseLayer === 'detection' && detectionResult?.tileUrl && (
                 <>
-                  <TileLayer url={fallbackSatellite} attribution="" maxZoom={19} />
-                  <TileLayer url={detectionResult.tileUrl} attribution={detectionResult.attribution} maxZoom={19} opacity={0.6} />
+                  <TileLayer url={fallbackSatellite} attribution="" maxZoom={21} maxNativeZoom={19} />
+                  <TileLayer url={detectionResult.tileUrl} attribution={detectionResult.attribution} maxZoom={21} maxNativeZoom={19} opacity={0.6} />
                 </>
               )}
 
               {/* Change detection tile layers */}
               {baseLayer === 'before' && changeResult?.beforeTileUrl && (
-                <TileLayer url={changeResult.beforeTileUrl} attribution="&copy; Copernicus Sentinel-2 via EE" maxZoom={19} />
+                <TileLayer url={changeResult.beforeTileUrl} attribution="&copy; Copernicus Sentinel-2 via EE" maxZoom={21} maxNativeZoom={16} />
               )}
               {baseLayer === 'after' && changeResult?.afterTileUrl && (
-                <TileLayer url={changeResult.afterTileUrl} attribution="&copy; Copernicus Sentinel-2 via EE" maxZoom={19} />
+                <TileLayer url={changeResult.afterTileUrl} attribution="&copy; Copernicus Sentinel-2 via EE" maxZoom={21} maxNativeZoom={16} />
               )}
               {baseLayer === 'change' && changeResult?.changeTileUrl && (
                 <>
-                  <TileLayer url={changeResult.afterTileUrl || fallbackSatellite} attribution="" maxZoom={19} />
-                  <TileLayer url={changeResult.changeTileUrl} attribution="Building changes &copy; Sentinel-2 via EE" maxZoom={19} opacity={0.7} />
+                  <TileLayer url={changeResult.afterTileUrl || fallbackSatellite} attribution="" maxZoom={21} maxNativeZoom={16} />
+                  <TileLayer url={changeResult.changeTileUrl} attribution="Building changes &copy; Sentinel-2 via EE" maxZoom={21} maxNativeZoom={16} opacity={0.7} />
                 </>
               )}
 
@@ -1661,7 +1661,7 @@ export default function PlanningDashboard() {
 
               {/* Hazard detection tile overlay */}
               {baseLayer === 'hazard' && hazardResult?.tileUrl && (
-                <TileLayer url={hazardResult.tileUrl} attribution="Hazard detection &copy; Sentinel-2 via EE" maxZoom={19} opacity={0.6} />
+                <TileLayer url={hazardResult.tileUrl} attribution="Hazard detection &copy; Sentinel-2 via EE" maxZoom={21} maxNativeZoom={16} opacity={0.6} />
               )}
 
               {/* Drawn boundary preview */}

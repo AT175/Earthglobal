@@ -106,32 +106,32 @@ const fallbackTiles = {
   satellite: {
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics',
-    maxZoom: 19,
+    maxZoom: 21,
     maxNativeZoom: 19,
   },
   // High-res satellite with road/place labels overlay (turns on at zoom >= 12)
   satelliteLabels: {
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
     attribution: '',
-    maxZoom: 19,
+    maxZoom: 21,
     maxNativeZoom: 19,
   },
   terrain: {
     url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
     attribution: '&copy; OpenStreetMap contributors, &copy; OpenTopoMap',
-    maxZoom: 19,
+    maxZoom: 21,
     maxNativeZoom: 17,
   },
   street: {
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
     attribution: '&copy; OpenStreetMap contributors',
-    maxZoom: 19,
+    maxZoom: 21,
     maxNativeZoom: 19,
   },
   osm: {
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
     attribution: '&copy; OpenStreetMap contributors',
-    maxZoom: 19,
+    maxZoom: 21,
     maxNativeZoom: 19,
   },
   ndviFallback: {
@@ -197,7 +197,7 @@ function DynamicTileLayer({ layerType, eeTiles, path }) {
   // 'recent' layer: use Earth Engine Sentinel-2 tiles if available (10m/px, ~5-day cadence)
   if (layerType === 'recent') {
     if (eeTiles.satellite) {
-      return <TileLayer url={eeTiles.satellite.url} attribution={eeTiles.satellite.attribution || '&copy; Copernicus Sentinel-2 via EE'} maxZoom={18} maxNativeZoom={16} />;
+      return <TileLayer url={eeTiles.satellite.url} attribution={eeTiles.satellite.attribution || '&copy; Copernicus Sentinel-2 via EE'} maxZoom={21} maxNativeZoom={16} />;
     }
     // No EE tiles available — fall back to Esri (still works, just not "recent")
     const fb = fallbackTiles.satellite;
@@ -213,7 +213,7 @@ function DynamicTileLayer({ layerType, eeTiles, path }) {
 // Labels overlay — renders road/place names on top of satellite imagery
 function SatelliteLabelsLayer() {
   const labels = fallbackTiles.satelliteLabels;
-  return <TileLayer url={labels.url} attribution={labels.attribution} maxZoom={labels.maxZoom} maxNativeZoom={labels.maxNativeZoom} opacity={0.9} />;
+  return <TileLayer url={labels.url} attribution={labels.attribution} maxZoom={labels.maxZoom} maxNativeZoom={labels.maxNativeZoom} opacity={0.8} />;
 }
 
 /**
@@ -296,7 +296,7 @@ export default function FreeParcelMap({ path = [], center, status = 'active', he
         center={resolvedCenter ? [resolvedCenter.lat, resolvedCenter.lng] : [0, 0]}
         zoom={17}
         minZoom={2}
-        maxZoom={19}
+        maxZoom={21}
         scrollWheelZoom
         zoomControl
         style={{ width: '100%', height: '100%' }}
