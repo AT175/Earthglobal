@@ -1688,3 +1688,121 @@ function generateRuleBasedReport(parcelInfo, logs, ndviHistory) {
   return report;
 }
 
+// ═══════════════════════════════════════════════════════════
+// 20. ENCROACHMENT STATUS — fast cached summary for instant load
+//     Returns the latest encroachment state from monitoring_logs
+//     without running any EE/PostGIS queries. Used for dashboard.
+// ═══════════════════════════════════════════════════════════
+exports.encroachmentStatus = async (req, res, next) => {
+  try {
+    const parcel = await getParcel(req.params.id, req.user.id, req.user.role, req.user.isSalesManager);
+    if (!parcel) return res.status(404).json({ error: 'Parcel not found' });
+
+    // Get latest encroachment log (cached result from cron or manual run)
+    const logRes = await db.query(
+      `SELECT result, summary, detected_at
+       FROM monitoring_logs
+       WHERE parcel_id = $1 AND indicator = 'encroachment'
+       ORDER BY detected_at DESC LIMIT 1`,
+      [req.params.id]
+    );
+
+    // Also get current building count near boundary (fast PostGIS query)
+    const buildingRes = await db.query(
+      `WITH boundary_line AS (
+         SELECT ST_Boundary(boundary) AS bl FROM parcels WHERE id = $1
+       )
+       SELECT count(*) AS count,
+              min(ST_Distance(b.footprint, (SELECT bl FROM boundary_line))) AS closest_m
+       FROM buildings b
+       WHERE ST_DWithin(b.footprint, (SELECT bl FROM boundary_line), 15)
+       AND (b.parcel_id IS NULL OR b.parcel_id != $1)`,
+      [req.params.id]
+    );
+
+    const currentCount = parseInt(buildingRes.rows[0]?.count || '0');
+    const closestM = buildingRes.rows[0]?.closest_m;
+    const lastLog = logRes.rows[0];
+
+    const result = {
+      currentCount,
+      closestDistance_m: closestM != null ? Number(closestM).toFixed(1) : null,
+      lastChecked: lastLog?.detected_at || null,
+      lastSummary: lastLog?.summary || 'No encroachment check run yet',
+      lastResult: lastLog?.result
+        ? (typeof lastLog.result === 'string' ? JSON.parse(lastLog.result) : lastLog.result)
+        : null,
+      status: currentCount === 0 ? 'clear' : currentCount <= 2 ? 'watch' : 'alert',
+      monitoring: 'automatic (daily at 5:00 AM UTC)',
+    };
+
+    res.json(result);
+  } catch (err) {
+    logger.error('[Monitoring] %s', err.message);
+    next(err);
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// 21. ENCROACHMENT SUMMARY — all parcels for an owner, fast
+//     Used on the dashboard for a quick encroachment overview.
+// ═══════════════════════════════════════════════════════════
+exports.encroachmentSummary = async (req, res, next) => {
+  try {
+    // Get all parcels for this owner (or all if sales manager)
+    const parcelQuery = req.user.role === 'owner' && !req.user.isSalesManager
+      ? `SELECT p.id, p.name, p.region,
+                ST_AsGeoJSON(p.boundary) AS boundary_geojson
+         FROM parcels p WHERE p.owner_id = $1 ORDER BY p.name`
+      : `SELECT p.id, p.name, p.region,
+                ST_AsGeoJSON(p.boundary) AS boundary_geojson
+         FROM parcels p ORDER BY p.name LIMIT 100`;
+    const parcelParams = req.user.role === 'owner' && !req.user.isSalesManager ? [req.user.id] : [];
+
+    const parcelsRes = await db.query(parcelQuery, parcelParams);
+
+    const summaries = [];
+    for (const p of parcelsRes.rows) {
+      const bRes = await db.query(
+        `WITH boundary_line AS (
+           SELECT ST_Boundary(boundary) AS bl FROM parcels WHERE id = $1
+         )
+         SELECT count(*) AS count,
+                min(ST_Distance(b.footprint, (SELECT bl FROM boundary_line))) AS closest_m
+         FROM buildings b
+         WHERE ST_DWithin(b.footprint, (SELECT bl FROM boundary_line), 15)
+         AND (b.parcel_id IS NULL OR b.parcel_id != $1)`,
+        [p.id]
+      );
+      const count = parseInt(bRes.rows[0]?.count || '0');
+      summaries.push({
+        parcelId: p.id,
+        parcelName: p.name,
+        region: p.region,
+        encroachmentCount: count,
+        closestDistance_m: bRes.rows[0]?.closest_m != null
+          ? Number(bRes.rows[0].closest_m).toFixed(1) : null,
+        status: count === 0 ? 'clear' : count <= 2 ? 'watch' : 'alert',
+      });
+    }
+
+    const totalAlerts = summaries.filter(s => s.status === 'alert').length;
+    const totalWatch = summaries.filter(s => s.status === 'watch').length;
+    const totalClear = summaries.filter(s => s.status === 'clear').length;
+
+    res.json({
+      parcels: summaries,
+      totals: {
+        alert: totalAlerts,
+        watch: totalWatch,
+        clear: totalClear,
+        total: summaries.length,
+      },
+      monitoring: 'automatic (daily at 5:00 AM UTC)',
+    });
+  } catch (err) {
+    logger.error('[Monitoring] %s', err.message);
+    next(err);
+  }
+};
+

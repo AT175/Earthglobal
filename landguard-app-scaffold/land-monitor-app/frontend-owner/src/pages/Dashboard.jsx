@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, ArrowRight, Ruler, AlertTriangle, X } from 'lucide-react';
+import { MapPin, ArrowRight, Ruler, AlertTriangle, X, ShieldCheck, Eye, AlertCircle } from 'lucide-react';
 import { Card, Badge, Skeleton, AreaBarChart, AlertTrendChart, useRealTime, ConnectionStatus } from '@earthglobal/design-system';
 import api from '../services/api';
 import OwnerLayout from '../components/OwnerLayout';
@@ -128,6 +128,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [liveAlert, setLiveAlert] = useState(null);
+  const [encroachmentSummary, setEncroachmentSummary] = useState(null);
 
   const token = localStorage.getItem('token');
   const { connected, on } = useRealTime({ token });
@@ -135,8 +136,9 @@ export default function Dashboard() {
   useEffect(() => {
     const loadParcels = api.get('/parcels').then((res) => setParcels(res.data));
     const loadTrends = api.get('/alerts/trends').then((res) => setAlertTrends(res.data));
+    const loadEncroachment = api.get('/parcels/encroachment-summary/all').then((res) => setEncroachmentSummary(res.data)).catch(() => {});
 
-    Promise.all([loadParcels, loadTrends])
+    Promise.all([loadParcels, loadTrends, loadEncroachment])
       .catch((err) => {
         console.error('Failed to load dashboard data', err);
         setError('Unable to load your parcels right now.');
@@ -233,6 +235,77 @@ export default function Dashboard() {
         <ChartCard>
           <ChartTitle>Alert history (last 12 months)</ChartTitle>
           <AlertTrendChart data={alertTrends} />
+        </ChartCard>
+      )}
+
+      {!loading && !error && parcels.length > 0 && encroachmentSummary && (
+        <ChartCard>
+          <ChartTitle>
+            <ShieldCheck size={18} style={{ display: 'inline', marginRight: 6 }} />
+            Encroachment Monitor
+            <span style={{ fontSize: '0.7rem', color: '#aab7d4', marginLeft: 8, fontWeight: 400 }}>
+              Auto-checked daily
+            </span>
+          </ChartTitle>
+          <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+            <div style={{
+              padding: '10px 16px', borderRadius: 8,
+              background: encroachmentSummary.totals.alert > 0 ? 'rgba(248,113,113,0.1)' : 'rgba(34,197,94,0.08)',
+              border: `1px solid ${encroachmentSummary.totals.alert > 0 ? 'rgba(248,113,113,0.2)' : 'rgba(34,197,94,0.15)'}`,
+            }}>
+              <div style={{ fontSize: '1.5rem', fontWeight: 700, color: encroachmentSummary.totals.alert > 0 ? '#f87171' : '#22c55e' }}>
+                {encroachmentSummary.totals.alert}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: '#aab7d4' }}>Alerts</div>
+            </div>
+            <div style={{
+              padding: '10px 16px', borderRadius: 8,
+              background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.15)',
+            }}>
+              <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#fbbf24' }}>
+                {encroachmentSummary.totals.watch}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: '#aab7d4' }}>Watching</div>
+            </div>
+            <div style={{
+              padding: '10px 16px', borderRadius: 8,
+              background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.15)',
+            }}>
+              <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#22c55e' }}>
+                {encroachmentSummary.totals.clear}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: '#aab7d4' }}>Clear</div>
+            </div>
+          </div>
+          {encroachmentSummary.parcels.filter(p => p.status !== 'clear').length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {encroachmentSummary.parcels.filter(p => p.status !== 'clear').map((p) => (
+                <Link key={p.parcelId} to={`/parcels/${p.parcelId}`} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '8px 12px', borderRadius: 6, textDecoration: 'none',
+                  background: p.status === 'alert' ? 'rgba(248,113,113,0.05)' : 'rgba(251,191,36,0.05)',
+                  border: `1px solid ${p.status === 'alert' ? 'rgba(248,113,113,0.1)' : 'rgba(251,191,36,0.1)'}`,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {p.status === 'alert'
+                      ? <AlertCircle size={14} color="#f87171" />
+                      : <Eye size={14} color="#fbbf24" />}
+                    <span style={{ fontSize: '0.82rem', color: '#e0e7ff' }}>{p.parcelName}</span>
+                    <span style={{ fontSize: '0.7rem', color: '#aab7d4' }}>{p.region}</span>
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: p.status === 'alert' ? '#f87171' : '#fbbf24' }}>
+                    {p.encroachmentCount} structure(s) • {p.closestDistance_m}m
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+          {encroachmentSummary.parcels.filter(p => p.status !== 'clear').length === 0 && (
+            <div style={{ fontSize: '0.82rem', color: '#22c55e', padding: '8px 0' }}>
+              <ShieldCheck size={14} style={{ display: 'inline', marginRight: 4 }} />
+              All parcels clear — no encroachment detected.
+            </div>
+          )}
         </ChartCard>
       )}
 

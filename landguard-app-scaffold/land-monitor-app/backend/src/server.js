@@ -31,6 +31,7 @@ const { createWebSocketServer } = require('./realtime/socketServer');
 const cron = require('node-cron');
 const { run: runNdviJob } = require('./jobs/ndviChangeDetection');
 const { runScheduled: runBuildingChangeJob } = require('./jobs/buildingChangeDetection');
+const { runScheduled: runEncroachmentJob } = require('./jobs/encroachmentMonitor');
 const db = require('./config/db');
 
 // ── Auto-migrate on startup ──
@@ -176,6 +177,15 @@ runMigrations().then(() => {
         runBuildingChangeJob().catch((err) => logger.error('[Cron] Building change job error:', err.message));
       });
       logger.info('Building change detection scheduled: weekly on Sundays at 4:00 AM UTC');
+
+      // Schedule encroachment monitor — runs daily at 5:00 AM UTC
+      // Checks all parcels for new buildings within 15m of boundaries
+      // and sends instant alerts to owners via WebSocket + email/SMS
+      cron.schedule('0 5 * * *', () => {
+        logger.info('[Cron] Starting scheduled encroachment monitor...');
+        runEncroachmentJob().catch((err) => logger.error('[Cron] Encroachment job error:', err.message));
+      });
+      logger.info('Encroachment monitor scheduled: daily at 5:00 AM UTC');
     } else {
       logger.info('Cron jobs disabled in dev — set ENABLE_NDVI_CRON=true to enable');
     }

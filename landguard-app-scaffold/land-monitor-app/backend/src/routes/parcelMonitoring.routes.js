@@ -37,4 +37,9 @@ router.get('/:id/open-buildings', requireAuth, monitoring.openBuildings);
 router.get('/:id/dynamic-world', requireAuth, monitoring.dynamicWorld);
 router.get('/:id/ai-report', requireAuth, monitoring.aiReport);
 
+// Fast encroachment status (cached, instant)
+// NOTE: /encroachment-summary/all must come BEFORE /:id/* routes
+router.get('/encroachment-summary/all', requireAuth, monitoring.encroachmentSummary);
+router.get('/:id/encroachment-status', requireAuth, monitoring.encroachmentStatus);
+
 module.exports = router;
