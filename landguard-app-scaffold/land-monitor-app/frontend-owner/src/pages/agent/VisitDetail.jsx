@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import {
   Upload, CheckCircle2, Camera, Video, Radio, MapPin, Phone,
@@ -10,6 +9,7 @@ import {
   AlertCircle, ExternalLink,
 } from 'lucide-react';
 import { Card, Badge, Button, Select, Skeleton, ParcelMap } from '@earthglobal/design-system';
+import { STATUS_LABELS, VISIT_TYPE_LABELS } from '../../lib/labels';
 import api from '../../services/api';
 import AgentLayout from '../../components/AgentLayout';
 
@@ -159,8 +159,6 @@ const TYPE_COLORS = {
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
 
 export default function VisitDetail() {
-  const { t } = useTranslation();
-  const { t: tCommon } = useTranslation('common');
   const { id } = useParams();
   const navigate = useNavigate();
   const [request, setRequest] = useState(null);
@@ -322,7 +320,7 @@ export default function VisitDetail() {
   if (!request) {
     return (
       <AgentLayout>
-        <Card>{t('visitDetail.notFound')}</Card>
+        <Card>Visit request not found.</Card>
       </AgentLayout>
     );
   }
@@ -344,8 +342,8 @@ export default function VisitDetail() {
           <Icon size={28} />
         </TypeIcon>
         <HeaderInfo>
-          <Title>{t('visitDetail.visitLabel', { type: tCommon(`visitType.${request.type}`) })}</Title>
-          <Badge tone="primary">{tCommon(`status.${request.status}`)}</Badge>
+          <Title>{`${VISIT_TYPE_LABELS[request.type]} visit`}</Title>
+          <Badge tone="primary">{STATUS_LABELS[request.status]}</Badge>
         </HeaderInfo>
       </Header>
 
@@ -498,15 +496,15 @@ export default function VisitDetail() {
       {/* Status update */}
       <SectionTitle><CheckCircle2 size={20} /> Visit Status</SectionTitle>
       <StatusCard>
-        <StatusLabel>{t('visitDetail.updateStatus')}</StatusLabel>
+        <StatusLabel>Update status</StatusLabel>
         <Select
           value={request.status}
           onValueChange={handleStatusChange}
           options={[
-            { value: 'in_progress', label: tCommon('status.in_progress') },
-            { value: 'completed', label: tCommon('status.completed') },
+            { value: 'in_progress', label: 'In progress' },
+            { value: 'completed', label: 'Completed' },
           ]}
-          placeholder={t('visitDetail.updateStatus')}
+          placeholder="Update status"
           id="visit-status"
         />
       </StatusCard>
@@ -544,13 +542,13 @@ export default function VisitDetail() {
         onClick={() => fileInputRef.current?.click()}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInputRef.current?.click(); } }}
         role="button" tabIndex={0}
-        aria-label={uploading ? t('visitDetail.uploading') : t('visitDetail.uploadPrompt')}
+        aria-label={uploading ? 'Uploading...' : 'Tap to upload photos or video for this visit'}
       >
         <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple hidden onChange={handleFileSelect} />
         {uploading ? (
-          <><Loader2 size={32} style={{ margin: '0 auto 12px', animation: 'spin 1s linear infinite' }} /><p>{t('visitDetail.uploading')}</p></>
+          <><Loader2 size={32} style={{ margin: '0 auto 12px', animation: 'spin 1s linear infinite' }} /><p>Uploading...</p></>
         ) : (
-          <><Upload size={32} style={{ margin: '0 auto 12px' }} /><p>{t('visitDetail.uploadPrompt')}</p></>
+          <><Upload size={32} style={{ margin: '0 auto 12px' }} /><p>Tap to upload photos or video for this visit</p></>
         )}
       </UploadZone>
 
@@ -571,7 +569,7 @@ export default function VisitDetail() {
       {/* Action buttons */}
       <ActionRow>
         <Button variant="primary" onClick={() => handleStatusChange('completed')} disabled={request.status === 'completed'}>
-          <CheckCircle2 size={16} /> {t('visitDetail.markCompleted')}
+          <CheckCircle2 size={16} /> Mark visit as completed
         </Button>
         {request.status !== 'completed' && (
           <Button variant="ghost" onClick={() => handleStatusChange('in_progress')} disabled={request.status === 'in_progress'}>

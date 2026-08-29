@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
-import { useTranslation } from 'react-i18next';
 import {
   FileCheck, Search, Download, MapPin, Clock, CheckCircle2, XCircle,
   Award, Loader, AlertTriangle, FileText, Navigation, X, Send,
@@ -166,7 +165,6 @@ const statusColors = {
 };
 
 export default function ValidationRequests() {
-  const { t } = useTranslation();
   const { Layout } = useRoleLayout();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);

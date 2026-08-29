@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
 import { FileText, MapPin, Clock, CheckCircle2, XCircle, Navigation, User, Phone } from 'lucide-react';
 import { Card } from '@earthglobal/design-system';
 import AgentLayout from '../../components/AgentLayout';
@@ -128,7 +127,6 @@ const STATUS_COLOR = {
 const FILTERS = ['all', 'pending', 'in_review', 'onboarded', 'rejected'];
 
 export default function AgentOnboardingTasks() {
-  const { t } = useTranslation();
   const navigate = useNavigate();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -153,8 +151,8 @@ export default function AgentOnboardingTasks() {
   return (
     <AgentLayout>
       <Header>
-        <PageTitle>{t('agent.onboardingTasks', 'Onboarding Tasks')}</PageTitle>
-        <PageSubtitle>{t('agent.onboardingTasksSubtitle', 'Parcels assigned to you for survey and onboarding.')}</PageSubtitle>
+        <PageTitle>Onboarding Tasks</PageTitle>
+        <PageSubtitle>Parcels assigned to you for survey and onboarding.</PageSubtitle>
       </Header>
 
       <FilterRow>

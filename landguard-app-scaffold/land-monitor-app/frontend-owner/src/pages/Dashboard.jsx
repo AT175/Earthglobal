@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useTranslation } from 'react-i18next';
 import { MapPin, ArrowRight, Ruler, AlertTriangle, X } from 'lucide-react';
 import { Card, Badge, Skeleton, AreaBarChart, AlertTrendChart, useRealTime, ConnectionStatus } from '@earthglobal/design-system';
 import api from '../services/api';
@@ -124,7 +123,6 @@ const LiveAlertClose = styled.button`
 `;
 
 export default function Dashboard() {
-  const { t } = useTranslation();
   const [parcels, setParcels] = useState([]);
   const [alertTrends, setAlertTrends] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -141,10 +139,10 @@ export default function Dashboard() {
     Promise.all([loadParcels, loadTrends])
       .catch((err) => {
         console.error('Failed to load dashboard data', err);
-        setError(t('dashboard.error'));
+        setError('Unable to load your parcels right now.');
       })
       .finally(() => setLoading(false));
-  }, [t]);
+  }, []);
 
   // Subscribe to real-time alert events
   useEffect(() => {
@@ -153,25 +151,25 @@ export default function Dashboard() {
       const parcel = parcels.find((p) => p.id === parcelId);
       setLiveAlert({
         alertType: alert.alert_type,
-        parcelName: parcel?.name || t('dashboard.unknownParcel'),
+        parcelName: parcel?.name || 'Unknown parcel',
         parcelId,
       });
     });
     return unsubscribe;
-  }, [on, parcels, t]);
+  }, [on, parcels]);
 
   return (
     <OwnerLayout>
       <Header>
         <HeaderRow>
           <div>
-            <Title>{t('dashboard.title')}</Title>
-            <Subtitle>{t('tagline', { ns: 'common' })}</Subtitle>
+            <Title>Your Land</Title>
+            <Subtitle>See it. Check it. Secure it.</Subtitle>
           </div>
           <ConnectionStatus
             connected={connected}
-            connectedLabel={t('realtime.live', { ns: 'common' })}
-            disconnectedLabel={t('realtime.reconnecting', { ns: 'common' })}
+            connectedLabel="Live"
+            disconnectedLabel="Reconnecting…"
           />
         </HeaderRow>
       </Header>
@@ -187,17 +185,14 @@ export default function Dashboard() {
           >
             <AlertTriangle size={20} color="#f59e0b" aria-hidden="true" />
             <LiveAlertText>
-              {t('dashboard.newAlert', {
-                type: liveAlert.alertType,
-                parcel: liveAlert.parcelName,
-              })}
+              {`New ${liveAlert.alertType} alert detected on ${liveAlert.parcelName}`}
             </LiveAlertText>
             <Link to={`/parcels/${liveAlert.parcelId}`}>
-              <Badge tone="warning">{t('dashboard.viewParcel')}</Badge>
+              <Badge tone="warning">View parcel</Badge>
             </Link>
             <LiveAlertClose
               onClick={() => setLiveAlert(null)}
-              aria-label={t('realtime.dismissAlert', { ns: 'common' })}
+              aria-label="Dismiss alert"
             >
               <X size={16} aria-hidden="true" />
             </LiveAlertClose>
@@ -221,12 +216,12 @@ export default function Dashboard() {
       )}
 
       {!loading && !error && parcels.length === 0 && (
-        <EmptyState>{t('dashboard.empty')}</EmptyState>
+        <EmptyState>No parcels linked to your account yet.</EmptyState>
       )}
 
       {!loading && !error && parcels.length > 0 && (
         <ChartCard>
-          <ChartTitle>{t('dashboard.areaByParcel')}</ChartTitle>
+          <ChartTitle>Area by parcel</ChartTitle>
           <AreaBarChart
             data={parcels.map((p) => ({ name: p.name, value: Number(p.area_sqm) / 10000 }))}
             unit="ha"
@@ -236,7 +231,7 @@ export default function Dashboard() {
 
       {!loading && !error && parcels.length > 0 && alertTrends.length > 0 && (
         <ChartCard>
-          <ChartTitle>{t('dashboard.alertTrend')}</ChartTitle>
+          <ChartTitle>Alert history (last 12 months)</ChartTitle>
           <AlertTrendChart data={alertTrends} />
         </ChartCard>
       )}
@@ -260,11 +255,11 @@ export default function Dashboard() {
                 <MetaRow>
                   <MapPin size={14} aria-hidden="true" />
                   {parcel.survey_date
-                    ? t('dashboard.surveyed', { date: new Date(parcel.survey_date).toLocaleDateString() })
-                    : t('dashboard.surveyedUnknown')}
+                    ? `Surveyed ${new Date(parcel.survey_date).toLocaleDateString()}`
+                    : 'Surveyed N/A'}
                 </MetaRow>
                 <ViewLink to={`/parcels/${parcel.id}`}>
-                  {t('dashboard.viewParcel')} <ArrowRight size={14} aria-hidden="true" />
+                  View parcel <ArrowRight size={14} aria-hidden="true" />
                 </ViewLink>
               </Card>
             </motion.div>

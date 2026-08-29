@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
 import { MapPin, Navigation, Loader2 } from 'lucide-react';
 import { Card } from '@earthglobal/design-system';
 import AgentLayout from '../../components/AgentLayout';
@@ -75,7 +74,6 @@ const EmptyState = styled.div`
 `;
 
 export default function AgentParcels() {
-  const { t } = useTranslation();
   const navigate = useNavigate();
   const [parcels, setParcels] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -94,8 +92,8 @@ export default function AgentParcels() {
   return (
     <AgentLayout>
       <Header>
-        <PageTitle>{t('agent.myParcels', 'My Parcels')}</PageTitle>
-        <PageSubtitle>{t('agent.myParcelsSubtitle', 'Parcels assigned to you for survey and monitoring.')}</PageSubtitle>
+        <PageTitle>My Parcels</PageTitle>
+        <PageSubtitle>Parcels assigned to you for survey and monitoring.</PageSubtitle>
       </Header>
 
       {loading && (

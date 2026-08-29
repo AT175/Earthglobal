@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import styled from 'styled-components';
-import { useTranslation } from 'react-i18next';
 import { CheckCircle2, FileUp, Clock, XCircle, MapPin } from 'lucide-react';
 import { Card, Button, Badge } from '@earthglobal/design-system';
 import api from '../services/api';
@@ -113,7 +112,6 @@ const STATUS_TONE = {
 };
 
 export default function RequestOnboarding() {
-  const { t } = useTranslation();
   const { Layout } = useRoleLayout();
   const [form, setForm] = useState({ name: '', region: '', notes: '' });
   const [file, setFile] = useState(null);
@@ -145,7 +143,7 @@ export default function RequestOnboarding() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) {
-      setError(t('requestOnboarding.nameRequired', 'Parcel name is required'));
+      setError('Parcel name is required');
       return;
     }
     setSubmitting(true);
@@ -166,7 +164,7 @@ export default function RequestOnboarding() {
       setTimeout(() => setSuccess(false), 4000);
     } catch (err) {
       console.error('Failed to submit onboarding request', err);
-      setError(err.response?.data?.error || t('requestOnboarding.error', 'Failed to submit request'));
+      setError(err.response?.data?.error || 'Failed to submit request');
     } finally {
       setSubmitting(false);
     }
@@ -174,48 +172,48 @@ export default function RequestOnboarding() {
 
   return (
     <Layout>
-      <Title>{t('requestOnboarding.title', 'Request Parcel Onboarding')}</Title>
+      <Title>Request Parcel Onboarding</Title>
       <Subtitle>
-        {t('requestOnboarding.subtitle', 'Ask our team to survey and register a new parcel on your behalf. Upload your site plan, deed, or sketch to speed up review.')}
+        Ask our team to survey and register a new parcel on your behalf. Upload your site plan, deed, or sketch to speed up review.
       </Subtitle>
 
       <Layout2Col>
         <FormCard as="form" onSubmit={handleSubmit}>
           <FieldGroup>
-            <FieldLabel htmlFor="name">{t('requestOnboarding.nameLabel', 'Parcel Name *')}</FieldLabel>
+            <FieldLabel htmlFor="name">Parcel Name *</FieldLabel>
             <StyledInput
               id="name"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder={t('requestOnboarding.namePlaceholder', 'e.g. Farm at Manso Nkwanta')}
+              placeholder="e.g. Farm at Manso Nkwanta"
             />
           </FieldGroup>
 
           <FieldGroup>
-            <FieldLabel htmlFor="region">{t('requestOnboarding.regionLabel', 'Region')}</FieldLabel>
+            <FieldLabel htmlFor="region">Region</FieldLabel>
             <StyledInput
               id="region"
               value={form.region}
               onChange={(e) => setForm({ ...form, region: e.target.value })}
-              placeholder={t('requestOnboarding.regionPlaceholder', 'e.g. Ashanti Region')}
+              placeholder="e.g. Ashanti Region"
             />
           </FieldGroup>
 
           <FieldGroup>
-            <FieldLabel htmlFor="notes">{t('requestOnboarding.notesLabel', 'Notes for the survey team')}</FieldLabel>
+            <FieldLabel htmlFor="notes">Notes for the survey team</FieldLabel>
             <StyledTextArea
               id="notes"
               value={form.notes}
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              placeholder={t('requestOnboarding.notesPlaceholder', 'Nearby landmarks, access directions, boundary markers...')}
+              placeholder="Nearby landmarks, access directions, boundary markers..."
             />
           </FieldGroup>
 
           <FieldGroup>
-            <FieldLabel>{t('requestOnboarding.docLabel', 'Site plan / deed / sketch (optional)')}</FieldLabel>
+            <FieldLabel>Site plan / deed / sketch (optional)</FieldLabel>
             <DropZone>
               <FileUp size={22} />
-              {file ? file.name : t('requestOnboarding.docPlaceholder', 'Click to upload a document or image')}
+              {file ? file.name : 'Click to upload a document or image'}
               <input
                 type="file"
                 accept=".pdf,.png,.jpg,.jpeg,.geojson,.json"
@@ -229,27 +227,27 @@ export default function RequestOnboarding() {
           )}
           {success && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#4ade80', marginBottom: 16, fontSize: '0.9rem' }}>
-              <CheckCircle2 size={18} /> {t('requestOnboarding.success', 'Request submitted! Our team will review it shortly.')}
+              <CheckCircle2 size={18} /> Request submitted! Our team will review it shortly.
             </div>
           )}
 
           <Button type="submit" disabled={submitting} fullWidth>
-            {submitting ? t('requestOnboarding.submitting', 'Submitting...') : t('requestOnboarding.submit', 'Submit Request')}
+            {submitting ? 'Submitting...' : 'Submit Request'}
           </Button>
         </FormCard>
 
         <Card>
-          <h2 style={{ fontSize: '1.1rem', marginBottom: 16 }}>{t('requestOnboarding.myRequests', 'My Onboarding Requests')}</h2>
-          {loading && <p style={{ color: '#9ca3af' }}>{t('requestOnboarding.loading', 'Loading...')}</p>}
+          <h2 style={{ fontSize: '1.1rem', marginBottom: 16 }}>My Onboarding Requests</h2>
+          {loading && <p style={{ color: '#9ca3af' }}>Loading...</p>}
           {!loading && requests.length === 0 && (
-            <p style={{ color: '#9ca3af' }}>{t('requestOnboarding.empty', 'You have not requested any parcel onboarding yet.')}</p>
+            <p style={{ color: '#9ca3af' }}>You have not requested any parcel onboarding yet.</p>
           )}
           {!loading && requests.map((r) => (
             <RequestRow key={r.id}>
               <div>
                 <RequestName>{r.name}</RequestName>
                 <RequestMeta>
-                  <MapPin size={12} /> {r.region || t('requestOnboarding.noRegion', 'No region set')}
+                  <MapPin size={12} /> {r.region || 'No region set'}
                   <Clock size={12} style={{ marginLeft: 8 }} />
                   {new Date(r.requested_at).toLocaleDateString()}
                 </RequestMeta>
@@ -260,7 +258,7 @@ export default function RequestOnboarding() {
                 )}
               </div>
               <Badge tone={STATUS_TONE[r.status] || 'neutral'}>
-                {t(`requestOnboarding.status.${r.status}`, r.status)}
+                {r.status}
               </Badge>
             </RequestRow>
           ))}

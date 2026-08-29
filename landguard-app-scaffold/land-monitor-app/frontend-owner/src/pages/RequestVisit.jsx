@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { useTranslation } from 'react-i18next';
 import { Camera, Video, Radio, CheckCircle2 } from 'lucide-react';
 import { Card, Button } from '@earthglobal/design-system';
 import api from '../services/api';
 import { useRoleLayout } from '../hooks/useRoleLayout';
+import { VISIT_TYPE_LABELS } from '../lib/labels';
 
 const Title = styled.h1`
   font-size: ${({ theme }) => theme.fontSizes['2xl']};
@@ -75,8 +75,6 @@ const VISIT_TYPES = [
 ];
 
 export default function RequestVisit() {
-  const { t } = useTranslation();
-  const { t: tCommon } = useTranslation('common');
   const { id } = useParams();
   const navigate = useNavigate();
   const { Layout, routePrefix } = useRoleLayout();
@@ -96,7 +94,7 @@ export default function RequestVisit() {
       setTimeout(() => navigate(`${routePrefix}/parcels/${id}`), 1500);
     } catch (err) {
       console.error('Failed to create visit request', err);
-      setError(err.response?.data?.error || t('requestVisit.error'));
+      setError(err.response?.data?.error || 'Something went wrong submitting your request. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -104,11 +102,11 @@ export default function RequestVisit() {
 
   return (
     <Layout>
-      <Title>{t('requestVisit.title')}</Title>
+      <Title>Request a Visit</Title>
       <FormCard as="form" onSubmit={handleSubmit}>
         <Fieldset>
-          <Legend>{t('requestVisit.question')}</Legend>
-          <OptionGrid role="radiogroup" aria-label={t('requestVisit.question')}>
+          <Legend>What kind of visit do you need?</Legend>
+          <OptionGrid role="radiogroup" aria-label="What kind of visit do you need?">
             {VISIT_TYPES.map(({ value, labelKey, icon: Icon }) => (
               <OptionLabel key={value} $checked={type === value}>
                 <input
@@ -119,7 +117,7 @@ export default function RequestVisit() {
                   onChange={() => setType(value)}
                 />
                 <Icon size={20} aria-hidden="true" />
-                {tCommon(`visitType.${labelKey}`)}
+                {VISIT_TYPE_LABELS[labelKey]}
               </OptionLabel>
             ))}
           </OptionGrid>
@@ -127,13 +125,13 @@ export default function RequestVisit() {
 
         <div style={{ marginBottom: 16 }}>
           <label htmlFor="notes" style={{ display: 'block', fontSize: '0.875rem', color: '#9ca3af', marginBottom: 6 }}>
-            {t('requestVisit.notesLabel')}
+            Notes (optional)
           </label>
           <textarea
             id="notes"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder={t('requestVisit.notesPlaceholder')}
+            placeholder="Any specific instructions or details for the agent..."
             style={{
               width: '100%',
               minHeight: 80,
@@ -157,12 +155,12 @@ export default function RequestVisit() {
 
         {success && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#4ade80', marginBottom: 16, fontSize: '0.9rem' }}>
-            <CheckCircle2 size={18} /> {t('requestVisit.success')}
+            <CheckCircle2 size={18} /> Visit request submitted successfully! Redirecting...
           </div>
         )}
 
         <Button type="submit" disabled={submitting || success} fullWidth>
-          {submitting ? t('requestVisit.submitting') : t('requestVisit.submit')}
+          {submitting ? 'Submitting...' : 'Submit request'}
         </Button>
       </FormCard>
     </Layout>

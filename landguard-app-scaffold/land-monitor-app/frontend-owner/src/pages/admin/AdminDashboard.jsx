@@ -2,13 +2,13 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import styled from 'styled-components';
-import { useTranslation } from 'react-i18next';
 import {
   MapPin, Users, Building2, Camera, AlertTriangle, DollarSign,
   TrendingUp, Clock, CheckCircle2, ArrowRight, LogOut,
 } from 'lucide-react';
 import AdminLayout from '../../components/AdminLayout';
 import api from '../../services/api';
+import { VISIT_TYPE_LABELS } from '../../lib/labels';
 
 const Page = styled.div`
   color: ${({ theme }) => theme.colors.text};
@@ -215,8 +215,6 @@ const statusColors = {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const { t: tCommon } = useTranslation('common');
-  const { t } = useTranslation();
   const [stats, setStats] = useState(null);
   const [activity, setActivity] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -230,79 +228,79 @@ export default function AdminDashboard() {
       setStats(s.data);
       setActivity(a.data);
     }).catch((err) => {
-      setError(err.response?.data?.error || t('adminDashboard.error'));
+      setError(err.response?.data?.error || 'Failed to load dashboard data');
     }).finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <AdminLayout><Loading>{t('adminDashboard.loading')}</Loading></AdminLayout>;
+  if (loading) return <AdminLayout><Loading>Loading dashboard...</Loading></AdminLayout>;
   if (error) return <AdminLayout><ErrorBox>{error}</ErrorBox></AdminLayout>;
 
   return (
     <AdminLayout>
       <Page>
         <Header>
-          <PageTitle>{t('adminDashboard.title')}</PageTitle>
-          <PageSubtitle>{t('adminDashboard.subtitle')}</PageSubtitle>
+          <PageTitle>Admin Dashboard</PageTitle>
+          <PageSubtitle>Overview of parcels, agents, visits, and alerts across the platform.</PageSubtitle>
         </Header>
 
         <StatsGrid>
           <StatCard $color="#1677ff" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <StatIcon $bg="rgba(22,119,255,0.15)" $color="#3ba7ff"><MapPin size={20} /></StatIcon>
             <StatValue>{stats.parcels}</StatValue>
-            <StatLabel>{t('adminDashboard.registeredParcels')}</StatLabel>
+            <StatLabel>Registered Parcels</StatLabel>
           </StatCard>
 
           <StatCard $color="#22c55e" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
             <StatIcon $bg="rgba(34,197,94,0.15)" $color="#4ade80"><Users size={20} /></StatIcon>
             <StatValue>{stats.owners}</StatValue>
-            <StatLabel>{t('adminDashboard.landOwners')}</StatLabel>
+            <StatLabel>Land Owners</StatLabel>
           </StatCard>
 
           <StatCard $color="#a855f7" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
             <StatIcon $bg="rgba(168,85,247,0.15)" $color="#c084fc"><Building2 size={20} /></StatIcon>
             <StatValue>{stats.agents.active}</StatValue>
-            <StatLabel>{t('adminDashboard.activeAgents')}</StatLabel>
-            <StatSub><span>{t('adminDashboard.ofTotal', { count: stats.agents.total })}</span></StatSub>
+            <StatLabel>Active Agents</StatLabel>
+            <StatSub><span>{`of ${stats.agents.total} total`}</span></StatSub>
           </StatCard>
 
           <StatCard $color="#fbbf24" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
             <StatIcon $bg="rgba(251,191,36,0.15)" $color="#fbbf24"><Camera size={20} /></StatIcon>
             <StatValue>{stats.visits.completed}</StatValue>
-            <StatLabel>{t('adminDashboard.completedVisits')}</StatLabel>
+            <StatLabel>Completed Visits</StatLabel>
             <StatSub>
-              <span><Clock size={11} /> {stats.visits.pending} {t('adminDashboard.pending')}</span>
+              <span><Clock size={11} /> {stats.visits.pending} pending</span>
             </StatSub>
           </StatCard>
 
           <StatCard $color="#ef4444" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
             <StatIcon $bg="rgba(239,68,68,0.15)" $color="#f87171"><AlertTriangle size={20} /></StatIcon>
             <StatValue>{stats.alerts.unverified}</StatValue>
-            <StatLabel>{t('adminDashboard.unverifiedAlerts')}</StatLabel>
-            <StatSub><span>{t('adminDashboard.ofTotal', { count: stats.alerts.total })}</span></StatSub>
+            <StatLabel>Unverified Alerts</StatLabel>
+            <StatSub><span>{`of ${stats.alerts.total} total`}</span></StatSub>
           </StatCard>
 
           <StatCard $color="#22c55e" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
             <StatIcon $bg="rgba(34,197,94,0.15)" $color="#4ade80"><DollarSign size={20} /></StatIcon>
             <StatValue>{fmtMoney(stats.revenue)}</StatValue>
-            <StatLabel>{t('adminDashboard.revenueCollected')}</StatLabel>
+            <StatLabel>Revenue Collected</StatLabel>
           </StatCard>
         </StatsGrid>
 
         <Grid2>
           <Panel>
             <PanelHeader>
-              <PanelTitle><MapPin size={18} /> {t('adminDashboard.recentParcels')}</PanelTitle>
-              <ViewAllLink to="/admin/parcels">{t('adminDashboard.viewAll')} <ArrowRight size={14} /></ViewAllLink>
+              <PanelTitle><MapPin size={18} /> Recent Parcels</PanelTitle>
+              <ViewAllLink to="/admin/parcels">View all <ArrowRight size={14} /></ViewAllLink>
             </PanelHeader>
             <ActivityList>
               {activity.parcels.length === 0 ? (
-                <Loading style={{ padding: '2rem' }}>{t('adminDashboard.noParcelsYet')}</Loading>
+                <Loading style={{ padding: '2rem' }}>No parcels yet</Loading>
               ) : activity.parcels.map((p) => (
                 <ActivityItem key={p.id}>
                   <ActivityIcon $bg="rgba(22,119,255,0.15)" $color="#3ba7ff"><MapPin size={16} /></ActivityIcon>
                   <ActivityInfo>
                     <ActivityTitle>{p.name}</ActivityTitle>
-                    <ActivityMeta>{p.region || t('adminDashboard.noRegion')} - {p.owner_name || t('adminDashboard.unknownOwner')}</ActivityMeta>
+                    <ActivityMeta>{p.region || 'No region'} - {p.owner_name || 'Unknown owner'}</ActivityMeta>
                   </ActivityInfo>
                   <ActivityMeta>{fmtDate(p.created_at)}</ActivityMeta>
                 </ActivityItem>
@@ -312,17 +310,17 @@ export default function AdminDashboard() {
 
           <Panel>
             <PanelHeader>
-              <PanelTitle><Camera size={18} /> {t('adminDashboard.recentVisits')}</PanelTitle>
+              <PanelTitle><Camera size={18} /> Recent Visits</PanelTitle>
             </PanelHeader>
             <ActivityList>
               {activity.visits.length === 0 ? (
-                <Loading style={{ padding: '2rem' }}>{t('adminDashboard.noVisitsYet')}</Loading>
+                <Loading style={{ padding: '2rem' }}>No visits yet</Loading>
               ) : activity.visits.map((v) => (
                 <ActivityItem key={v.id}>
                   <ActivityIcon $bg="rgba(251,191,36,0.15)" $color="#fbbf24"><Camera size={16} /></ActivityIcon>
                   <ActivityInfo>
-                    <ActivityTitle>{v.parcel_name || t('adminDashboard.unknownParcel')}</ActivityTitle>
-                    <ActivityMeta>{tCommon(`visitType.${v.type}`)} {t('adminDashboard.visit')}</ActivityMeta>
+                    <ActivityTitle>{v.parcel_name || 'Unknown parcel'}</ActivityTitle>
+                    <ActivityMeta>{VISIT_TYPE_LABELS[v.type]} visit</ActivityMeta>
                   </ActivityInfo>
                   <StatusBadge $bg={statusColors[v.status]?.bg} $color={statusColors[v.status]?.color}>
                     {v.status.replace(/_/g, ' ')}
@@ -334,22 +332,22 @@ export default function AdminDashboard() {
 
           <Panel>
             <PanelHeader>
-              <PanelTitle><AlertTriangle size={18} /> {t('adminDashboard.recentAlerts')}</PanelTitle>
+              <PanelTitle><AlertTriangle size={18} /> Recent Alerts</PanelTitle>
             </PanelHeader>
             <ActivityList>
               {activity.alerts.length === 0 ? (
-                <Loading style={{ padding: '2rem' }}>{t('adminDashboard.noAlertsYet')}</Loading>
+                <Loading style={{ padding: '2rem' }}>No alerts yet</Loading>
               ) : activity.alerts.map((a) => (
                 <ActivityItem key={a.id}>
                   <ActivityIcon $bg="rgba(239,68,68,0.15)" $color="#f87171"><AlertTriangle size={16} /></ActivityIcon>
                   <ActivityInfo>
-                    <ActivityTitle>{a.parcel_name || t('adminDashboard.unknownParcel')}</ActivityTitle>
+                    <ActivityTitle>{a.parcel_name || 'Unknown parcel'}</ActivityTitle>
                     <ActivityMeta>{a.alert_type.replace(/_/g, ' ')}</ActivityMeta>
                   </ActivityInfo>
                   {a.verified ? (
-                    <StatusBadge $bg="rgba(34,197,94,0.15)" $color="#4ade80"><CheckCircle2 size={12} /> {t('adminDashboard.verified')}</StatusBadge>
+                    <StatusBadge $bg="rgba(34,197,94,0.15)" $color="#4ade80"><CheckCircle2 size={12} /> verified</StatusBadge>
                   ) : (
-                    <StatusBadge $bg="rgba(251,191,36,0.15)" $color="#fbbf24"><Clock size={12} /> {t('adminDashboard.pending')}</StatusBadge>
+                    <StatusBadge $bg="rgba(251,191,36,0.15)" $color="#fbbf24"><Clock size={12} /> pending</StatusBadge>
                   )}
                 </ActivityItem>
               ))}
@@ -358,27 +356,27 @@ export default function AdminDashboard() {
 
           <Panel>
             <PanelHeader>
-              <PanelTitle><TrendingUp size={18} /> {t('adminDashboard.quickActions')}</PanelTitle>
+              <PanelTitle><TrendingUp size={18} /> Quick Actions</PanelTitle>
             </PanelHeader>
             <ActivityList>
               <Link to="/admin" style={{ textDecoration: 'none' }}>
                 <ActivityItem>
                   <ActivityIcon $bg="rgba(22,119,255,0.15)" $color="#3ba7ff"><MapPin size={16} /></ActivityIcon>
-                  <ActivityInfo><ActivityTitle>{t('adminDashboard.onboardingRequests', { defaultValue: t('adminDashboard.onboardNewParcel') })}</ActivityTitle><ActivityMeta>{t('adminDashboard.onboardingRequestsDesc', { defaultValue: t('adminDashboard.onboardNewParcelDesc') })}</ActivityMeta></ActivityInfo>
+                  <ActivityInfo><ActivityTitle>Onboard New Parcel</ActivityTitle><ActivityMeta>Add a new land parcel with GPS or file import</ActivityMeta></ActivityInfo>
                   <ArrowRight size={16} color="#aab7d4" />
                 </ActivityItem>
               </Link>
               <Link to="/admin/agents" style={{ textDecoration: 'none' }}>
                 <ActivityItem>
                   <ActivityIcon $bg="rgba(168,85,247,0.15)" $color="#c084fc"><Users size={16} /></ActivityIcon>
-                  <ActivityInfo><ActivityTitle>{t('adminDashboard.manageAgents')}</ActivityTitle><ActivityMeta>{t('adminDashboard.manageAgentsDesc')}</ActivityMeta></ActivityInfo>
+                  <ActivityInfo><ActivityTitle>Manage Agents</ActivityTitle><ActivityMeta>Add, activate, or deactivate field agents</ActivityMeta></ActivityInfo>
                   <ArrowRight size={16} color="#aab7d4" />
                 </ActivityItem>
               </Link>
               <Link to="/admin/parcels" style={{ textDecoration: 'none' }}>
                 <ActivityItem>
                   <ActivityIcon $bg="rgba(34,197,94,0.15)" $color="#4ade80"><Building2 size={16} /></ActivityIcon>
-                  <ActivityInfo><ActivityTitle>{t('adminDashboard.viewAllParcels')}</ActivityTitle><ActivityMeta>{t('adminDashboard.viewAllParcelsDesc')}</ActivityMeta></ActivityInfo>
+                  <ActivityInfo><ActivityTitle>View All Parcels</ActivityTitle><ActivityMeta>Browse and search registered parcels</ActivityMeta></ActivityInfo>
                   <ArrowRight size={16} color="#aab7d4" />
                 </ActivityItem>
               </Link>

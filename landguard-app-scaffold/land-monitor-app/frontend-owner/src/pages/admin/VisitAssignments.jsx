@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import styled from 'styled-components';
 import { motion } from 'framer-motion';
-import { useTranslation } from 'react-i18next';
 import {
   ClipboardList, Camera, Video, Radio, MapPin, Phone, Calendar,
   User, ChevronDown, Check, AlertCircle, Loader2, UserCheck,
@@ -9,6 +8,7 @@ import {
 import { Card, Badge, Button, Skeleton } from '@earthglobal/design-system';
 import AdminLayout from '../../components/AdminLayout';
 import api from '../../services/api';
+import { VISIT_TYPE_LABELS } from '../../lib/labels';
 
 const Title = styled.h1`
   font-size: 1.5rem;
@@ -147,7 +147,6 @@ const fmtDate = (d) => d
   : '—';
 
 export default function VisitAssignments() {
-  const { t: tCommon } = useTranslation('common');
   const [visits, setVisits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [assigning, setAssigning] = useState(null);
@@ -239,7 +238,7 @@ export default function VisitAssignments() {
                   <VisitHeader>
                     <VisitType>
                       <Icon size={20} style={{ color }} />
-                      {tCommon(`visitType.${visit.type}`)} — {visit.parcel_name}
+                      {VISIT_TYPE_LABELS[visit.type]} — {visit.parcel_name}
                     </VisitType>
                     <Badge tone="warning">Pending</Badge>
                   </VisitHeader>

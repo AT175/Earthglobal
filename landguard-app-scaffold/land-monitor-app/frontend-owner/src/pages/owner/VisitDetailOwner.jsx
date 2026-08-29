@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import {
   Camera, Video, Radio, MapPin, Phone, Calendar, User, ArrowLeft,
@@ -10,6 +9,7 @@ import {
 import { Card, Badge, Button, Skeleton, ParcelMap } from '@earthglobal/design-system';
 import api from '../../services/api';
 import { useRoleLayout } from '../../hooks/useRoleLayout';
+import { STATUS_LABELS, VISIT_TYPE_LABELS } from '../../lib/labels';
 
 const BackBtn = styled.button`
   display: flex;
@@ -170,8 +170,6 @@ const fmtDateTime = (d) => d
   : '—';
 
 export default function VisitDetailOwner() {
-  const { t } = useTranslation();
-  const { t: tCommon } = useTranslation('common');
   const { id } = useParams();
   const navigate = useNavigate();
   const { Layout, routePrefix } = useRoleLayout();
@@ -226,13 +224,13 @@ export default function VisitDetailOwner() {
           <Icon size={28} />
         </TypeIcon>
         <HeaderInfo>
-          <Title>{tCommon(`visitType.${visit.type}`)} Visit — {visit.parcel_name}</Title>
+          <Title>{VISIT_TYPE_LABELS[visit.type]} Visit — {visit.parcel_name}</Title>
           <Badge tone={
             visit.status === 'completed' ? 'success' :
             visit.status === 'in_progress' ? 'primary' :
             visit.status === 'cancelled' ? 'neutral' : 'warning'
           }>
-            {tCommon(`status.${visit.status}`)}
+            {STATUS_LABELS[visit.status]}
           </Badge>
         </HeaderInfo>
       </Header>

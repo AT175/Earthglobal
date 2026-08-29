@@ -1,13 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import {
   Camera, Video, Radio, ChevronRight, CheckCircle2, Clock,
   Loader2, ClipboardList, Film, MapPin, Phone, Calendar, Inbox,
 } from 'lucide-react';
 import { Card, Badge, Skeleton, useRealTime, ConnectionStatus } from '@earthglobal/design-system';
+import { STATUS_LABELS, VISIT_TYPE_LABELS, REALTIME_LABELS } from '../../lib/labels';
 import api from '../../services/api';
 import AgentLayout from '../../components/AgentLayout';
 
@@ -183,8 +183,6 @@ const fmtDate = (d) => d
 
 // ── Component ──
 export default function VisitList() {
-  const { t } = useTranslation();
-  const { t: tCommon } = useTranslation('common');
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [requests, setRequests] = useState([]);
@@ -230,11 +228,11 @@ export default function VisitList() {
   return (
     <AgentLayout>
       <Header>
-        <Title>{t('visitList.title')}</Title>
+        <Title>My Assigned Visits</Title>
         <ConnectionStatus
           connected={connected}
-          connectedLabel={tCommon('realtime.live')}
-          disconnectedLabel={tCommon('realtime.reconnecting')}
+          connectedLabel={REALTIME_LABELS.live}
+          disconnectedLabel={REALTIME_LABELS.reconnecting}
         />
       </Header>
 
@@ -295,7 +293,7 @@ export default function VisitList() {
       {!loading && requests.length === 0 && (
         <EmptyState>
           <EmptyIcon><ClipboardList size={48} /></EmptyIcon>
-          <p>{t('visitList.empty')}</p>
+          <p>No visits assigned yet.</p>
         </EmptyState>
       )}
 
@@ -323,7 +321,7 @@ export default function VisitList() {
                       <Icon size={20} />
                     </VisitTypeIcon>
                     <VisitInfo>
-                      <VisitTitle>{tCommon(`visitType.${r.type}`)} — {parcelName}</VisitTitle>
+                      <VisitTitle>{VISIT_TYPE_LABELS[r.type]} — {parcelName}</VisitTitle>
                       <VisitMeta>
                         <VisitMetaItem>
                           <Calendar size={12} /> {fmtDate(r.requested_at)}
@@ -348,7 +346,7 @@ export default function VisitList() {
                   </VisitLeft>
                   <VisitRight>
                     <Badge tone={STATUS_TONE[r.status] || 'neutral'}>
-                      {tCommon(`status.${r.status}`)}
+                      {STATUS_LABELS[r.status]}
                     </Badge>
                     <ChevronRight size={18} style={{ color: 'var(--textMuted)', opacity: 0.5 }} />
                   </VisitRight>

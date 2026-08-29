@@ -1,13 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import {
   Camera, Video, Radio, MapPin, Phone, Calendar, User,
   Inbox, Loader2, Check, AlertCircle, Hand,
 } from 'lucide-react';
 import { Card, Badge, Button, Skeleton } from '@earthglobal/design-system';
+import { VISIT_TYPE_LABELS } from '../../lib/labels';
 import api from '../../services/api';
 import AgentLayout from '../../components/AgentLayout';
 
@@ -82,8 +82,6 @@ const fmtDate = (d) => d
   : '—';
 
 export default function AvailableVisits() {
-  const { t } = useTranslation();
-  const { t: tCommon } = useTranslation('common');
   const navigate = useNavigate();
   const [visits, setVisits] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -162,7 +160,7 @@ export default function AvailableVisits() {
                   <CardHeader>
                     <VisitType>
                       <Icon size={20} style={{ color }} />
-                      {tCommon(`visitType.${visit.type}`)} — {visit.parcel_name}
+                      {VISIT_TYPE_LABELS[visit.type]} — {visit.parcel_name}
                     </VisitType>
                     <Badge tone="warning">Available</Badge>
                   </CardHeader>

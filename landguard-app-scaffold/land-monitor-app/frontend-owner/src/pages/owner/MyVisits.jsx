@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
-import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import {
   Camera, Video, Radio, ChevronRight, MapPin, Calendar, User,
@@ -10,6 +9,7 @@ import {
 import { Card, Badge, Skeleton } from '@earthglobal/design-system';
 import api from '../../services/api';
 import { useRoleLayout } from '../../hooks/useRoleLayout';
+import { STATUS_LABELS, VISIT_TYPE_LABELS } from '../../lib/labels';
 
 const Title = styled.h1`
   font-size: ${({ theme }) => theme.fontSizes['2xl']};
@@ -169,8 +169,6 @@ const fmtDate = (d) => d
   : '—';
 
 export default function MyVisits() {
-  const { t } = useTranslation();
-  const { t: tCommon } = useTranslation('common');
   const { Layout, routePrefix } = useRoleLayout();
   const [visits, setVisits] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -260,7 +258,7 @@ export default function MyVisits() {
                       <Icon size={20} />
                     </VisitTypeIcon>
                     <VisitInfo>
-                      <VisitTitle>{tCommon(`visitType.${v.type}`)} — {v.parcel_name || 'Parcel'}</VisitTitle>
+                      <VisitTitle>{VISIT_TYPE_LABELS[v.type]} — {v.parcel_name || 'Parcel'}</VisitTitle>
                       <VisitMeta>
                         <VisitMetaItem><Calendar size={12} /> {fmtDate(v.requested_at)}</VisitMetaItem>
                         {v.region && <VisitMetaItem><MapPin size={12} /> {v.region}</VisitMetaItem>}
@@ -273,7 +271,7 @@ export default function MyVisits() {
                   </VisitLeft>
                   <VisitRight>
                     <Badge tone={STATUS_TONE[v.status] || 'neutral'}>
-                      {tCommon(`status.${v.status}`)}
+                      {STATUS_LABELS[v.status]}
                     </Badge>
                     <ChevronRight size={18} style={{ opacity: 0.4 }} />
                   </VisitRight>

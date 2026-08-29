@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
 import styled from 'styled-components';
 import { ClipboardList, User, LogOut, MapPin, Smartphone, Inbox, Map, FileCheck } from 'lucide-react';
-import { LanguageSwitcher } from '@earthglobal/design-system';
 
 const NAV_ITEMS = [
   { to: '/agent', labelKey: 'nav.myVisits', fallbackLabel: 'My Visits', icon: ClipboardList },
@@ -128,7 +126,6 @@ const Tab = styled.button`
 export default function AgentLayout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { t } = useTranslation('common');
   const [user, setUser] = useState(null);
 
   useEffect(() => {
@@ -136,10 +133,7 @@ export default function AgentLayout({ children }) {
     if (userStr) setUser(JSON.parse(userStr));
   }, []);
 
-  const navItems = NAV_ITEMS.map((item) => ({
-    ...item,
-    label: t(item.labelKey, { defaultValue: item.fallbackLabel || item.labelKey }),
-  }));
+  const navItems = NAV_ITEMS;
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -155,7 +149,6 @@ export default function AgentLayout({ children }) {
           Earth<span style={{ color: '#5ce1ff' }}>Global</span> Agent
         </Logo>
         <UserInfo>
-          <LanguageSwitcher />
           {user && (
             <UserBadge>
               <span>{user.name}</span>
@@ -163,16 +156,16 @@ export default function AgentLayout({ children }) {
             </UserBadge>
           )}
           <LogoutBtn onClick={handleLogout}>
-            <LogOut size={16} /> {t('nav.logout', { defaultValue: 'Logout' })}
+            <LogOut size={16} /> Logout
           </LogoutBtn>
         </UserInfo>
       </TopBar>
 
       <Container>
         <Tabs>
-          {navItems.map(({ to, label, icon: Icon }) => (
+          {navItems.map(({ to, fallbackLabel, icon: Icon }) => (
             <Tab key={to} $active={location.pathname === to} onClick={() => navigate(to)}>
-              <Icon size={16} /> {label}
+              <Icon size={16} /> {fallbackLabel}
             </Tab>
           ))}
         </Tabs>

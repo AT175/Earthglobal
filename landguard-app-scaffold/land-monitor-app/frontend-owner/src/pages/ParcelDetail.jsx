@@ -1,7 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import styled from 'styled-components';
-import { useTranslation } from 'react-i18next';
 import {
   AlertTriangle, CheckCircle2, Ruler, ArrowLeftRight, Camera, Video, Radio,
   ChevronRight, Film, ClipboardList, FileText, Building2, Maximize, TrendingUp,
@@ -14,6 +13,7 @@ import OwnerLayout from '../components/OwnerLayout';
 import SalesManagerLayout from '../components/SalesManagerLayout';
 import AgentLayout from '../components/AgentLayout';
 import { verifyBoundary, createBoundaryTracker } from '../utils/gpsUtils';
+import { STATUS_LABELS, VISIT_TYPE_LABELS } from '../lib/labels';
 
 const Header = styled.div`
   display: flex;
@@ -330,8 +330,6 @@ const RiskBadge = styled.span`
 `;
 
 export default function ParcelDetail() {
-  const { t } = useTranslation();
-  const { t: tCommon } = useTranslation('common');
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -524,7 +522,7 @@ ${data.visitMedia.length > 0 ? '<table><tr><th>Type</th><th>Visit</th><th>Agent<
   if (!parcel) {
     return (
       <LoadingLayout>
-        <Card>{t('parcelDetail.notFound')}</Card>
+        <Card>Parcel not found.</Card>
       </LoadingLayout>
     );
   }
@@ -595,7 +593,7 @@ ${data.visitMedia.length > 0 ? '<table><tr><th>Type</th><th>Visit</th><th>Agent<
         {routePrefix !== '/agent' && (
           <div style={{ display: 'flex', gap: 8 }}>
             <Button onClick={() => navigate(`${routePrefix}/parcels/${id}/request-visit`)}>
-              {t('parcelDetail.requestVisit')}
+              Request a visit
             </Button>
             <Button variant="secondary" onClick={() => navigate(`${routePrefix}/sell`)}>
               List for Sale
@@ -614,7 +612,7 @@ ${data.visitMedia.length > 0 ? '<table><tr><th>Type</th><th>Visit</th><th>Agent<
         </span>
         <span>
           <ArrowLeftRight size={16} aria-hidden="true" />
-          {t('parcelDetail.perimeter', { value: Number(parcel.perimeter_m)?.toFixed(0) })}
+          {`${Number(parcel.perimeter_m)?.toFixed(0)}m perimeter`}
         </span>
       </StatsRow>
 
@@ -1249,9 +1247,9 @@ ${data.visitMedia.length > 0 ? '<table><tr><th>Type</th><th>Visit</th><th>Agent<
         )}
       </Card>
 
-      <SectionTitle>{t('parcelDetail.alerts')}</SectionTitle>
+      <SectionTitle>Alerts</SectionTitle>
       {alerts.length === 0 ? (
-        <Card>{t('parcelDetail.noAlerts')}</Card>
+        <Card>No change alerts detected.</Card>
       ) : (
         <AlertList>
           {alerts.map((alert) => (
@@ -1265,12 +1263,12 @@ ${data.visitMedia.length > 0 ? '<table><tr><th>Type</th><th>Visit</th><th>Agent<
                 <div>
                   <strong>{alert.alert_type}</strong>
                   <div style={{ fontSize: '0.85em', opacity: 0.7 }}>
-                    {t('parcelDetail.detected', { date: new Date(alert.detected_at).toLocaleDateString() })}
+                    {`Detected ${new Date(alert.detected_at).toLocaleDateString()}`}
                   </div>
                 </div>
               </AlertMeta>
               <Badge tone={alert.verified ? 'success' : 'warning'}>
-                {alert.verified ? tCommon('status.verified') : tCommon('status.unverified')}
+                {alert.verified ? 'Verified' : 'Unverified'}
               </Badge>
             </AlertRow>
           ))}
@@ -1354,7 +1352,7 @@ ${data.visitMedia.length > 0 ? '<table><tr><th>Type</th><th>Visit</th><th>Agent<
                 <AlertMeta>
                   <VIcon size={20} color="#3ba7ff" aria-hidden="true" />
                   <div>
-                    <strong>{tCommon(`visitType.${v.type}`)}</strong>
+                    <strong>{VISIT_TYPE_LABELS[v.type]}</strong>
                     <div style={{ fontSize: '0.85em', opacity: 0.7, display: 'flex', alignItems: 'center', gap: 8 }}>
                       {new Date(v.requested_at).toLocaleDateString()}
                       {v.agent_name && <span>• {v.agent_name}</span>}
@@ -1363,7 +1361,7 @@ ${data.visitMedia.length > 0 ? '<table><tr><th>Type</th><th>Visit</th><th>Agent<
                   </div>
                 </AlertMeta>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Badge tone={tone}>{tCommon(`status.${v.status}`)}</Badge>
+                  <Badge tone={tone}>{STATUS_LABELS[v.status]}</Badge>
                   <ChevronRight size={16} style={{ opacity: 0.4 }} />
                 </div>
               </AlertRow>
