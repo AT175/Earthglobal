@@ -1,10 +1,21 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { Buffer } from 'buffer';
 
 export default defineConfig({
   resolve: {
     dedupe: ['styled-components', 'react', 'react-dom', 'react-router-dom'],
+    alias: {
+      buffer: 'buffer',
+    },
+  },
+  define: {
+    'process.env': {},
+    global: 'globalThis',
+  },
+  optimizeDeps: {
+    include: ['buffer'],
   },
   plugins: [
     react(),

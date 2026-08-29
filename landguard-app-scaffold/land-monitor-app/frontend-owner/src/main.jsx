@@ -1,6 +1,11 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { Buffer } from 'buffer';
 import App from './App';
+
+// Polyfill Buffer for libraries that expect a Node.js environment (e.g. shpjs)
+window.Buffer = Buffer;
+globalThis.Buffer = Buffer;
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 
