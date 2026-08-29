@@ -50,12 +50,6 @@ const TopBar = styled.header`
 
 const MenuToggleBtn = styled.button`
   display: none;
-  align-items: center; justify-content: center;
-  width: 36px; height: 36px; flex-shrink: 0;
-  background: none; border: 1px solid ${({ theme }) => theme.colors.borderDark};
-  color: ${({ theme }) => theme.colors.text}; border-radius: ${({ theme }) => theme.radii.md};
-  cursor: pointer;
-  @media (max-width: 768px) { display: flex; }
 `;
 
 const Logo = styled.div`
@@ -106,49 +100,117 @@ const LogoutBtn = styled.button`
   }
 `;
 
-const Content = styled.div`display: flex; flex: 1; overflow: hidden; position: relative;`;
+const Content = styled.div`display: flex; flex-direction: column; flex: 1; overflow: hidden; position: relative;`;
 
-const Sidebar = styled.aside`
-  width: 340px; background: ${({ theme }) => theme.colors.surface};
-  border-right: 1px solid ${({ theme }) => theme.colors.borderDark};
-  overflow-y: auto; display: flex; flex-direction: column;
-  @media (max-width: 1024px) { width: 280px; }
-
-  /* On small screens, the sidebar becomes a slide-in drawer (toggled via
-     the hamburger button in the TopBar) instead of disappearing entirely —
-     otherwise nav, layers, stats and tools would be unreachable. */
-  @media (max-width: 768px) {
-    position: fixed; top: 0; bottom: 0; left: 0; z-index: 1900;
-    width: 85vw; max-width: 320px; height: 100%;
-    box-shadow: 8px 0 32px rgba(0,0,0,0.5);
-    transform: translateX(${({ $open }) => ($open ? '0' : '-100%')});
-    transition: transform 0.25s ease;
-  }
-`;
-
-const SidebarBackdrop = styled.div`
-  display: none;
-  @media (max-width: 768px) {
-    display: ${({ $show }) => ($show ? 'block' : 'none')};
-    position: fixed; inset: 0; z-index: 1800;
-    background: rgba(0,0,0,0.55);
-  }
-`;
-
-const SidebarCloseBtn = styled.button`
-  display: none;
-  @media (max-width: 768px) {
-    display: flex; align-items: center; justify-content: center;
-    width: 32px; height: 32px; margin-left: auto;
-    background: none; border: 1px solid ${({ theme }) => theme.colors.borderDark};
-    color: ${({ theme }) => theme.colors.text}; border-radius: ${({ theme }) => theme.radii.md};
-    cursor: pointer;
-  }
-`;
-
-const SidebarSection = styled.div`
-  padding: ${({ theme }) => theme.spacing[4]};
+// ── Top control bar (replaces the left sidebar) ──
+const TopControlBar = styled.div`
+  background: ${({ theme }) => theme.colors.surface};
   border-bottom: 1px solid ${({ theme }) => theme.colors.borderDark};
+  display: flex; flex-direction: column;
+  max-height: 45vh; overflow-y: auto;
+  flex-shrink: 0;
+`;
+
+const TopBarRow = styled.div`
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid ${({ theme }) => theme.colors.borderDark};
+  flex-wrap: wrap;
+  &:last-child { border-bottom: none; }
+`;
+
+const TopBarGroup = styled.div`
+  display: flex; align-items: center; gap: 8px;
+  flex-shrink: 0;
+`;
+
+const TopBarDivider = styled.div`
+  width: 1px; height: 24px; background: ${({ theme }) => theme.colors.borderDark};
+  flex-shrink: 0;
+`;
+
+const TopBarSectionLabel = styled.span`
+  font-size: 0.7rem; font-weight: 600; color: ${({ theme }) => theme.colors.textMuted};
+  text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap;
+`;
+
+const InlineLayerToggle = styled.label`
+  display: flex; align-items: center; gap: 4px;
+  padding: 4px 8px; cursor: pointer;
+  font-size: 0.78rem; color: ${({ theme }) => theme.colors.text};
+  background: rgba(8,15,36,0.4); border-radius: 6px;
+  white-space: nowrap; transition: background 0.2s;
+  &:hover { background: rgba(92,225,255,0.1); }
+`;
+
+const InlineStat = styled.div`
+  display: flex; align-items: center; gap: 4px;
+  font-size: 0.75rem; color: ${({ theme }) => theme.colors.textMuted};
+  white-space: nowrap;
+  strong { color: ${({ $color }) => $color || 'inherit'}; font-weight: 700; }
+`;
+
+const CompactSelect = styled.select`
+  padding: 4px 8px; background: rgba(8,15,36,0.6);
+  border: 1px solid rgba(92,225,255,0.15); border-radius: 6px;
+  color: ${({ theme }) => theme.colors.text}; font-size: 0.78rem; outline: none;
+  max-width: 200px;
+`;
+
+const CompactInput = styled.input`
+  padding: 4px 8px; background: rgba(8,15,36,0.6);
+  border: 1px solid rgba(92,225,255,0.15); border-radius: 6px;
+  color: ${({ theme }) => theme.colors.text}; font-size: 0.78rem; outline: none;
+  width: 160px;
+`;
+
+const BuildingListHorizontal = styled.div`
+  display: flex; gap: 8px; overflow-x: auto; padding: 8px 16px;
+  scrollbar-width: thin;
+  &::-webkit-scrollbar { height: 4px; }
+  &::-webkit-scrollbar-thumb { background: rgba(92,225,255,0.3); border-radius: 4px; }
+`;
+
+const BuildingCard = styled.div`
+  flex-shrink: 0; width: 200px; padding: 10px;
+  background: ${({ theme }) => theme.colors.surfaceLight};
+  border: 1px solid ${({ theme }) => theme.colors.borderDark};
+  border-left: 3px solid ${({ $accent }) => $accent || '#fbbf24'};
+  border-radius: ${({ theme }) => theme.radii.md};
+  cursor: pointer; transition: all 0.2s;
+  &:hover { background: rgba(92,225,255,0.08); }
+  ${({ $selected }) => $selected && `border-color: #1677ff; background: rgba(22,119,255,0.1);`}
+`;
+
+// ── Bottom bar (replaces floating map overlays) ──
+const BottomBar = styled.div`
+  background: rgba(13,23,51,0.95); backdrop-filter: blur(12px);
+  border-top: 1px solid rgba(92,225,255,0.2);
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px; flex-shrink: 0;
+  overflow-x: auto; scrollbar-width: thin;
+  &::-webkit-scrollbar { height: 4px; }
+  &::-webkit-scrollbar-thumb { background: rgba(92,225,255,0.3); border-radius: 4px; }
+  z-index: 1000;
+`;
+
+const BottomBarGroup = styled.div`
+  display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+`;
+
+const BottomBarDivider = styled.div`
+  width: 1px; height: 28px; background: rgba(92,225,255,0.15);
+  flex-shrink: 0;
+`;
+
+const BaseLayerRadio = styled.label`
+  display: flex; align-items: center; gap: 4px;
+  padding: 4px 10px; cursor: pointer;
+  font-size: 0.78rem; color: ${({ theme }) => theme.colors.text};
+  background: rgba(8,15,36,0.5); border: 1px solid rgba(92,225,255,0.1);
+  border-radius: 6px; white-space: nowrap; transition: all 0.2s;
+  &:hover { border-color: rgba(92,225,255,0.3); }
+  input { accent-color: ${({ theme }) => theme.colors.primary}; width: 14px; height: 14px; }
 `;
 
 const SectionTitle = styled.h3`
@@ -235,53 +297,15 @@ const MapWrapper = styled.div`
   .leaflet-draw-toolbar a { background: rgba(13,23,51,0.9) !important; border-color: rgba(92,225,255,0.2) !important; }
 `;
 
-const MapOverlay = styled.div`
-  position: absolute; top: 16px; left: 16px; right: 16px; z-index: 1000;
-  display: flex; flex-direction: column; gap: 8px;
-
-  /* On small screens a vertical stack of ~8 buttons overflows the map
-     viewport and most become unreachable — turn it into a horizontally
-     scrollable row instead so every action stays reachable. */
-  @media (max-width: 768px) {
-    flex-direction: row; overflow-x: auto; right: 16px;
-    padding-bottom: 4px; -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
-    &::-webkit-scrollbar { height: 4px; }
-    &::-webkit-scrollbar-thumb { background: rgba(92,225,255,0.3); border-radius: 4px; }
-  }
-`;
-
 const MapButton = styled.button`
-  display: flex; align-items: center; gap: 8px;
-  padding: 10px 16px; background: rgba(13,23,51,0.9); backdrop-filter: blur(12px);
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px; background: rgba(13,23,51,0.8);
   border: 1px solid rgba(92,225,255,0.2); border-radius: ${({ theme }) => theme.radii.md};
-  color: ${({ theme }) => theme.colors.text}; font-size: ${({ theme }) => theme.fontSizes.sm};
+  color: ${({ theme }) => theme.colors.text}; font-size: 0.78rem;
   font-weight: 600; cursor: pointer; transition: all 0.2s;
+  white-space: nowrap;
   &:hover { border-color: ${({ theme }) => theme.colors.primary}; background: rgba(22,119,255,0.15); }
   &:disabled { opacity: 0.5; cursor: not-allowed; }
-  @media (max-width: 768px) {
-    flex-shrink: 0; white-space: nowrap; padding: 8px 12px; font-size: 0.78rem;
-  }
-`;
-
-const LayerControl = styled.div`
-  position: absolute; top: 16px; right: 16px; z-index: 1000;
-  background: rgba(13,23,51,0.9); backdrop-filter: blur(12px);
-  border: 1px solid rgba(92,225,255,0.2); border-radius: ${({ theme }) => theme.radii.md};
-  padding: 12px; min-width: 180px;
-
-  /* Move below the (now horizontally-scrolling) action row on mobile so
-     the two overlays don't stack on top of each other. */
-  @media (max-width: 768px) {
-    top: auto; bottom: 16px; right: 16px; left: 16px;
-    min-width: 0; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  }
-`;
-
-const LayerControlTitle = styled.div`
-  font-size: 0.8rem; font-weight: 600; color: ${({ theme }) => theme.colors.textMuted};
-  text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;
-  display: flex; align-items: center; gap: 6px;
 `;
 
 const DetectionPanel = styled.div`
@@ -289,8 +313,6 @@ const DetectionPanel = styled.div`
   background: rgba(13,23,51,0.95); backdrop-filter: blur(12px);
   border: 1px solid rgba(92,225,255,0.2); border-radius: ${({ theme }) => theme.radii.lg};
   padding: 16px; display: ${({ $show }) => ($show ? 'block' : 'none')};
-  /* LayerControl relocates to the bottom bar on mobile — sit above it */
-  @media (max-width: 768px) { bottom: 76px; }
 `;
 
 const DetectionTitle = styled.div`
@@ -309,8 +331,7 @@ const FloatingPanel = styled.div`
   border: 1px solid rgba(92,225,255,0.3); border-radius: ${({ theme }) => theme.radii.lg};
   padding: 20px; width: 380px; max-width: calc(100vw - 32px); max-height: 70vh; overflow-y: auto;
   display: ${({ $show }) => ($show ? 'block' : 'none')};
-  /* LayerControl relocates to the bottom bar on mobile — sit above it */
-  @media (max-width: 768px) { left: 16px; bottom: 76px; }
+  @media (max-width: 768px) { left: 16px; width: auto; }
 `;
 
 const PanelTitle = styled.h3`
@@ -636,9 +657,6 @@ export default function PlanningDashboard() {
 
   // Building list search
   const [search, setSearch] = useState('');
-
-  // Mobile sidebar drawer (sidebar is hidden by default on small screens)
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     const userStr = localStorage.getItem('user');
@@ -1295,9 +1313,6 @@ export default function PlanningDashboard() {
   return (
     <Page>
       <TopBar>
-        <MenuToggleBtn onClick={() => setMobileSidebarOpen(true)} aria-label="Open menu">
-          <Menu size={20} />
-        </MenuToggleBtn>
         <Logo>
           <LogoIcon><Landmark size={22} /></LogoIcon>
           EarthGlobal <span style={{ color: '#5ce1ff' }}>Planning</span>
@@ -1326,60 +1341,48 @@ export default function PlanningDashboard() {
       </TopBar>
 
       <Content>
-        {/* ── Mobile sidebar backdrop ── */}
-        <SidebarBackdrop $show={mobileSidebarOpen} onClick={() => setMobileSidebarOpen(false)} />
-
-        {/* ── Sidebar ── */}
-        <Sidebar $open={mobileSidebarOpen}>
-          <SidebarSection>
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <SectionTitle style={{ marginBottom: 0 }}><Layers size={14} /> Planning</SectionTitle>
-              <SidebarCloseBtn onClick={() => setMobileSidebarOpen(false)} aria-label="Close menu">
-                <X size={16} />
-              </SidebarCloseBtn>
-            </div>
-            <NavList style={{ marginTop: 12, gap: 2 }}>
-              <NavItem as={Link} to="/assembly/planning" $active onClick={() => setMobileSidebarOpen(false)}>
-                <MapIcon size={16} aria-hidden="true" /> Planning Map
+        {/* ── Top Control Bar (replaces left sidebar) ── */}
+        <TopControlBar>
+          {/* Row 1: Nav + Org info + FAO District + Search + Tools */}
+          <TopBarRow>
+            <TopBarGroup>
+              <NavItem as={Link} to="/assembly/planning" $active>
+                <MapIcon size={14} aria-hidden="true" /> Planning Map
               </NavItem>
-              <NavItem as={Link} to="/assembly/planning/schemes" onClick={() => setMobileSidebarOpen(false)}>
-                <FileText size={16} aria-hidden="true" /> Scheme Management
+              <NavItem as={Link} to="/assembly/planning/schemes">
+                <FileText size={14} aria-hidden="true" /> Schemes
               </NavItem>
-            </NavList>
-          </SidebarSection>
+            </TopBarGroup>
 
-          {orgInfo && (
-            <SidebarSection>
-              <SectionTitle><MapPin size={14} /> {orgInfo.name}</SectionTitle>
-              <div style={{ fontSize: '0.8rem', color: '#aab7d4' }}>
-                {orgInfo.region} — {(orgInfo.type || '').replace(/_/g, ' ')}
-              </div>
-            </SidebarSection>
-          )}
-
-          {/* ── FAO District Selector ── */}
-          <SidebarSection>
-            <SectionTitle><Globe size={14} /> FAO District Boundary</SectionTitle>
-            <div style={{ fontSize: '0.75rem', color: '#aab7d4', marginBottom: 8 }}>
-              Select a Ghana district/region to load its boundary on the map and use it for detection.
-            </div>
-            {faoDistricts.length === 0 && !loadingDistricts && (
-              <ActionBtn onClick={loadFAODistricts} style={{ width: '100%', justifyContent: 'center' }}>
-                <Globe size={12} /> Load District List
-              </ActionBtn>
-            )}
-            {loadingDistricts && (
-              <div style={{ fontSize: '0.8rem', color: '#aab7d4', padding: '8px 0' }}>
-                <Loader size={12} className="animate-spin" style={{ marginRight: 6 }} /> Loading districts…
-              </div>
-            )}
-            {faoDistricts.length > 0 && (
+            {orgInfo && (
               <>
-                <Select
+                <TopBarDivider />
+                <TopBarGroup style={{ fontSize: '0.78rem', color: '#aab7d4' }}>
+                  <MapPin size={12} /> {orgInfo.name} — {orgInfo.region}
+                </TopBarGroup>
+              </>
+            )}
+
+            <TopBarDivider />
+
+            {/* FAO District Selector */}
+            <TopBarGroup>
+              <TopBarSectionLabel>District:</TopBarSectionLabel>
+              {faoDistricts.length === 0 && !loadingDistricts && (
+                <ActionBtn onClick={loadFAODistricts} style={{ fontSize: '0.72rem', padding: '4px 8px' }}>
+                  <Globe size={10} /> Load
+                </ActionBtn>
+              )}
+              {loadingDistricts && (
+                <span style={{ fontSize: '0.75rem', color: '#aab7d4' }}>
+                  <Loader size={10} className="animate-spin" style={{ marginRight: 4 }} /> Loading…
+                </span>
+              )}
+              {faoDistricts.length > 0 && (
+                <CompactSelect
                   value={selectedDistrict}
                   onChange={(e) => onSelectDistrict(e.target.value)}
                   disabled={loadingDistrictBoundary}
-                  style={{ width: '100%' }}
                 >
                   <option value="">— Select district/region —</option>
                   {faoRegions.length > 0 && (
@@ -1389,191 +1392,138 @@ export default function PlanningDashboard() {
                       ))}
                     </optgroup>
                   )}
-                  <optgroup label={`Districts (Level 2) — ${faoDistricts.length}`}>
+                  <optgroup label={`Districts (${faoDistricts.length})`}>
                     {faoDistricts.map(d => (
                       <option key={d.name} value={d.name}>{d.name}</option>
                     ))}
                   </optgroup>
-                </Select>
-                {loadingDistrictBoundary && (
-                  <div style={{ fontSize: '0.75rem', color: '#5ce1ff', marginTop: 6 }}>
-                    <Loader size={10} className="animate-spin" style={{ marginRight: 4 }} /> Loading boundary…
-                  </div>
-                )}
-                {selectedDistrictBoundary && (
-                  <div style={{ fontSize: '0.75rem', color: '#4ade80', marginTop: 6, padding: '6px 8px', background: 'rgba(34,197,94,0.1)', borderRadius: 6 }}>
-                    ✓ {selectedDistrictBoundary.level === 'region' ? 'Region' : 'District'}: {selectedDistrictBoundary.name}
-                    <div style={{ color: '#aab7d4', marginTop: 2 }}>
-                      Detection will use this boundary
-                    </div>
-                  </div>
-                )}
-                <ActionBtn onClick={loadFAODistricts} style={{ marginTop: 6, fontSize: '0.7rem' }}>
-                  <RefreshCw size={10} /> Refresh list
-                </ActionBtn>
+                </CompactSelect>
+              )}
+              {loadingDistrictBoundary && (
+                <Loader size={12} className="animate-spin" style={{ color: '#5ce1ff' }} />
+              )}
+              {selectedDistrictBoundary && (
+                <span style={{ fontSize: '0.72rem', color: '#4ade80', whiteSpace: 'nowrap' }}>
+                  ✓ {selectedDistrictBoundary.name}
+                </span>
+              )}
+            </TopBarGroup>
+
+            <TopBarDivider />
+
+            {/* Search */}
+            <TopBarGroup>
+              <Search size={12} color="#aab7d4" />
+              <CompactInput placeholder="Search buildings..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            </TopBarGroup>
+
+            <TopBarDivider />
+
+            {/* Geospatial Tools */}
+            <TopBarGroup>
+              <ActionBtn onClick={exportKML} style={{ fontSize: '0.72rem', padding: '4px 8px' }}>
+                <Download size={10} /> KML
+              </ActionBtn>
+              <ActionBtn onClick={startParcelCreate} style={{ fontSize: '0.72rem', padding: '4px 8px' }}>
+                <Plus size={10} /> New Parcel
+              </ActionBtn>
+              <ActionBtn onClick={() => { setActivePanel('transfer'); setTransferForm({ parcel_id: '', new_owner_id: '', transfer_reason: '', transfer_document_ref: '' }); }} style={{ fontSize: '0.72rem', padding: '4px 8px' }}>
+                <UserPlus size={10} /> Transfer
+              </ActionBtn>
+            </TopBarGroup>
+          </TopBarRow>
+
+          {/* Row 2: Map Layers + Stats (inline, horizontal) */}
+          <TopBarRow>
+            <TopBarSectionLabel>Layers:</TopBarSectionLabel>
+            <InlineLayerToggle>
+              <Checkbox type="checkbox" checked={showParcels} onChange={(e) => setShowParcels(e.target.checked)} />
+              <MapPin size={12} color="#3ba7ff" /> Parcels ({parcelsFC?.features?.length || 0})
+            </InlineLayerToggle>
+            <InlineLayerToggle>
+              <Checkbox type="checkbox" checked={showBuildings} onChange={(e) => setShowBuildings(e.target.checked)} />
+              <Building2 size={12} color="#fbbf24" /> Buildings ({buildingsFC?.features?.length || 0})
+            </InlineLayerToggle>
+            <InlineLayerToggle>
+              <Checkbox type="checkbox" checked={showProtected} onChange={(e) => setShowProtected(e.target.checked)} />
+              <Trees size={12} color="#22c55e" /> Protected ({protectedFC?.features?.length || 0})
+            </InlineLayerToggle>
+            <InlineLayerToggle>
+              <Checkbox type="checkbox" checked={showDistrict} onChange={(e) => setShowDistrict(e.target.checked)} />
+              <MapPin size={12} color="#5ce1ff" /> District
+            </InlineLayerToggle>
+            <InlineLayerToggle>
+              <Checkbox type="checkbox" checked={showHazards} onChange={(e) => setShowHazards(e.target.checked)} />
+              <AlertTriangle size={12} color="#ef4444" /> Hazards ({hazardsFC?.features?.length || 0})
+            </InlineLayerToggle>
+            <InlineLayerToggle>
+              <Checkbox type="checkbox" checked={showGoogleBuildings} onChange={(e) => toggleGoogleBuildings(e.target.checked)} disabled={loadingRefBuildings} />
+              <Building2 size={12} color="#22d3ee" /> Google ({googleBuildingsFC?.features?.length || 0})
+              {loadingRefBuildings && <Loader size={8} className="animate-spin" />}
+            </InlineLayerToggle>
+            <InlineLayerToggle>
+              <Checkbox type="checkbox" checked={showOSMBuildings} onChange={(e) => toggleOSMBuildings(e.target.checked)} disabled={loadingRefBuildings} />
+              <Building2 size={12} color="#a3e635" /> OSM ({osmBuildingsFC?.features?.length || 0})
+            </InlineLayerToggle>
+
+            <TopBarDivider />
+
+            {/* Building stats inline */}
+            <TopBarSectionLabel>Buildings:</TopBarSectionLabel>
+            <InlineStat $color="#fbbf24"><strong>{buildingList.filter(b => b.properties.status === 'unverified').length}</strong> unverified</InlineStat>
+            <InlineStat $color="#4ade80"><strong>{buildingList.filter(b => b.properties.status === 'verified_permitted').length}</strong> permitted</InlineStat>
+            <InlineStat $color="#f87171"><strong>{buildingList.filter(b => b.properties.status === 'verified_unpermitted').length}</strong> unpermitted</InlineStat>
+            <InlineStat $color="#c084fc"><strong>{buildingList.filter(b => b.properties.status === 'under_investigation').length}</strong> investigating</InlineStat>
+
+            {/* Hazard stats inline */}
+            {hazardStats && (
+              <>
+                <TopBarDivider />
+                <TopBarSectionLabel>Hazards:</TopBarSectionLabel>
+                <InlineStat $color="#ef4444"><strong>{hazardStats.total_active || 0}</strong> active</InlineStat>
+                <InlineStat $color="#f97316"><strong>{hazardStats.by_severity?.find(s => s.severity === 'high')?.count || 0}</strong> high</InlineStat>
+                <InlineStat $color="#16a34a"><strong>{hazardStats.total_verified || 0}</strong> verified</InlineStat>
               </>
             )}
-          </SidebarSection>
+          </TopBarRow>
 
-          <SidebarSection>
-            <SectionTitle><Layers size={14} /> Map Layers</SectionTitle>
-            <LayerToggle>
-              <Checkbox type="checkbox" checked={showParcels} onChange={(e) => setShowParcels(e.target.checked)} />
-              <MapPin size={14} color="#3ba7ff" /> Parcels ({parcelsFC?.features?.length || 0})
-            </LayerToggle>
-            <LayerToggle>
-              <Checkbox type="checkbox" checked={showBuildings} onChange={(e) => setShowBuildings(e.target.checked)} />
-              <Building2 size={14} color="#fbbf24" /> Buildings ({buildingsFC?.features?.length || 0})
-            </LayerToggle>
-            <LayerToggle>
-              <Checkbox type="checkbox" checked={showProtected} onChange={(e) => setShowProtected(e.target.checked)} />
-              <Trees size={14} color="#22c55e" /> Protected Areas ({protectedFC?.features?.length || 0})
-            </LayerToggle>
-            <LayerToggle>
-              <Checkbox type="checkbox" checked={showDistrict} onChange={(e) => setShowDistrict(e.target.checked)} />
-              <MapPin size={14} color="#5ce1ff" /> District Boundary
-            </LayerToggle>
-            <LayerToggle>
-              <Checkbox type="checkbox" checked={showHazards} onChange={(e) => setShowHazards(e.target.checked)} />
-              <AlertTriangle size={14} color="#ef4444" /> Env. Hazards ({hazardsFC?.features?.length || 0})
-            </LayerToggle>
-            <LayerToggle>
-              <Checkbox type="checkbox" checked={showGoogleBuildings} onChange={(e) => toggleGoogleBuildings(e.target.checked)} disabled={loadingRefBuildings} />
-              <Building2 size={14} color="#22d3ee" /> Google Buildings ({googleBuildingsFC?.features?.length || 0})
-              {loadingRefBuildings && <Loader size={10} className="animate-spin" style={{ marginLeft: 4 }} />}
-            </LayerToggle>
-            <LayerToggle>
-              <Checkbox type="checkbox" checked={showOSMBuildings} onChange={(e) => toggleOSMBuildings(e.target.checked)} disabled={loadingRefBuildings} />
-              <Building2 size={14} color="#a3e635" /> OSM Buildings ({osmBuildingsFC?.features?.length || 0})
-            </LayerToggle>
-          </SidebarSection>
-
-          {/* ── Environmental Hazard Stats ── */}
-          {hazardStats && (
-            <SidebarSection>
-              <SectionTitle><AlertTriangle size={14} color="#ef4444" /> Hazard Summary</SectionTitle>
-              <StatsGrid>
-                <StatCard>
-                  <StatValue $color="#ef4444">{hazardStats.total_active || 0}</StatValue>
-                  <StatLabel>Active</StatLabel>
-                </StatCard>
-                <StatCard>
-                  <StatValue $color="#f97316">{hazardStats.by_severity?.find(s => s.severity === 'high')?.count || 0}</StatValue>
-                  <StatLabel>High Risk</StatLabel>
-                </StatCard>
-                <StatCard>
-                  <StatValue $color="#fbbf24">{hazardStats.by_severity?.find(s => s.severity === 'moderate')?.count || 0}</StatValue>
-                  <StatLabel>Moderate</StatLabel>
-                </StatCard>
-                <StatCard>
-                  <StatValue $color="#16a34a">{hazardStats.total_verified || 0}</StatValue>
-                  <StatLabel>Verified</StatLabel>
-                </StatCard>
-              </StatsGrid>
-              {hazardStats.by_type?.map(t => (
-                <div key={t.hazard_type} style={{ fontSize: '0.75rem', color: '#aab7d4', marginTop: 4, display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ textTransform: 'capitalize' }}>{t.hazard_type.replace(/_/g, ' ')}</span>
-                  <span>{t.count} ({Math.round((t.total_area || 0) / 10000).toLocaleString()} ha)</span>
-                </div>
-              ))}
-            </SidebarSection>
-          )}
-
-          <SidebarSection>
-            <SectionTitle><Building2 size={14} /> Building Stats</SectionTitle>
-            <StatsGrid>
-              <StatCard>
-                <StatValue $color="#fbbf24">{buildingList.filter(b => b.properties.status === 'unverified').length}</StatValue>
-                <StatLabel>Unverified</StatLabel>
-              </StatCard>
-              <StatCard>
-                <StatValue $color="#4ade80">{buildingList.filter(b => b.properties.status === 'verified_permitted').length}</StatValue>
-                <StatLabel>Permitted</StatLabel>
-              </StatCard>
-              <StatCard>
-                <StatValue $color="#f87171">{buildingList.filter(b => b.properties.status === 'verified_unpermitted').length}</StatValue>
-                <StatLabel>Unpermitted</StatLabel>
-              </StatCard>
-              <StatCard>
-                <StatValue $color="#c084fc">{buildingList.filter(b => b.properties.status === 'under_investigation').length}</StatValue>
-                <StatLabel>Investigating</StatLabel>
-              </StatCard>
-            </StatsGrid>
-            {/* Height + comparison summary */}
-            {buildingList.some(b => b.properties.estimated_height_m != null) && (
-              <div style={{ fontSize: '0.7rem', color: '#5ce1ff', marginTop: 8, padding: '6px 8px', background: 'rgba(92,225,255,0.08)', borderRadius: 6 }}>
-                {buildingList.filter(b => b.properties.estimated_height_m != null).length} buildings with height data |
-                Tallest: {Math.max(...buildingList.filter(b => b.properties.estimated_height_m != null).map(b => b.properties.estimated_height_m))}m |
-                Avg floors: {(buildingList.filter(b => b.properties.estimated_floors != null).reduce((s, b) => s + b.properties.estimated_floors, 0) / Math.max(1, buildingList.filter(b => b.properties.estimated_floors != null).length)).toFixed(1)}
-              </div>
-            )}
-            {buildingList.some(b => b.properties.metadata?.nearby_comparison?.size_category && b.properties.metadata.nearby_comparison.size_category !== 'typical' && b.properties.metadata.nearby_comparison.size_category !== 'unknown') && (
-              <div style={{ fontSize: '0.7rem', color: '#84cc16', marginTop: 4, padding: '6px 8px', background: 'rgba(132,204,22,0.08)', borderRadius: 6 }}>
-                {buildingList.filter(b => b.properties.metadata?.nearby_comparison?.size_category === 'unusually_large').length} unusually large |
-                {buildingList.filter(b => b.properties.metadata?.nearby_comparison?.size_category === 'unusually_small').length} unusually small
-              </div>
-            )}
-          </SidebarSection>
-
-          <SidebarSection>
-            <SectionTitle><FileText size={14} /> Geospatial Tools</SectionTitle>
-            <ActionButtons>
-              <ActionBtn onClick={exportKML}><Download size={12} /> Export KML</ActionBtn>
-              <ActionBtn onClick={startParcelCreate}><Plus size={12} /> New Parcel</ActionBtn>
-              <ActionBtn onClick={() => { setActivePanel('transfer'); setTransferForm({ parcel_id: '', new_owner_id: '', transfer_reason: '', transfer_document_ref: '' }); }}>
-                <UserPlus size={12} /> Transfer Land
-              </ActionBtn>
-            </ActionButtons>
-          </SidebarSection>
-
-          <SidebarSection style={{ borderBottom: 'none' }}>
-            <SectionTitle><Search size={14} /> Search Buildings</SectionTitle>
-            <Input placeholder="Search by status or parcel..." value={search} onChange={(e) => setSearch(e.target.value)} />
-          </SidebarSection>
-
-          <BuildingList>
-            {filteredBuildings.map((b, i) => {
-              const props = b.properties;
-              const badge = statusBadgeColors[props.status] || statusBadgeColors.unverified;
-              return (
-                <BuildingItem key={props.id || i} $selected={selectedBuilding === props.id} onClick={() => onBuildingClick(b)}>
-                  <BuildingName>
-                    <Building2 size={14} color={badge.color} /> Building #{i + 1}
-                    {props.centroid_lat && (
+          {/* Row 3: Building list (horizontal scroll) */}
+          {filteredBuildings.length > 0 && (
+            <BuildingListHorizontal>
+              {filteredBuildings.map((b, i) => {
+                const props = b.properties;
+                const badge = statusBadgeColors[props.status] || statusBadgeColors.unverified;
+                return (
+                  <BuildingCard key={props.id || i} $selected={selectedBuilding === props.id} $accent={badge.color} onClick={() => onBuildingClick(b)}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.78rem', fontWeight: 500 }}>
+                      <Building2 size={12} color={badge.color} /> #{i + 1}
                       <span style={{ marginLeft: 'auto', fontSize: '0.65rem', color: '#6b7280' }}>
-                        {props.centroid_lat.toFixed(4)}, {props.centroid_lng.toFixed(4)}
+                        {props.centroid_lat ? `${props.centroid_lat.toFixed(3)}, ${props.centroid_lng.toFixed(3)}` : ''}
                       </span>
-                    )}
-                  </BuildingName>
-                  <BuildingMeta>
-                    <span><Ruler size={11} /> {Math.round(props.area_sqm)}m²</span>
-                    {props.estimated_height_m != null && (
-                      <span style={{ color: '#5ce1ff' }}>H: {props.estimated_height_m}m{props.estimated_floors ? ` (~${props.estimated_floors}f)` : ''}</span>
-                    )}
-                    {props.parcel_name && <span>{props.parcel_name}</span>}
-                  </BuildingMeta>
-                  <div style={{ marginTop: 4, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                    <StatusBadge $bg={badge.bg} $color={badge.color}>{props.status?.replace(/_/g, ' ')}</StatusBadge>
-                    {props.in_protected_area && (
-                      <StatusBadge $bg="rgba(239,68,68,0.15)" $color="#f87171"><AlertTriangle size={9} /> Protected</StatusBadge>
-                    )}
-                    {props.metadata?.nearby_comparison && props.metadata.nearby_comparison.size_category && props.metadata.nearby_comparison.size_category !== 'typical' && props.metadata.nearby_comparison.size_category !== 'unknown' && (
-                      <StatusBadge $bg="rgba(132,204,22,0.15)" $color="#84cc16">{props.metadata.nearby_comparison.size_category.replace(/_/g, ' ')}</StatusBadge>
-                    )}
-                    {props.metadata && Object.keys(props.metadata).length > 0 && (
-                      <StatusBadge $bg="rgba(92,225,255,0.15)" $color="#5ce1ff">{Object.keys(props.metadata).length} meta</StatusBadge>
-                    )}
-                  </div>
-                </BuildingItem>
-              );
-            })}
-            {filteredBuildings.length === 0 && (
-              <div style={{ padding: 24, textAlign: 'center', color: '#aab7d4', fontSize: '0.85rem' }}>
-                No buildings found. Run detection to find new buildings.
-              </div>
-            )}
-          </BuildingList>
-        </Sidebar>
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: '#aab7d4', marginTop: 4, display: 'flex', gap: 8 }}>
+                      <span><Ruler size={9} /> {Math.round(props.area_sqm)}m²</span>
+                      {props.estimated_height_m != null && (
+                        <span style={{ color: '#5ce1ff' }}>H: {props.estimated_height_m}m</span>
+                      )}
+                    </div>
+                    <div style={{ marginTop: 4, display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                      <StatusBadge $bg={badge.bg} $color={badge.color}>{props.status?.replace(/_/g, ' ')}</StatusBadge>
+                      {props.in_protected_area && (
+                        <StatusBadge $bg="rgba(239,68,68,0.15)" $color="#f87171"><AlertTriangle size={8} /> Protected</StatusBadge>
+                      )}
+                    </div>
+                  </BuildingCard>
+                );
+              })}
+            </BuildingListHorizontal>
+          )}
+          {filteredBuildings.length === 0 && (
+            <div style={{ padding: '8px 16px', fontSize: '0.78rem', color: '#aab7d4' }}>
+              No buildings found. Run detection to find new buildings.
+            </div>
+          )}
+        </TopControlBar>
 
         {/* ── Map ── */}
         <MapArea>
@@ -1764,107 +1714,6 @@ export default function PlanningDashboard() {
               <FitBounds bounds={mapBounds} />
               <MapBoundsTracker onBoundsChange={setMapBounds} />
             </MapContainer>
-
-            {/* Map overlay buttons */}
-            <MapOverlay>
-              <MapButton onClick={() => runDetection(true)} disabled={detecting}
-                style={{ borderColor: 'rgba(34,197,94,0.4)', color: '#4ade80' }}>
-                {detecting ? <Loader size={16} className="animate-spin" /> : <Globe size={16} />}
-                {detecting ? 'Detecting...' : selectedDistrict ? `Detect (${selectedDistrict})` : 'Detect Buildings (FAO Boundary)'}
-              </MapButton>
-              <MapButton onClick={() => runDetection(false)} disabled={detecting}>
-                {detecting ? <Loader size={16} className="animate-spin" /> : <Satellite size={16} />}
-                {detecting ? 'Detecting...' : detectionBox ? 'Detect (Drawn Area)' : 'Detect (Map Viewport)'}
-              </MapButton>
-              <MapButton
-                onClick={() => drawDetectionMode ? setDrawDetectionMode(false) : setDrawDetectionMode(true)}
-                style={{ borderColor: drawDetectionMode ? 'rgba(251,191,36,0.6)' : 'rgba(251,191,36,0.3)', color: '#fbbf24' }}>
-                <Edit3 size={16} /> {drawDetectionMode ? 'Drawing… Click & drag on map' : 'Draw Detection Area'}
-              </MapButton>
-              {detectionBox && (
-                <MapButton onClick={clearDetectionBox} style={{ borderColor: 'rgba(239,68,68,0.3)', color: '#f87171' }}>
-                  <X size={16} /> Clear Detection Area
-                </MapButton>
-              )}
-              <MapButton onClick={runChangeDetection} disabled={changeDetecting}
-                style={{ borderColor: 'rgba(239,68,68,0.4)', color: '#f87171' }}>
-                {changeDetecting ? <Loader size={16} className="animate-spin" /> : <Activity size={16} />}
-                {changeDetecting ? 'Analyzing...' : 'Change Detection (ML)'}
-              </MapButton>
-              <MapButton onClick={runHazardDetection} disabled={detectingHazards}
-                style={{ borderColor: 'rgba(168,85,247,0.4)', color: '#c084fc' }}>
-                {detectingHazards ? <Loader size={16} className="animate-spin" /> : <AlertTriangle size={16} />}
-                {detectingHazards ? 'Scanning...' : 'Detect Hazards (EE)'}
-              </MapButton>
-              <MapButton onClick={() => setShowHazardPanel(!showHazardPanel)}
-                style={{ borderColor: 'rgba(168,85,247,0.3)', color: '#c084fc' }}>
-                <Search size={16} /> Hazard Query
-              </MapButton>
-              <MapButton onClick={runBuildingComparison} disabled={loadingRefBuildings}
-                style={{ borderColor: 'rgba(34,211,238,0.4)', color: '#22d3ee' }}>
-                {loadingRefBuildings ? <Loader size={16} className="animate-spin" /> : <Layers size={16} />}
-                {loadingRefBuildings ? 'Comparing...' : 'Compare Sources'}
-              </MapButton>
-              <MapButton onClick={loadAll}><RefreshCw size={16} /> Refresh Data</MapButton>
-              <MapButton onClick={exportKML}><Download size={16} /> Export KML</MapButton>
-              {drawMode && (
-                <MapButton onClick={() => setDrawMode(false)} style={{ borderColor: 'rgba(251,191,36,0.4)', color: '#fbbf24' }}>
-                  <X size={16} /> Cancel Drawing
-                </MapButton>
-              )}
-              {drawDetectionMode && (
-                <MapButton onClick={() => setDrawDetectionMode(false)} style={{ borderColor: 'rgba(251,191,36,0.4)', color: '#fbbf24' }}>
-                  <X size={16} /> Cancel Detection Drawing
-                </MapButton>
-              )}
-            </MapOverlay>
-
-            {/* Layer control */}
-            <LayerControl>
-              <LayerControlTitle><Layers size={14} /> Base Layer</LayerControlTitle>
-              <LayerToggle>
-                <input type="radio" name="baseLayer" checked={baseLayer === 'satellite'} onChange={() => setBaseLayer('satellite')} />
-                <Satellite size={14} /> Satellite (Esri)
-              </LayerToggle>
-              <LayerToggle>
-                <input type="radio" name="baseLayer" checked={baseLayer === 'recent'} onChange={() => setBaseLayer('recent')} />
-                <Clock size={14} color="#5ce1ff" /> Recent (Sentinel-2)
-              </LayerToggle>
-              <LayerToggle>
-                <input type="radio" name="baseLayer" checked={baseLayer === 'street'} onChange={() => setBaseLayer('street')} />
-                <MapPin size={14} /> Dark Map
-              </LayerToggle>
-              {detectionResult && (
-                <LayerToggle>
-                  <input type="radio" name="baseLayer" checked={baseLayer === 'detection'} onChange={() => setBaseLayer('detection')} />
-                  <Building2 size={14} /> Detection Overlay
-                </LayerToggle>
-              )}
-              {changeResult?.beforeTileUrl && (
-                <LayerToggle>
-                  <input type="radio" name="baseLayer" checked={baseLayer === 'before'} onChange={() => setBaseLayer('before')} />
-                  <Clock size={14} /> Before (baseline)
-                </LayerToggle>
-              )}
-              {changeResult?.afterTileUrl && (
-                <LayerToggle>
-                  <input type="radio" name="baseLayer" checked={baseLayer === 'after'} onChange={() => setBaseLayer('after')} />
-                  <Clock size={14} /> After (current)
-                </LayerToggle>
-              )}
-              {changeResult?.changeTileUrl && (
-                <LayerToggle>
-                  <input type="radio" name="baseLayer" checked={baseLayer === 'change'} onChange={() => setBaseLayer('change')} />
-                  <Activity size={14} color="#f87171" /> Changes (red)
-                </LayerToggle>
-              )}
-              {hazardResult?.tileUrl && (
-                <LayerToggle>
-                  <input type="radio" name="baseLayer" checked={baseLayer === 'hazard'} onChange={() => setBaseLayer('hazard')} />
-                  <AlertTriangle size={14} color="#c084fc" /> Hazard Detection
-                </LayerToggle>
-              )}
-            </LayerControl>
 
             {/* Detection results panel */}
             <DetectionPanel $show={!!detectionResult}>
@@ -2604,6 +2453,122 @@ export default function PlanningDashboard() {
             )}
           </MapWrapper>
         </MapArea>
+
+        {/* ── Bottom Bar (action buttons + base layers) ── */}
+        <BottomBar>
+          {/* Action buttons */}
+          <BottomBarGroup>
+            <MapButton onClick={() => runDetection(true)} disabled={detecting}
+              style={{ borderColor: 'rgba(34,197,94,0.4)', color: '#4ade80' }}>
+              {detecting ? <Loader size={14} className="animate-spin" /> : <Globe size={14} />}
+              {detecting ? 'Detecting...' : selectedDistrict ? `Detect (${selectedDistrict})` : 'Detect (FAO)'}
+            </MapButton>
+            <MapButton onClick={() => runDetection(false)} disabled={detecting}>
+              {detecting ? <Loader size={14} className="animate-spin" /> : <Satellite size={14} />}
+              {detecting ? 'Detecting...' : detectionBox ? 'Detect (Drawn)' : 'Detect (Viewport)'}
+            </MapButton>
+            <MapButton
+              onClick={() => drawDetectionMode ? setDrawDetectionMode(false) : setDrawDetectionMode(true)}
+              style={{ borderColor: drawDetectionMode ? 'rgba(251,191,36,0.6)' : 'rgba(251,191,36,0.3)', color: '#fbbf24' }}>
+              <Edit3 size={14} /> {drawDetectionMode ? 'Drawing…' : 'Draw Area'}
+            </MapButton>
+            {detectionBox && (
+              <MapButton onClick={clearDetectionBox} style={{ borderColor: 'rgba(239,68,68,0.3)', color: '#f87171' }}>
+                <X size={14} /> Clear Area
+              </MapButton>
+            )}
+          </BottomBarGroup>
+
+          <BottomBarDivider />
+
+          <BottomBarGroup>
+            <MapButton onClick={runChangeDetection} disabled={changeDetecting}
+              style={{ borderColor: 'rgba(239,68,68,0.4)', color: '#f87171' }}>
+              {changeDetecting ? <Loader size={14} className="animate-spin" /> : <Activity size={14} />}
+              {changeDetecting ? 'Analyzing...' : 'Change Detection'}
+            </MapButton>
+            <MapButton onClick={runHazardDetection} disabled={detectingHazards}
+              style={{ borderColor: 'rgba(168,85,247,0.4)', color: '#c084fc' }}>
+              {detectingHazards ? <Loader size={14} className="animate-spin" /> : <AlertTriangle size={14} />}
+              {detectingHazards ? 'Scanning...' : 'Detect Hazards'}
+            </MapButton>
+            <MapButton onClick={() => setShowHazardPanel(!showHazardPanel)}
+              style={{ borderColor: 'rgba(168,85,247,0.3)', color: '#c084fc' }}>
+              <Search size={14} /> Hazard Query
+            </MapButton>
+            <MapButton onClick={runBuildingComparison} disabled={loadingRefBuildings}
+              style={{ borderColor: 'rgba(34,211,238,0.4)', color: '#22d3ee' }}>
+              {loadingRefBuildings ? <Loader size={14} className="animate-spin" /> : <Layers size={14} />}
+              {loadingRefBuildings ? 'Comparing...' : 'Compare'}
+            </MapButton>
+          </BottomBarGroup>
+
+          <BottomBarDivider />
+
+          <BottomBarGroup>
+            <MapButton onClick={loadAll}><RefreshCw size={14} /> Refresh</MapButton>
+            <MapButton onClick={exportKML}><Download size={14} /> KML</MapButton>
+            {drawMode && (
+              <MapButton onClick={() => setDrawMode(false)} style={{ borderColor: 'rgba(251,191,36,0.4)', color: '#fbbf24' }}>
+                <X size={14} /> Cancel Draw
+              </MapButton>
+            )}
+            {drawDetectionMode && (
+              <MapButton onClick={() => setDrawDetectionMode(false)} style={{ borderColor: 'rgba(251,191,36,0.4)', color: '#fbbf24' }}>
+                <X size={14} /> Cancel Area
+              </MapButton>
+            )}
+          </BottomBarGroup>
+
+          <BottomBarDivider />
+
+          {/* Base layer radios */}
+          <BottomBarGroup>
+            <TopBarSectionLabel>Base:</TopBarSectionLabel>
+            <BaseLayerRadio>
+              <input type="radio" name="baseLayer" checked={baseLayer === 'satellite'} onChange={() => setBaseLayer('satellite')} />
+              <Satellite size={12} /> Satellite
+            </BaseLayerRadio>
+            <BaseLayerRadio>
+              <input type="radio" name="baseLayer" checked={baseLayer === 'recent'} onChange={() => setBaseLayer('recent')} />
+              <Clock size={12} color="#5ce1ff" /> Sentinel-2
+            </BaseLayerRadio>
+            <BaseLayerRadio>
+              <input type="radio" name="baseLayer" checked={baseLayer === 'street'} onChange={() => setBaseLayer('street')} />
+              <MapPin size={12} /> Street
+            </BaseLayerRadio>
+            {detectionResult && (
+              <BaseLayerRadio>
+                <input type="radio" name="baseLayer" checked={baseLayer === 'detection'} onChange={() => setBaseLayer('detection')} />
+                <Building2 size={12} /> Detection
+              </BaseLayerRadio>
+            )}
+            {changeResult?.beforeTileUrl && (
+              <BaseLayerRadio>
+                <input type="radio" name="baseLayer" checked={baseLayer === 'before'} onChange={() => setBaseLayer('before')} />
+                <Clock size={12} /> Before
+              </BaseLayerRadio>
+            )}
+            {changeResult?.afterTileUrl && (
+              <BaseLayerRadio>
+                <input type="radio" name="baseLayer" checked={baseLayer === 'after'} onChange={() => setBaseLayer('after')} />
+                <Clock size={12} /> After
+              </BaseLayerRadio>
+            )}
+            {changeResult?.changeTileUrl && (
+              <BaseLayerRadio>
+                <input type="radio" name="baseLayer" checked={baseLayer === 'change'} onChange={() => setBaseLayer('change')} />
+                <Activity size={12} color="#f87171" /> Changes
+              </BaseLayerRadio>
+            )}
+            {hazardResult?.tileUrl && (
+              <BaseLayerRadio>
+                <input type="radio" name="baseLayer" checked={baseLayer === 'hazard'} onChange={() => setBaseLayer('hazard')} />
+                <AlertTriangle size={12} color="#c084fc" /> Hazard
+              </BaseLayerRadio>
+            )}
+          </BottomBarGroup>
+        </BottomBar>
       </Content>
 
       {toast && (
